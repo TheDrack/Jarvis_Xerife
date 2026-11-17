@@ -90,7 +90,7 @@ Regras aplicadas pelo adaptador:
 - Mantém **uma linha por empresa** (raiz do CNPJ): o primeiro estabelecimento encontrado é preservado, o que na ordenação oficial é a matriz.
 - Cada empresa sai com uma `ProspectEvidence` apontando para o conjunto oficial, com a licença CC-BY preenchida — a atribuição é obrigatória na entrega ao cliente.
 - Conta linhas lidas, casadas e malformadas, e sinaliza `truncated` quando o limite da consulta é atingido. Falha de arquivo é erro explícito, não resultado vazio.
-- Não lê telefone/e-mail: a primeira versão do domínio não armazena contato, e essa decisão continua valendo.
+- O DuckDB preserva as colunas de telefone/e-mail do arquivo oficial, mas o domínio e as respostas MCP não devolvem os valores. A consulta pode filtrar apenas pela presença de telefone/e-mail/fax. O arquivo DuckDB deve permanecer em armazenamento privado do host; não exportar contatos nem iniciar outreach sem política de finalidade, retenção, acesso e oposição.
 
 ## Limites operacionais conhecidos
 
@@ -104,7 +104,7 @@ Regras aplicadas pelo adaptador:
 - CC-BY exige atribuição à Receita Federal em qualquer planilha entregue.
 - Não fazer scraping de diretórios ou redes sociais para contornar termos; Places não pode virar tabela própria.
 - Contato pessoal (nome, telefone, e-mail individual) continua fora do domínio: incluir exige finalidade, base legal, minimização, retenção e opt-out documentados, além de canal de oposição.
-- Dados de contato de pessoa jurídica cadastrados na Receita ainda exigem finalidade comercial declarada e respeito a pedido de não contato (`DO_NOT_CONTACT` é terminal no domínio).
+- Dados de contato de pessoa jurídica cadastrados na Receita ainda exigem finalidade comercial declarada e respeito a pedido de não contato (`DO_NOT_CONTACT` é terminal no domínio). No Prospecto, os valores não são expostos; filtros de presença não revelam o destino.
 
 ## Próximos passos sugeridos
 
@@ -126,3 +126,8 @@ DiscoveryQuery agora prevê filtros opcionais para:
 O materializador preserva os sete campos do arquivo Empresas (razão social, natureza jurídica, qualificação do responsável, capital social, porte e ente federativo, além da raiz CNPJ) e pode carregar Simples, Naturezas, Qualificações, Países e Motivos como tabelas auxiliares. Dados pessoais de sócios não são ingeridos nesta etapa; contatos cadastrais continuam sem exposição no domínio comercial.
 
 O catálogo de filtros só deve habilitar filtros auxiliares quando a respectiva tabela tiver sido carregada. A ausência de dados não pode ser interpretada como ausência de empresas elegíveis.
+
+
+## Filtros de presença sem expor contato
+
+O DuckDB permite filtrar has_phone, has_email e has_fax. O resultado de ProspectCompany não inclui os números nem o e-mail. A finalidade desse filtro é medir a completude cadastral e priorizar enriquecimento/revisão, não autorizar disparo automático. O CSV/manifesto comercial não recebe os valores brutos.
