@@ -112,7 +112,7 @@ Detalhes: [catálogo](docs/skills-connectors/CATALOG.md), [inventário](docs/ski
 
 | Documento | Conteúdo |
 |---|---|
-| [Arquitetura](docs/ARCHITECTURE.md) | Camadas, componentes, limites e fluxos. |
+| [Guia de uso](docs/GUIA_DE_USO.md) | Superfícies e runbooks de uso. |\n| [Arquitetura](docs/ARCHITECTURE.md) | Camadas, componentes, limites e fluxos. |
 | [Guia do agente](docs/AGENT_GUIDE.md) | Navegação do repositório e regras para agentes. |
 | [Catálogo de skills e conectores](docs/skills-connectors/CATALOG.md) | Bootstrap e descoberta de capacidades. |
 | [Inventário de capacidades](docs/skills-connectors/CAPABILITY_INVENTORY.md) | Evidências e limitações conhecidas. |
