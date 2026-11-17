@@ -386,3 +386,27 @@ def test_contact_presence_and_cadastral_status_filters_do_not_return_contact_val
     assert serialized["has_phone"] is True
     assert serialized["has_email"] is True
     assert serialized["has_fax"] is True
+
+
+def test_omitting_optional_auxiliary_files_clears_stale_filter_data(tmp_path):
+    base = sample_files(tmp_path / "base")
+    files = CnpjStoreFiles(
+        establishments=base.establishments,
+        companies=base.companies,
+        municipalities=base.municipalities,
+        cnaes=base.cnaes,
+        simples=write_csv(tmp_path / "Simples.csv", [["12345678", "S", "20200101", "", "S", "20200101", ""]]),
+        legal_natures=write_csv(tmp_path / "Naturezas.csv", [["2062", "Sociedade limitada"]]),
+    )
+    database = tmp_path / "refresh.duckdb"
+    builder = CnpjStoreBuilder(database, scope_ufs=("SC",))
+    builder.build(files)
+    builder.build(sample_files(tmp_path / "without_aux"))
+
+    import duckdb
+    connection = duckdb.connect(str(database), read_only=True)
+    try:
+        assert connection.execute("SELECT count(*) FROM simples").fetchone()[0] == 0
+        assert connection.execute("SELECT count(*) FROM legal_natures").fetchone()[0] == 0
+    finally:
+        connection.close()
