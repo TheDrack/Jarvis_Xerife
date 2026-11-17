@@ -285,6 +285,115 @@
       "limitations": [
         "Titularidade e autoria podem envolver pessoas físicas; aplicar minimização e validação jurídica."
       ]
+    },
+    {
+      "source_id": "comexstat_mdic",
+      "name": "Comex Stat - MDIC",
+      "kind": "trade",
+      "acquisition_mode": "official_open_data",
+      "status": "research_only",
+      "homepage": "https://www.gov.br/mdic/pt-br/assuntos/comercio-exterior/estatisticas/base-de-dados-bruta",
+      "description": "Séries mensais de exportação e importação por NCM, país, município, UF, via e classificações econômicas.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": true,
+      "durable_storage_allowed": true,
+      "geographic_coverage": [
+        "BR",
+        "SC",
+        "municipal"
+      ],
+      "data_dimensions": [
+        "exports",
+        "imports",
+        "ncm",
+        "destination_country",
+        "origin_country",
+        "municipality",
+        "fob_value",
+        "net_weight"
+      ],
+      "limitations": [
+        "Dados por município não devem ser interpretados como prova de uma empresa específica exportar ou importar.",
+        "Exige tabelas de correlação e dicionários de códigos."
+      ]
+    },
+    {
+      "source_id": "fapesc_chamadas",
+      "name": "FAPESC - Chamadas em andamento",
+      "kind": "funding",
+      "acquisition_mode": "official_open_data",
+      "status": "research_only",
+      "homepage": "https://fapesc.sc.gov.br/chamadas-em-andamento/",
+      "description": "Editais e chamadas de fomento, bolsas, inovação, pesquisa aplicada e programas de empreendedorismo em Santa Catarina.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": true,
+      "geographic_coverage": [
+        "SC"
+      ],
+      "data_dimensions": [
+        "funding_call",
+        "eligibility",
+        "deadline",
+        "funding_amount",
+        "research_area",
+        "partner_requirements"
+      ],
+      "limitations": [
+        "Tratar como oportunidade de financiamento, não como lead empresarial.",
+        "Validar elegibilidade, prazo, retificações e documentos do edital."
+      ]
+    },
+    {
+      "source_id": "finep_chamadas",
+      "name": "FINEP - Chamadas públicas",
+      "kind": "funding",
+      "acquisition_mode": "official_open_data",
+      "status": "planned",
+      "homepage": "https://www.finep.gov.br/chamadas-publicas",
+      "description": "Chamadas de subvenção, crédito e apoio à inovação para empresas e instituições.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": null,
+      "geographic_coverage": [
+        "BR"
+      ],
+      "data_dimensions": [
+        "funding_call",
+        "credit_line",
+        "grant",
+        "eligibility",
+        "deadline",
+        "technology_area"
+      ],
+      "limitations": [
+        "Validar regras e requisitos específicos de cada chamada antes de recomendar."
+      ]
+    },
+    {
+      "source_id": "ceis_cnep",
+      "name": "CEIS/CNEP - Cadastro de empresas sancionadas",
+      "kind": "compliance",
+      "acquisition_mode": "official_open_data",
+      "status": "planned",
+      "homepage": "https://portaldatransparencia.gov.br/sancoes",
+      "description": "Dados públicos de sanções e impedimentos para diligência de fornecedores e parceiros.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": null,
+      "geographic_coverage": [
+        "BR"
+      ],
+      "data_dimensions": [
+        "sanction",
+        "legal_basis",
+        "start_date",
+        "end_date",
+        "sanctioning_body"
+      ],
+      "limitations": [
+        "Uso para due diligence e prevenção de risco, nunca como ranking comercial sem contexto e validação."
+      ]
     }
   ]
 }
