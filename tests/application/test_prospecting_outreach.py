@@ -198,3 +198,56 @@ def test_phone_and_web_form_are_distinct_channels(tmp_path):
 
     assert phone.channel == Channel.PHONE
     assert form.channel == Channel.WEB_FORM
+
+
+def test_company_wide_do_not_contact_blocks_every_channel(tmp_path):
+    transport = FakeTransport()
+    outreach, _ = service(tmp_path, {Channel.EMAIL: transport})
+    plan = outreach.create_plan(
+        company_id="12345678000190",
+        channel=Channel.EMAIL,
+        destination="sales@example.com",
+        subject="Apresentação",
+        body="Mensagem",
+        campaign_id="campaign-1",
+        authorization=authorization(),
+    )
+
+    outreach.block_contact(
+        company_id="12345678000190",
+        channel=None,
+        destination=None,
+        reason="recipient_requested_stop",
+        recorded_by="operator",
+    )
+
+    with pytest.raises(PermissionError, match="do_not_contact"):
+        outreach.approve_plan(plan.plan_id, approved_by="operator")
+
+    assert transport.calls == []
+
+
+def test_form_destination_must_be_https_and_email_requires_subject(tmp_path):
+    outreach, _ = service(tmp_path)
+
+    with pytest.raises(ValueError, match="web_form_requires_https_url"):
+        outreach.create_plan(
+            company_id="12345678000190",
+            channel=Channel.WEB_FORM,
+            destination="http://example.com/contact",
+            subject=None,
+            body="Mensagem",
+            campaign_id="campaign-1",
+            authorization=authorization(),
+        )
+
+    with pytest.raises(ValueError, match="email_subject_required"):
+        outreach.create_plan(
+            company_id="12345678000190",
+            channel=Channel.EMAIL,
+            destination="sales@example.com",
+            subject=None,
+            body="Mensagem",
+            campaign_id="campaign-2",
+            authorization=authorization(),
+        )
