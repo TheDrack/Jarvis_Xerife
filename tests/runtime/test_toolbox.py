@@ -426,6 +426,8 @@ def test_registry_loads_checked_in_manifests():
         "intelligence.events.earthquakes",
         "intelligence.snapshot.collect",
         "communication.chatgpt_plan.send_prompt",
+        "prospecting.companies.search",
+        "prospecting.companies.lookup",
     }
     assert registry.get("telegram.send_message").requires_idempotency_key is True
     assert registry.get("drive.upload_backup").operation == "upload_backup_scoped"
