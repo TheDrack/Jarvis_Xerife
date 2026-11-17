@@ -128,3 +128,64 @@ async def test_search_omits_optional_nulls_before_tool_schema_validation():
     assert "municipalities" not in arguments
     assert "after_cnpj_basico" not in arguments
     assert arguments["limit"] == 50
+
+
+def test_registers_session_authorized_outreach_controls():
+    from app.application.prospecting.outreach import PlanStatus
+
+    class Gateway:
+        def __init__(self):
+            self.calls = []
+
+        def require(self, capability):
+            self.calls.append(capability)
+            return {"session_id": "paired-session"}
+
+    class Service:
+        def __init__(self):
+            self.calls = []
+
+        def create_plan(self, **kwargs):
+            self.calls.append(("plan", kwargs))
+            return SimpleNamespace(plan_id="plan-1", status=PlanStatus.PENDING_APPROVAL)
+
+        def approve_plan(self, plan_id, *, approved_by):
+            self.calls.append(("approve", plan_id, approved_by))
+            return SimpleNamespace(plan_id=plan_id, status=PlanStatus.APPROVED)
+
+        def dispatch(self, plan_id, *, idempotency_key):
+            self.calls.append(("dispatch", plan_id, idempotency_key))
+            return SimpleNamespace(plan_id=plan_id, status=PlanStatus.SENT)
+
+        def block_contact(self, **kwargs):
+            self.calls.append(("block", kwargs))
+
+    mcp, gateway, service = FakeMCP(), Gateway(), Service()
+    names = prospecting_mcp_tools.register_prospecting_outreach_tools(
+        mcp, service=service, session_gateway=gateway
+    )
+
+    draft = mcp.tools["prospecting.outreach.plan"](
+        company_id="12345678000190", channel="email", destination="sales@example.com",
+        body="Apresentação", campaign_id="campaign-1",
+        authorization_basis="legitimate_interest_reviewed",
+        authorization_evidence_ref="review:42", subject="Contato comercial",
+    )
+    approved = mcp.tools["prospecting.outreach.approve"](plan_id="plan-1")
+    sent = mcp.tools["prospecting.outreach.dispatch"](
+        plan_id="plan-1", idempotency_key="send-1"
+    )
+    blocked = mcp.tools["prospecting.outreach.block"](
+        company_id="12345678000190", channel="email",
+        reason="recipient_requested_stop", destination="sales@example.com",
+    )
+
+    assert names == prospecting_mcp_tools.PROSPECTING_OUTREACH_TOOLS
+    assert draft["status"] == "pending_approval"
+    assert approved["status"] == "approved"
+    assert sent["status"] == "sent"
+    assert blocked["blocked"] is True
+    assert gateway.calls == ["prospecting.outreach.manage"] * 4
+    assert service.calls[0][1]["authorization"].reviewed_by == "paired-session"
+    assert service.calls[1] == ("approve", "plan-1", "paired-session")
+    assert service.calls[2] == ("dispatch", "plan-1", "send-1")
