@@ -73,7 +73,7 @@ ESTABELECIMENTO_COLUMNS: tuple[str, ...] = (
 )
 MINIMUM_ESTABLISHMENT_COLUMNS = 21
 _ACTIVE = "02"
-_SUPPORTED_FIELDS = ("company_name", "legal_name", "cnpj", "industry", "city", "state", "company_size", "legal_nature", "capital_social", "opening_date", "establishment_type", "neighborhood", "postal_code", "primary_cnae")
+_SUPPORTED_FIELDS = ("company_name", "legal_name", "cnpj", "industry", "city", "state", "company_size", "legal_nature", "capital_social", "opening_date", "establishment_type", "neighborhood", "postal_code", "primary_cnae", "has_phone", "has_email", "has_fax")
 
 
 @dataclass(frozen=True)
@@ -371,7 +371,7 @@ class CnpjStoreProvider:
         if row is None:
             return None
 
-        (basename, ordem, dv, trade_name, cnae, legal_name, municipality_name, description, legal_nature, capital_social, company_size, opening_date, establishment_type, neighborhood, postal_code) = row
+        (basename, ordem, dv, trade_name, cnae, legal_name, municipality_name, description, legal_nature, capital_social, company_size, opening_date, establishment_type, neighborhood, postal_code, has_phone, has_email, has_fax) = row
         name = (trade_name or "").strip() or (legal_name or "").strip()
         if not name or not any(ch.isalpha() for ch in name):
             return None
