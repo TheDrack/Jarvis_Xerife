@@ -383,3 +383,6 @@ def test_contact_presence_and_cadastral_status_filters_do_not_return_contact_val
     serialized = result.companies[0].model_dump(mode="json")
     assert "33334444" not in str(serialized)
     assert "CONTATO@EXEMPLO.COM" not in str(serialized)
+    assert serialized["has_phone"] is True
+    assert serialized["has_email"] is True
+    assert serialized["has_fax"] is True
