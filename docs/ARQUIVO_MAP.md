@@ -54,7 +54,7 @@ graph LR
     app_application_privacy["<b>privacy</b><br/><hr/>📄 pii_redactor.py: PiiRedactor, execute"]
     class app_application_privacy support
     app_application --> app_application_privacy
-    app_application_prospecting["<b>prospecting</b><br/><hr/>📄 campaign.py: CampaignDefinition, validate_same_tenant, RunManifest<br/>📄 history.py: SnapshotCompany, RunSnapshot, SnapshotChange"]
+    app_application_prospecting["<b>prospecting</b><br/><hr/>📄 campaign.py: CampaignDefinition, validate_same_tenant, RunManifest<br/>📄 history.py: SnapshotCompany, RunSnapshot, SnapshotChange<br/>📄 outreach.py: from"]
     class app_application_prospecting support
     app_application --> app_application_prospecting
     app_application_security["<b>security</b><br/><hr/>📄 capability_authorizer.py: CapabilityAuthorizer, can_execute<br/>📄 repository_path_policy.py: UnsafeRepositoryPath, normalize_relative_path, validate_filename"]
