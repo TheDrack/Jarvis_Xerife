@@ -31,6 +31,10 @@ MCP tools:
 - `prospecting.demands.create`
 - `prospecting.demands.get`
 - `prospecting.demands.list`
+- `prospecting.demands.history`
+- `prospecting.demands.withdraw_profile_consent`
+
+CV sharing consent can be withdrawn; the opaque profile reference is removed from the demand record and the withdrawal is audited.
 
 Database path defaults to `~/.local/share/jarvis/prospecto/demands.sqlite3`; override with `JARVIS_PROSPECTO_DEMAND_DB`.
 
