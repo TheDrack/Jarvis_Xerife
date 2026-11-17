@@ -1,93 +1,113 @@
-# PIPELINE RUNNER
+# Pipeline Runner
 
-Executor de pipelines declarativos em YAML. Cada pipeline é uma sequência de
-passos que resolvem componentes pelo Nexus e executam seus `execute(context)`.
+O Pipeline Runner executa definições YAML em config/pipelines/. Ele preserva o caminho legado que resolve componentes pelo Nexus e possui uma rota separada para etapas declaradas com tool_id.
 
-- Código: `app/runtime/pipeline_runner.py`
-- Configurações: `config/pipelines/<nome>.yml`
+**Importante:** a existência da rota tool_id não significa que a execução de ferramentas esteja habilitada. A composição atual do runner cria ToolDispatcher sem fornecer ToolAuthorizationPolicy. O dispatcher recusa chamadas sem uma política confiável. O campo tool_approvals apenas preenche metadados da requisição; não constitui, por si só, uma aprovação verificável.
 
----
+## Código e configuração
 
-## Uso
+- Runner: app/runtime/pipeline_runner.py
+- Manifests: config/tool_registry.json
+- Dispatcher: app/runtime/toolbox/
+- Toolchains: config/toolchains/
+- Pipelines: config/pipelines/
+
+O runner aceita arquivos .yml e .yaml, procurando primeiro o sufixo .yml.
+
+Pipelines presentes no branch de referência:
+- auto_evolution.yml
+- build_installer.yml
+- jarvis_chat.yml
+- osint_geo_discovery.yaml
+- sync_drive.yml
+
+Consulte o conteúdo YAML do branch para conhecer os passos e dependências de cada pipeline.
+
+## Execução
+
+Execute a partir da raiz do repositório:
 
 ```bash
-# Pipeline declarado em config/pipelines/sync_drive.yml
 PIPELINE=sync_drive python app/runtime/pipeline_runner.py
-
-# Modo estrito global (aborta no primeiro passo com falha)
 PIPELINE=sync_drive PIPELINE_STRICT=true python app/runtime/pipeline_runner.py
-
-# Sem PIPELINE definido o runner imprime a ajuda e sai com código 1
-python app/runtime/pipeline_runner.py
 ```
 
-O runner deve ser executado a partir do **root do projeto** (os caminhos de
-pipeline e os artefatos gerados são relativos ao diretório atual). O root é
-injetado automaticamente no `sys.path`, portanto não é necessário exportar
-`PYTHONPATH` para a execução direta.
+Sem PIPELINE, o runner imprime a forma de uso e termina com código 1.
 
-### Códigos de saída
+Também é possível chamar a API Python:
 
-| Situação | Código | `status` do contexto |
-|----------|--------|----------------------|
-| Todos os passos OK | 0 | `success` |
-| Algum passo falhou (sem strict) | 1 | `partial` |
-| Falha em strict mode | 1 | `failed` (aborta e retorna o contexto) |
+```python
+from app.runtime.pipeline_runner import run_pipeline
 
----
+result = run_pipeline(
+    "sync_drive",
+    global_strict=False,
+    inputs={"correlation_id": "manual-run-001"},
+)
+```
 
-## Formato do pipeline
+## Contexto de execução
+
+O contexto inicial contém:
+- pipeline
+- strict
+- results
+- artifacts
+
+inputs pode adicionar valores de runtime, mas não pode sobrescrever as chaves reservadas pipeline, strict, results, artifacts ou component_config.
+
+Cada passo executa em ordem de declaração no YAML. O retorno em formato dict pode acrescentar dados ao contexto, mas não pode sobrescrever results, pipeline ou status.
+
+## Tipos de passo
+
+### Passo legado — resolução Nexus
+
+Exemplo de forma declarativa:
 
 ```yaml
-# config/pipelines/<nome>.yml
-description: "Descrição curta do objetivo do pipeline"
-strict: false            # default global; sobrescrito por PIPELINE_STRICT=true
-
 components:
-  nome_do_passo:
-    id: "componente_nexus"          # ID resolvido via nexus.resolve()
-    hint_path: "app/adapters/infrastructure/componente_nexus"  # opcional
-    singleton: true                 # opcional (metadado do componente)
-    action: "backup"                # opcional (vai no contexto entregue ao componente)
+  sync_step:
+    id: "consolidator"
+    hint_path: "app/adapters/infrastructure/consolidator.py"
     config:
-      strict_mode: true             # sobrescreve o strict só para este passo
+      strict_mode: false
 ```
 
-Regras do passo:
+O runner:
+1. resolve id (ou o nome do passo) via nexus.resolve();
+2. encaminha hint_path, inclusive quando ausente;
+3. recusa CloudMock sem chamar execute();
+4. chama execute(context) ou, se o objeto for callable, chama o objeto;
+5. mescla retorno dict no contexto respeitando as chaves estruturais.
 
-1. `id` (ou o nome do passo) é resolvido com `nexus.resolve(target_id=..., hint_path=...)`.
-2. Se o Nexus devolver um `CloudMock` (circuit breaker aberto ou componente
-   inexistente), o passo **falha**: o `execute()` do mock nunca é chamado, para
-   não mascarar indisponibilidade como sucesso.
-3. `execute(context)` é chamado quando existe; caso contrário o componente é
-   chamado diretamente se for callable.
-4. O dicionário retornado é mesclado no contexto compartilhado, exceto as chaves
-   estruturais `results`, `pipeline` e `status`.
-5. `config.strict_mode: true` no passo (ou `strict: true` no pipeline) faz a
-   falha levantar exceção e abortar o restante do pipeline.
+A chave config é disponibilizada ao componente em component_config. strict no pipeline e config.strict_mode controlam a falha/aborto; a opção do passo torna a execução estrita para aquele passo.
 
----
+### Passo de ferramenta — Tool Dispatcher
 
-## Pipelines existentes
+Uma etapa com tool_id segue a rota ToolRequest → ToolDispatcher → ToolRegistry/manifest. Os campos relevantes no código incluem:
+- tool_id e tool_version;
+- capability;
+- arguments ou arguments_from_context;
+- tool_approvals, que fornece scope, approval_id e idempotency_key à requisição.
 
-| Pipeline | Objetivo |
-|----------|----------|
-| `sync_drive.yml` | Snapshot consolidado → Drive, Telegram e Gist |
-| `auto_evolution.yml` | Ciclo de auto-evolução |
-| `jarvis_chat.yml` | Fluxo de conversa do assistente |
-| `build_installer.yml` | Build do instalador |
+Não coloque arguments e arguments_from_context juntos. O runner rejeita essa combinação.
 
----
+**Limite atual:** _get_tool_dispatcher() instancia ToolDispatcher com registry e sink JSONL, mas sem authorizer. O dispatcher exige authorize_tool de uma ToolAuthorizationPolicy confiável e falha fechada quando ela não existe. Portanto, não considere um passo tool_id executável apenas porque o manifest existe ou porque tool_approvals contém approval_id. A aprovação precisa ser validada por uma composição confiável, que não está fornecida por este runner.
 
-## Onde isso é executado
+## Strict mode e resultados
 
-- `.github/workflows/consolidador.yml` e `.github/workflows/sync_to_drive.yml`
-  rodam `PIPELINE=sync_drive python app/runtime/pipeline_runner.py`.
-- `scripts/validate_self_awareness.py` verifica se o snapshot consolidado
-  (`CORE_LOGIC_CONSOLIDATED.txt`), gerado pelo `consolidator` deste pipeline,
-  está disponível para os consumidores de long context.
+- Sem strict: o runner tenta os passos seguintes e retorna status success ou partial.
+- Com strict: a primeira falha encerra o pipeline com status failed.
+- Pipeline inexistente, YAML inválido ou falha fatal resulta em erro.
+- O CLI retorna 0 apenas quando o contexto final tem status success; estados partial/failed retornam 1.
 
----
+## Segurança
+
+- Não trate valores YAML como autorização.
+- Não passe segredos em inputs, config ou arquivos de pipeline.
+- Passos tool_id devem permanecer bloqueados até existir uma composição com identidade, sessão e política confiáveis.
+- A autorização deve ocorrer no dispatcher/host, antes de qualquer efeito externo.
+- Não confunda logs JSONL locais com auditoria durável/distribuída.
 
 ## Testes
 
@@ -95,5 +115,4 @@ Regras do passo:
 python -m pytest tests/test_pipeline_runner.py -q
 ```
 
-Cobrem detecção de `CloudMock`, encaminhamento de `hint_path` e execução normal
-de componentes.
+Os testes atuais cobrem, entre outros pontos, resolução Nexus, encaminhamento de hint_path, comportamento de CloudMock e modo estrito. Consulte os testes do runtime/toolbox para os contratos do dispatcher. Não afirme cobertura de ponta a ponta para execução de tool_id sem um teste com política confiável real/fake e autorização validada.

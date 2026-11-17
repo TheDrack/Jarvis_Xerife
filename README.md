@@ -1,273 +1,136 @@
-# 🤖 JARVIS – Plataforma de Assistente e Automação Distribuída
+# Jarvis Xerife
 
-[![🧬 JARVIS: PyTest e Auto-Cura](https://github.com/TheDrack/Jarvis_Xerife/actions/workflows/homeostase.yml/badge.svg?branch=main)](https://github.com/TheDrack/Jarvis_Xerife/actions/workflows/homeostase.yml)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+**Plataforma modular de automação, agentes, inteligência e integração entre dispositivos.**
 
-**Versão:** 2.0.0  
-**Última Atualização:** 2026-03-10  
-**Status:** ✅ Operacional
+Jarvis Xerife é um repositório de software com núcleo Python, interfaces locais e remotas, adaptadores de infraestrutura, runtime multiagente e componentes Android/Desktop. A arquitetura é organizada por contratos e adaptadores; a presença de um módulo, manifesto ou documento não significa que a capacidade esteja habilitada no ambiente de execução.
 
----
+> **Regra de leitura:** diferencie sempre código existente, integração conectada, autorização efetiva, testes aprovados e operação verificada em produção. São estados diferentes.
 
-## 🎯 Visão Geral
+## O que existe no repositório
 
-JARVIS é um sistema de software autônomo que combina **Arquitetura Hexagonal**, **Injeção de Dependência (Nexus DI)** e **Auto-Evolução Assistida por LLM**.
+- **Núcleo e composição:** Nexus DI, configuração, descoberta e resolução de componentes.
+- **Domínio:** capacidades, memória, contexto, inteligência, grafo, missões, orquestração e contratos de ferramentas.
+- **Aplicação:** serviços de caso de uso, segurança, comunicação e portas.
+- **Adaptadores:** integrações de infraestrutura, API, desktop/edge, provedores de IA, persistência e dispositivos.
+- **Execução de ferramentas:** manifests versionados, registry, dispatcher com validação, autorização, limites e auditoria.
+- **Multiagente:** fila compartilhada, scheduler, workers supervisionados, identidade de worker, leases, tentativas e planos declarativos.
+- **Inteligência:** contratos normalizados e adaptadores de fontes públicas/externas, com coleta sob demanda e tratamento de falhas parciais.
+- **Clientes:** aplicação desktop Windows, aplicativo Android nativo, scripts operacionais e servidores MCP.
+- **Qualidade e segurança:** suíte pytest, workflows GitHub Actions, políticas de autorização, isolamento e testes de regressão.
 
-O sistema é capaz de:
-- ✅ Interpretar comandos em linguagem natural
-- ✅ Executar código existente (prioritário sobre criar)
-- ✅ Criar novo código apenas se necessário (JarvisDevAgent)
-- ✅ Testar em sandbox isolado (Docker ou local)
-- ✅ Aprender com cada interação (ProceduralMemory)
-- ✅ Auto-corrigir erros (Self-Healing)
-- ✅ Evoluir autonomamente (EvolutionOrchestrator)
+## Arquitetura em uma visão
 
----
-
-## Rota remota principal: RDC → Aperture → Tailscale → Jarvis
-
-**Prioridade P0.** Ao ligar o PC, o Tailscale deve conectar automaticamente à tailnet. Agentes compatíveis com MCP e autorizados usam o gateway do Aperture: `https://aperture.tail350144.ts.net/v1/mcp`. O conector `jarvis` do Aperture encaminha as chamadas ao upstream privado `https://multimetal.tail350144.ts.net/mcp`, publicado pelo Tailscale Serve para o servidor local `127.0.0.1:8765`.
-
-O Aperture centraliza grants e exposição de ferramentas; as ACLs/identidade do Tailscale limitam o alcance de rede. “Qualquer agente” significa qualquer agente compatível e autorizado, não acesso público irrestrito.
-
-RDC diretamente ao bridge JSONL e Aperture diretamente ao upstream Jarvis são alternativas para situações específicas, por exemplo diagnóstico local ou quando a rota principal não pode ser usada. Não são a metodologia padrão. A sessão visual do Windows ainda precisa estar acessível para ferramentas que controlam a interface gráfica.
-
-Detalhes, boot, segurança e critérios de aceitação: `docs/ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md`.
-
-
-## 🏗️ Arquitetura
-
-```
-┌─────────────────────────────────────────┐
-│         INTERFACE / CI-CD               │
-│  - GitHub Actions                       │
-│  - API REST                             │
-│  - Telegram Bot                         │
-├─────────────────────────────────────────┤
-│         ADAPTERS (Infra/Edge)           │
-│  - gateway_llm_adapter.py               │
-│  - telegram_adapter.py                  │
-│  - github_adapter.py                    │
-│  - ollama_adapter.py                    │
-│  - docker_sandbox.py                    │
-│  - persistent_shell_adapter.py          │
-├─────────────────────────────────────────┤
-│        APPLICATION (Services)           │
-│  - assistant_service.py                 │
-│  - jarvis_dev_agent/ (agent.py)         │
-│  - evolution_orchestrator.py            │
-│  - metabolism_core.py                   │
-│  - llm_router.py                        │
-│  - consolidated_context_service.py      │
-├─────────────────────────────────────────┤
-│          DOMAIN (Core)                  │
-│  - capability_manager.py                │
-│  - memory/ (semantic, procedural, etc)  │
-│  - models/ (agent, adapter_registry)    │
-├─────────────────────────────────────────┤
-│       CORE (Nexus DI)                   │
-│  - nexus.py                             │
-│  - nexus_exceptions.py                  │
-│  - nexuscomponent.py                    │
-└─────────────────────────────────────────┘
+```text
+Clientes e superfícies
+  Desktop / Android / API / MCP / CLI / integrações externas
+                    |
+Adaptadores
+  API / Edge / Infrastructure / comunicação / provedores
+                    |
+Aplicação
+  serviços / casos de uso / portas / segurança
+                    |
+Domínio
+  ferramentas / capacidades / inteligência / memória /
+  contexto / missões / orquestração
+                    |
+Runtime e composição
+  Nexus DI / Tool Registry + Dispatcher / Multi-agent workers
+                    |
+Infraestrutura externa
+  PostgreSQL-Supabase / Render / LLMs / Tailscale / serviços externos
 ```
 
----
+A estrutura real e os limites de cada subsistema estão em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). O Nexus é o mecanismo de composição/resolução de componentes; o Tool Registry é um catálogo de manifests e não substitui autorização nem execução.
 
-## 🤖 JarvisDevAgent (Fluxo Principal)
+## Entrypoints
 
-**Inspirado no Devin/OpenHands**, o JarvisDevAgent é o **motor autônomo de desenvolvimento** que agora orquestra todo o fluxo do JARVIS:
+| Finalidade | Entrada | Observação |
+|---|---|---|
+| Inicialização principal | main.py | Bootstrap combinado cloud/edge; comportamento depende do ambiente e da configuração. |
+| API headless / deploy | serve.py | Delega para app.application.services.serve. |
+| Bootstrap edge | app/bootstrap_edge.py | Inicialização local com verificações de ambiente e assistente de configuração. |
+| Desktop Windows | scripts/start_jarvis_desktop.ps1 | Inicia o núcleo local e a janela desktop; consulte desktop/README.md. |
+| MCP desktop | app/adapters/edge/jarvis_desktop_mcp.py | Servidor MCP local; depende do host e das permissões do sistema operacional. |
+| Worker multiagente | scripts/run_multiagent_worker.py | Opt-in; exige configuração, credenciais e backend de fila compatível. |
+| Android | mobile/android/ | Aplicativo nativo independente, integrado aos serviços Jarvis por contratos próprios. |
 
-### Fluxo de Execução
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    USUÁRIO SOLICITA                             │
-│  "Crie pipeline para enviar notificação no Telegram"            │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│              JARVIS DEV AGENT (Analisa)                         │
-│  1. Seleciona a capability executável (CapabilityManager)       │
-│  2. Consulta SemanticMemory por soluções similares (few-shot)   │
-│  3. Gera código via LLMRouter → proposta + PR (com gatekeeper)  │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│              PIPELINE YAML (Declara)                            │
-│  Define: config/pipelines/<nome>.yml (passos + componentes)     │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│              PIPELINE RUNNER (Executa)                          │
-│  PIPELINE=<nome> python app/runtime/pipeline_runner.py          │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                    RESULTADO                                    │
-│  ✅ Capability executada / proposta gerada                       │
-│  ✅ Gatekeeper validou (sandbox + testes)                        │
-│  ✅ Ciclo registrado em SemanticMemory                           │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Casos de Uso
-
-| Fonte | Exemplo | Endpoint |
-|-------|---------|----------|
-| **User Request** | "Crie script de backup" | POST /v1/dev-agent/run |
-| **Self-Healing** | Erro detectado → corrigir | Auto-trigger |
-| **Auto-Evolution** | Gap de capability → implementar | EvolutionOrchestrator |
-| **Proactive** | Oportunidade → otimizar | ProactiveCore |
-
-### Exemplo de Uso
-
-```bash
-# Via API
-curl -X POST http://localhost:8000/v1/dev-agent/run \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "user_request",
-    "description": "Crie pipeline para backup automático no Drive"
-  }'
-
-# Via Python
-from app.core.nexus import nexus
-
-agent = nexus.resolve("jarvis_dev_agent")
-result = agent.execute({
-    "description": "Envie notificação no Telegram",
-    "source": "user_request"
-})
-```
-
----
-
-## 📦 AdapterRegistry
-
-Registro simplificado do que o Jarvis **PODE fazer** (5KB vs 500KB do consolidated context):
-
-```python
-from app.core.nexus import nexus
-
-registry = nexus.resolve("adapter_registry")
-
-# Lista todos os adapters
-adapters = registry.execute({"action": "list"})
-
-# Verifica se adapter existe
-adapter = registry.execute({
-    "action": "get",
-    "adapter_id": "telegram_adapter"
-})
-
-# Identifica gaps (o que falta criar)
-gap = registry.execute({
-    "action": "find_gap",
-    "capability": "enviar email"
-})
-```
-
-### Adapters Registrados
-
-| Adapter ID | Descrição | Capabilities |
-|------------|-----------|--------------|
-| `llm_router` | Roteamento dinâmico de LLMs | code_generation, self_repair, planning |
-| `github_worker` | Operações no GitHub | create_pull_request, create_issue, push_commits |
-| `persistent_shell_adapter` | Terminal stateful | run_shell_command, run_tests, browse_directory |
-| `telegram_adapter` | Interface via Telegram | send_message, send_voice, receive_message |
-| `consolidated_context_service` | Snapshot do código | read_context, refresh_context |
-| `capability_manager` | Gerenciamento de capabilities | list_capabilities, execute_capability |
-| `procedural_memory` | Memória de padrões | store_pattern, find_similar |
-| `semantic_memory` | Memória de eventos | store_event, query_similar |
-
-> A lista acima é a do registry estático (`app/domain/models/adapter_registry.py`).
-> O Nexus Discovery completa o registro com os demais componentes em runtime — a
-> lista viva está em `data/nexus_registry.json`.
->
-> Estado atual: o `AdapterRegistry` responde a `list`/`get`/`find_gap`, mas ainda
-> **não é consultado automaticamente** pelo agente nem pelo ciclo de evolução — a
-> integração "consulte o que já existe antes de criar" está pendente. Veja
-> [docs/VERIFICACAO_ENTREGAS.md](docs/VERIFICACAO_ENTREGAS.md).
-
----
-
-## 🧪 Validação
-
-```bash
-# Validar arquitetura (camadas, ports, adapters, DI container)
-python scripts/validate_architecture.py
-
-# Validar autoconsciência via Long Context (contexto consolidado)
-python scripts/validate_self_awareness.py
-
-# Testar JarvisDevAgent
-python -c "from app.application.services.jarvis_dev_agent import JarvisDevAgent; print('✅ OK')"
-python -c "from app.domain.models.adapter_registry import AdapterRegistry; print('✅ OK')"
-python -c "from app.adapters.infrastructure.docker_sandbox import DockerSandbox; print('✅ OK')"
-```
-
----
-
-## 📊 Status
-
-| Fase | Status | Descrição |
-|------|--------|-----------|
-| Phase 1 | ✅ Completo | Arquitetura Hexagonal + Nexus DI |
-| Phase 2 | ⏸️ Pausado | Autoevolução fail-closed por padrão; recuperação e curiosidade em validação |
-| Phase 3 | ✅ Completo | JarvisDevAgent + AdapterRegistry |
-| Phase 4 | 🟡 Em Progresso | Soldier Mesh (Edge Computing) |
-
----
-
-## 📚 Documentação
-
-- → Veja [docs/ARQUIVO_MAP.md](docs/ARQUIVO_MAP.md) para lista completa de arquivos
-- → Veja [docs/MULTI_AGENT_USAGE.md](docs/MULTI_AGENT_USAGE.md) para o guia de uso dos multiagentes (fila, workers, concorrência e falhas)
-- → Veja [docs/RESPAN_GATEWAY.md](docs/RESPAN_GATEWAY.md) para ligar o Respan Gateway (open-source, in-process) como camada de roteamento do `AIGateway`, com o guia oficial e o resultado da verificação local
-- → Veja [docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md](docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md) para o protocolo de inicialização e consolidação de memória das IAs.
-- → Veja [docs/STATUS.md](docs/STATUS.md) para status detalhado
-- → Veja [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para arquitetura completa
-- → Veja [docs/architecture/JARVIS_OS_HARNESS.md](docs/architecture/JARVIS_OS_HARNESS.md) para a arquitetura do harness e do Jarvis OS.
-- → Veja [docs/JARVIS_OS_FOUNDATION.md](docs/JARVIS_OS_FOUNDATION.md) para o plano de implementação JOF 0.1.
-- → Veja [docs/NEXUS.md](docs/NEXUS.md) para documentação do Nexus DI
-- → Veja [docs/CURIOSITY_PROTOCOL.md](docs/CURIOSITY_PROTOCOL.md) para transformar descobertas em oportunidades verificáveis.
-- → A saudação de reencontro usa `reconnection_briefing` para resumir descobertas, PRs e testes com status verificado.
-- → Veja [docs/AUTOEVOLUTION_RECOVERY.md](docs/AUTOEVOLUTION_RECOVERY.md) para recuperação controlada e critérios para reativar a autoevolução.
-
----
-
-## 🚀 Quick Start
-
-```bash
-# 1. Instalar dependências
-pip install -r requirements/core.txt
-
-# 2. Configurar variáveis de ambiente
-cp .env.example .env
-# Edite .env com suas chaves de API
-
-# 3. Iniciar o JARVIS
-python main.py
-
-# 4. Testar via API
-curl http://localhost:8000/health
-```
-
----
-
-## 📄 Licença
-
-MIT License — veja [LICENSE](LICENSE) para detalhes.
-
-**Made with ❤️ by the Jarvis Team**
-
-
-## Guia de uso e modos de opera??o
-
-Consulte [docs/GUIA_DE_USO.md](docs/GUIA_DE_USO.md) para os modos de opera??o e [docs/NAVEGACAO_VISUAL.md](docs/NAVEGACAO_VISUAL.md) para navega??o do desktop.
+Não presuma que iniciar um entrypoint habilita todos os subsistemas. Workers, integrações externas, observabilidade e recursos privilegiados possuem pré-requisitos próprios.
 
 ## Pós-instalação e primeiro uso obrigatório
 
 Antes de considerar uma instalação operacional, toda IA que usar Jarvis deve executar a **Verificação Inicial de Vôo (VIV)**: [procedimento de pós-instalação](docs/POS_INSTALACAO.md). O protocolo também está referenciado nas instruções de agentes e no [prompt inicial portátil](docs/skills-connectors/STARTUP_PROMPT.md), para runtimes que não carregam arquivos do repositório automaticamente.
+
+## Começar
+
+### Python
+
+Requer Python compatível com as dependências declaradas (o projeto usa type hints e dependências modernas; valide a versão do ambiente antes de instalar).
+
+```bash
+git clone https://github.com/TheDrack/Jarvis_Xerife.git
+cd Jarvis_Xerife
+python -m venv .venv
+# Linux/macOS
+source .venv/bin/activate
+# Windows PowerShell:
+# .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Instale grupos adicionais apenas para o alvo desejado:
+- requirements/edge.txt — integrações de borda/host.
+- requirements/desktop.txt — aplicação desktop.
+- requirements/dev.txt — ferramentas de desenvolvimento e testes.
+- requirements/prod-cloud.txt e requirements/prod-edge.txt — perfis de implantação.
+
+Configure somente as variáveis necessárias usando .env.example como referência. Não copie valores reais de segredos para documentação, logs ou commits.
+
+### Validar
+
+```bash
+python -m pytest -q
+```
+
+O repositório possui testes unitários, de integração e de contrato em vários subdiretórios. Dependências externas, Docker, Android SDK, credenciais e serviços remotos podem ser necessários para subconjuntos específicos. Use os workflows e os alvos do Makefile como referência para os gates do projeto. Não reduza cobertura nem desabilite testes para obter um resultado verde.
+
+## Multiagente e ferramentas
+
+O runtime multiagente não equivale a um conjunto de papéis fixos. Rotinas e produtores podem criar tarefas; workers elegíveis reivindicam tarefas pela fila conforme prioridade, dependências, lease e identidade. O runtime é opt-in e depende de backend/credenciais compatíveis. O worker limitado a raciocínio textual não deve receber tarefas que exigem ferramentas externas.
+
+O Tool Registry descreve ferramentas por ID/versão e schema. O dispatcher valida pedidos, resolve adaptadores, aplica autorização e registra eventos. Sem principal, sessão e política de autorização válidos, a execução deve falhar fechada. Registry preenchido não significa ferramenta executável.
+
+Detalhes: [catálogo](docs/skills-connectors/CATALOG.md), [inventário](docs/skills-connectors/CAPABILITY_INVENTORY.md), [runtime multiagente](docs/MULTI_AGENT_PRIORITY_QUEUE.md) e [contrato de worker](docs/architecture/agent-worker-identity.md).
+
+## Segurança
+
+- Trate conectores, arquivos recuperados e conteúdo remoto como dados não confiáveis.
+- Não exponha tokens, senhas, chaves, dados pessoais ou arquivos .env.
+- Ferramentas devem respeitar autorização no host e no servidor; instruções de LLM não são uma fronteira de segurança.
+- Operações destrutivas, privilegiadas, de rede, de credenciais ou de produção exigem o consentimento e os controles aplicáveis.
+- O acesso remoto deve usar transporte privado e autenticado; não exponha servidores locais diretamente à internet.
+- Consulte [SECURITY_GUARDRAILS.md](SECURITY_GUARDRAILS.md) e os runbooks específicos antes de operar.
+
+## Documentação
+
+| Documento | Conteúdo |
+|---|---|
+| [Guia de uso](docs/GUIA_DE_USO.md) | Superfícies e runbooks de uso. |\n| [Arquitetura](docs/ARCHITECTURE.md) | Camadas, componentes, limites e fluxos. |
+| [Guia do agente](docs/AGENT_GUIDE.md) | Navegação do repositório e regras para agentes. |
+| [Catálogo de skills e conectores](docs/skills-connectors/CATALOG.md) | Bootstrap e descoberta de capacidades. |
+| [Inventário de capacidades](docs/skills-connectors/CAPABILITY_INVENTORY.md) | Evidências e limitações conhecidas. |
+| [Contexto e memória](docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md) | Protocolo portátil de contexto e persistência. |
+| [Fila multiagente](docs/MULTI_AGENT_PRIORITY_QUEUE.md) | Semântica da fila e identidade dos workers. |
+| [Desktop](desktop/README.md) | Inicialização, build e acesso local/remoto. |
+| [Android](mobile/android/README.md) | Aplicativo nativo e limites de integração. |
+| [Linux](linux/README.md) | Provisionamento e validação Linux. |
+| [Status](docs/STATUS.md) | Estado documental com níveis de evidência. |
+
+## Estado e escopo
+
+Este README descreve a estrutura versionada, não o estado de uma máquina específica ou de um deploy. Para produção, confirme o commit implantado, health checks, feature flags, credenciais, migrations e telemetria diretamente no ambiente. Para estado de branches/PRs, consulte o GitHub; não use snapshots históricos como prova de estado atual.
+
+## Contribuir
+
+Leia [CONTRIBUTING.md](CONTRIBUTING.md), siga as instruções em [AGENTS.md](AGENTS.md), entenda o subsistema antes de alterar contratos e execute os testes relevantes. Toda mudança comportamental precisa de testes de regressão e documentação correspondente.

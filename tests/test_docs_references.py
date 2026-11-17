@@ -23,12 +23,19 @@ from typing import Dict, Iterator, List, Set, Tuple
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Documentos vivos: mudam com o código e são verificados aqui.
-# `docs/ARQUIVO_MAP.md` fica fora: é gerado pelo `scripts/autodoc.py` a partir do
-# codebase, então não é uma afirmação escrita à mão.
+# `docs/ARQUIVO_MAP.md` é gerado pelo `scripts/autodoc.py` e também é verificado:
+# referências emitidas pelo gerador precisam resolver para arquivos versionados.
 CHECKED_DOCS: Tuple[str, ...] = (
     "README.md",
     "docs/AGENT_GUIDE.md",
     "docs/STATUS.md",
+    "docs/ARQUIVO_MAP.md",
+    "docs/README.md",
+    "docs/ARCHITECTURE.md",
+    "docs/GUIA_DE_USO.md",
+    "docs/skills-connectors/CATALOG.md",
+    "docs/skills-connectors/CAPABILITY_INVENTORY.md",
+    "docs/skills-connectors/FREEBUFF_HARNESS.md",
     "docs/NEXUS.md",
     "docs/PIPELINE_RUNNER.md",
     "scripts/README.md",
@@ -62,17 +69,11 @@ _FILE_REF_RES = (_FILE_REF_RE, _DOTTED_FILE_REF_RE)
 # A lista é auditada: `test_allowlist_has_no_stale_entries` remove a necessidade de
 # manter exceções que voltaram a existir ou que nenhum doc usa mais.
 _ALLOWED_MISSING: Dict[str, str] = {
-    # Artefatos gerados em runtime e não versionados.
-    "CORE_LOGIC_CONSOLIDATED.txt": "gerado pelo pipeline `sync_drive` (consolidator)",
+    # Artefato de compatibilidade gerado em runtime e não versionado.
     "data/nexus_registry.jrvs": "espelho .jrvs criado sob demanda pelo document_store",
-    # Nomes citados em exemplos de log/CLI, não arquivos do repositório.
-    "app/main.py": "exemplo de traceback na seção de padrões de erro",
-    "app/utils.py": "exemplo de mensagem de erro na seção de padrões de erro",
-    "report.json": "artefato de runtime citado nos exemplos de CLI",
-    "pytest_log.txt": "artefato de runtime citado nos exemplos de CLI",
-    "failed_workflow_logs.txt": "artefato de runtime citado nos exemplos de CLI",
+    ".agents/mcp.json": "registro MCP local criado pelo instalador do harness; ignorado pelo Git",
+    "mcp.json": "nome do arquivo de configuração local citado no runbook do harness",
 }
-
 
 def _repo_paths() -> List[Path]:
     """Arquivos rastreados pelo Git e presentes no checkout atual."""

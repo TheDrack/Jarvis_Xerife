@@ -56,11 +56,12 @@ shortcut should use the EXE as its icon source (for example,
 5. Both screens use the same local API and local runtime; no Render/Firebase dependency
    is used for the desktop/mobile dashboard.
 
-On the current Windows host, the inbound firewall allowance is restricted to TCP 8766
-from the Tailscale CGNAT range `100.64.0.0/10` on the Private profile. No broad
-LocalSubnet or Public-profile rule is created. Direct Wi-Fi/LAN access is therefore
-not opened by default; use Tailscale for Android until a narrower LAN rule is explicitly
-approved.
+Firewall rules are host-specific and are not created by the launcher. Before relying on
+remote access, inspect the active Windows Firewall rules on the target machine and confirm
+that the allowed profile, interface, remote-address range and port match the intended
+private network. Do not infer the current firewall state from this README. Direct
+Wi-Fi/LAN access requires a separately reviewed and approved rule; do not create a broad
+LocalSubnet or Public-profile allowance.
 
 The pairing code is visible only to loopback clients and rotates after a successful
 pairing or after ten minutes. Five failed attempts temporarily lock pairing.
