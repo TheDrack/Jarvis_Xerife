@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional, Protocol, runtime_checkable
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.domain.prospecting.contracts import ProspectCompany
 
@@ -37,6 +37,18 @@ class DiscoveryQuery(BaseModel):
     # Exclusive cursor for exhausting a slice page by page: the next page starts
     # after this CNPJ base. ``None`` means "from the beginning".
     after_cnpj_basico: Optional[str] = None
+    establishment_types: tuple[str, ...] = Field(default=(), max_length=2)
+    situation_codes: tuple[str, ...] = Field(default=(), max_length=20)
+    neighborhoods: tuple[str, ...] = Field(default=(), max_length=100)
+    postal_codes: tuple[str, ...] = Field(default=(), max_length=100)
+    company_sizes: tuple[str, ...] = Field(default=(), max_length=10)
+    legal_natures: tuple[str, ...] = Field(default=(), max_length=100)
+    opened_from: Optional[str] = Field(default=None, pattern=r"^\\d{8}$")
+    opened_to: Optional[str] = Field(default=None, pattern=r"^\\d{8}$")
+    capital_min: Optional[float] = Field(default=None, ge=0)
+    capital_max: Optional[float] = Field(default=None, ge=0)
+    simples_only: bool = False
+    mei_only: bool = False
 
     @field_validator("after_cnpj_basico")
     @classmethod
@@ -52,6 +64,16 @@ class DiscoveryQuery(BaseModel):
     @classmethod
     def normalize_uf(cls, value: str) -> str:
         return value.upper()
+
+    @model_validator(mode="after")
+    def validate_ranges(self) -> "DiscoveryQuery":
+        if self.opened_from and self.opened_to and self.opened_from > self.opened_to:
+            raise ValueError("opened_from must not be later than opened_to")
+        if self.capital_min is not None and self.capital_max is not None and self.capital_min > self.capital_max:
+            raise ValueError("capital_min must not exceed capital_max")
+        if self.simples_only and self.mei_only:
+            raise ValueError("simples_only and mei_only are mutually exclusive")
+        return self
 
     @field_validator("cnae_prefixes")
     @classmethod
