@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Optional
 from uuid import UUID
 
 from app.domain.prospecting.demand import DemandRequest
@@ -45,6 +44,17 @@ class SQLiteDemandStore:
                 """CREATE INDEX IF NOT EXISTS idx_prospecto_demands_owner
                    ON prospecto_demands(tenant_id, requester_id, created_at)"""
             )
+            db.execute(
+                """CREATE TABLE IF NOT EXISTS prospecto_demand_events (
+                    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    demand_id TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    actor_id TEXT NOT NULL,
+                    occurred_at TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL
+                )"""
+            )
 
     def _connect(self):
         db = sqlite3.connect(self.database, timeout=15, factory=_ClosingConnection)
@@ -62,6 +72,13 @@ class SQLiteDemandStore:
                     demand.status.value, demand.model_dump_json(),
                     demand.created_at.isoformat(), demand.updated_at.isoformat(),
                 ),
+            )
+            db.execute(
+                """INSERT INTO prospecto_demand_events
+                   (demand_id, tenant_id, event_type, actor_id, occurred_at, metadata_json)
+                   VALUES (?, ?, 'demand_created', ?, ?, '{}')""",
+                (str(demand.demand_id), str(demand.tenant_id), demand.requester_id,
+                 demand.created_at.isoformat()),
             )
         return demand
 
@@ -89,6 +106,55 @@ class SQLiteDemandStore:
                 (str(tenant_id), requester_id, limit),
             ).fetchall()
         return tuple(DemandRequest.model_validate_json(row["payload_json"]) for row in rows)
+
+
+    def withdraw_profile_consent(
+        self, demand_id: UUID, *, tenant_id: UUID, requester_id: str,
+    ) -> DemandRequest:
+        """Revoke request-scoped CV sharing and erase its opaque reference."""
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                """SELECT payload_json FROM prospecto_demands
+                   WHERE demand_id=? AND tenant_id=? AND requester_id=?""",
+                (str(demand_id), str(tenant_id), requester_id),
+            ).fetchone()
+            if row is None:
+                raise DemandNotFound("demand_not_found")
+            demand = DemandRequest.model_validate_json(row["payload_json"])
+            if not demand.consent_to_share_profile:
+                return demand
+            from datetime import datetime, timezone
+            updated = demand.model_copy(update={
+                "consent_to_share_profile": False,
+                "consent_recorded_at": None,
+                "consent_scope": None,
+                "profile_reference": None,
+                "updated_at": datetime.now(timezone.utc),
+            })
+            db.execute(
+                """UPDATE prospecto_demands SET payload_json=?, updated_at=?
+                   WHERE demand_id=? AND tenant_id=? AND requester_id=?""",
+                (updated.model_dump_json(), updated.updated_at.isoformat(),
+                 str(demand_id), str(tenant_id), requester_id),
+            )
+            db.execute(
+                """INSERT INTO prospecto_demand_events
+                   (demand_id, tenant_id, event_type, actor_id, occurred_at, metadata_json)
+                   VALUES (?, ?, 'profile_sharing_withdrawn', ?, ?, '{}')""",
+                (str(demand_id), str(tenant_id), requester_id, updated.updated_at.isoformat()),
+            )
+            return updated
+
+    def list_events(self, demand_id: UUID, *, tenant_id: UUID) -> tuple[dict, ...]:
+        with self._connect() as db:
+            rows = db.execute(
+                """SELECT event_type, actor_id, occurred_at, metadata_json
+                   FROM prospecto_demand_events
+                   WHERE demand_id=? AND tenant_id=? ORDER BY event_id""",
+                (str(demand_id), str(tenant_id)),
+            ).fetchall()
+        return tuple(dict(row) for row in rows)
 
 
 __all__ = ["DemandNotFound", "SQLiteDemandStore"]
