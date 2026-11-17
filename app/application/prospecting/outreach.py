@@ -436,6 +436,9 @@ class OutreachService:
     def approve_plan(self, plan_id: str, *, approved_by: str) -> OutreachPlan:
         return self.store.approve(plan_id, approved_by)
 
+    def list_events(self, plan_id: str) -> list[dict[str, Any]]:
+        return self.store.list_events(plan_id)
+
     def block_contact(self, *, company_id: str, channel: Channel | None,
                       destination: str | None, reason: str, recorded_by: str) -> None:
         self.store.block_contact(
