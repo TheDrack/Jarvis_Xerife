@@ -29,7 +29,7 @@ This stage is intentionally host-local. Setting the environment variable on Andr
 
 ## 3. Interim hosted option — dedicated Render service with persistent disk
 
-A dedicated private service with a persistent SSD disk can host the DuckDB store and a private discovery API. Mount the disk at a stable path such as `/var/data` and configure `JARVIS_PROSPECTO_STORE_PATH=/var/data/cnpj.duckdb`.
+A paid dedicated private service with a persistent SSD disk can host the DuckDB store and a private discovery API. Mount the disk at a stable path such as `/var/data` and configure `JARVIS_PROSPECTO_STORE_PATH=/var/data/cnpj.duckdb`.
 
 This is suitable for a single-instance internal service, not a final horizontal-scale design:
 - Render's default service filesystem is ephemeral; only data under the persistent disk mount survives deploys/restarts.
