@@ -464,6 +464,8 @@ class OutreachService:
             )
             if result.get("accepted") is not True:
                 code = str(result.get("error") or "provider_rejected")
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", code):
+                    code = "provider_rejected"
                 self.store.finish_dispatch(
                     plan_id, idempotency_key, success=False, error_code=code
                 )
@@ -492,9 +494,12 @@ class WebhookOutreachTransport:
 
     def __init__(self, endpoint: str, token: str, *, timeout_seconds: int = 15) -> None:
         parsed = urlparse(endpoint)
-        if parsed.scheme != "https" or not parsed.hostname:
-            raise ValueError("outreach_webhook_requires_https")
-        if not token.strip():
+        if (
+            parsed.scheme != "https" or not parsed.hostname
+            or parsed.username or parsed.password or parsed.fragment
+        ):
+            raise ValueError("outreach_webhook_requires_safe_https_url")
+        if not token.strip() or "\\r" in token or "\\n" in token:
             raise ValueError("outreach_webhook_token_required")
         self.endpoint = endpoint
         self.token = token
