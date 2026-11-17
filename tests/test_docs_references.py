@@ -30,6 +30,12 @@ CHECKED_DOCS: Tuple[str, ...] = (
     "docs/AGENT_GUIDE.md",
     "docs/STATUS.md",
     "docs/ARQUIVO_MAP.md",
+    "docs/README.md",
+    "docs/ARCHITECTURE.md",
+    "docs/GUIA_DE_USO.md",
+    "docs/skills-connectors/CATALOG.md",
+    "docs/skills-connectors/CAPABILITY_INVENTORY.md",
+    "docs/skills-connectors/FREEBUFF_HARNESS.md",
     "docs/NEXUS.md",
     "docs/PIPELINE_RUNNER.md",
     "scripts/README.md",
@@ -65,6 +71,8 @@ _FILE_REF_RES = (_FILE_REF_RE, _DOTTED_FILE_REF_RE)
 _ALLOWED_MISSING: Dict[str, str] = {
     # Artefato de compatibilidade gerado em runtime e não versionado.
     "data/nexus_registry.jrvs": "espelho .jrvs criado sob demanda pelo document_store",
+    ".agents/mcp.json": "registro MCP local criado pelo instalador do harness; ignorado pelo Git",
+    "mcp.json": "nome do arquivo de configuração local citado no runbook do harness",
 }
 
 def _repo_paths() -> List[Path]:
