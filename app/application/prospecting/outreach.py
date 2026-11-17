@@ -287,7 +287,7 @@ class SQLiteOutreachStore:
                     (PlanStatus.BLOCKED.value, _now(), row["plan_id"]),
                 )
                 self._event(db, row["plan_id"], "contact_blocked", recorded_by,
-                            {"reason": reason, "channel": channel.value})
+                            {"reason": reason, "channel": channel_value})
             db.commit()
 
     def approve(self, plan_id: str, approved_by: str) -> OutreachPlan:
