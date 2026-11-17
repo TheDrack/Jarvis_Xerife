@@ -97,7 +97,7 @@ def register_prospecting_tools(
         """
         try:
             arguments: dict[str, Any] = {
-                "uf": uf,
+                "uf": uf.strip().upper(),
                 "cnae_prefixes": cnae_prefixes,
                 "only_active": only_active,
                 "include_secondary_cnae": include_secondary_cnae,
