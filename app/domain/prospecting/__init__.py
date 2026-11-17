@@ -1,5 +1,7 @@
 """Domain contracts and policies for B2B prospecting."""
 
+from app.domain.prospecting.market_intelligence import MarketIndicator, MarketIndicatorDataset
+
 from app.domain.prospecting.demand import (
     CandidateType,
     DemandCandidate,
@@ -68,6 +70,8 @@ __all__ = [
     "DemandRequest",
     "DemandStatus",
     "MarketDirection",
+    "MarketIndicator",
+    "MarketIndicatorDataset",
     "RequesterType",
     "evaluate_demand_match",
     "ConfidenceAssessment",
