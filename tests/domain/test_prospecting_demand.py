@@ -141,3 +141,13 @@ def test_b2c_supplier_search_matches_company_candidates():
         evidence=evidence(),
     )
     assert evaluate_demand_match(demand, candidate).score == 90
+
+
+def test_demand_evidence_rejects_insecure_http_source():
+    with pytest.raises(ValidationError, match="demand_evidence_requires_https"):
+        DemandEvidence(
+            source_id="untrusted",
+            source_name="Untrusted source",
+            url="http://jobs.example/opening/42",
+            terms_reference="Terms not verified",
+        )
