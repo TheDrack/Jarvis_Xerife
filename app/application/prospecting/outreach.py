@@ -499,7 +499,7 @@ class WebhookOutreachTransport:
             or parsed.username or parsed.password or parsed.fragment
         ):
             raise ValueError("outreach_webhook_requires_safe_https_url")
-        if not token.strip() or "\\r" in token or "\\n" in token:
+        if not token.strip() or "\r" in token or "\n" in token:
             raise ValueError("outreach_webhook_token_required")
         self.endpoint = endpoint
         self.token = token
