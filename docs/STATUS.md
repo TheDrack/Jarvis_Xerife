@@ -1,8 +1,7 @@
 # Estado do projeto — leitura do código versionado
 
 **Data da revisão documental:** 2026-11-16  
-**Branch de referência:** main  
-**Commit de referência:** 444b0b322f132802368cbbe0c9568d4409438e61  
+**Base de código auditada:** main @ 444b0b322f132802368cbbe0c9568d4409438e61  
 **Escopo:** árvore de código e documentação versionada. Não foi realizada nesta página uma inspeção autenticada do deploy, banco, dispositivos ou serviços externos.
 
 ## Como interpretar este documento
