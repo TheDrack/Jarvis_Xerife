@@ -161,7 +161,7 @@ Critério de invalidação sugerido: se depois de 20 abordagens humanas menos de
 
 ## 9. Uso interno pelo Jarvis
 
-O mesmo store DuckDB usado pelo CLI pode ser lido pelos MCPs Desktop e Android. O adaptador não cria nem baixa a base automaticamente: ele abre o arquivo configurado em modo de leitura.
+O mesmo store DuckDB usado pelo CLI pode ser lido pelos MCPs Desktop e Android e pela janela Prospecto do HUD Global. O adaptador não cria nem baixa a base automaticamente: ele abre o arquivo configurado em modo de leitura.
 
 Configure `JARVIS_PROSPECTO_STORE_PATH` no processo que hospeda o MCP. Se não for definido, o adaptador procura `data/prospecting/cnpj.duckdb` na raiz do repositório.
 
@@ -177,7 +177,9 @@ $env:JARVIS_PROSPECTO_STORE_PATH = "D:\JarvisData\prospecting\cnpj.duckdb"
 export JARVIS_PROSPECTO_STORE_PATH="$HOME/.local/share/jarvis/prospecting/cnpj.duckdb"
 ```
 
-As ferramentas disponíveis são:
+A janela **Prospecto** no HUD Global chama o endpoint local autenticado `/api/prospecting/search`; a pesquisa não é executada no navegador nem abre uma conexão DuckDB no frontend. O endpoint usa o mesmo adaptador Nexus. A rota de lookup `/api/prospecting/lookup` também é local e autenticada.
+
+As ferramentas MCP disponíveis são:
 
 - `prospecting.companies.search`: recebe `uf`, `cnae_prefixes`, opcionalmente `municipalities`, `only_active`, `include_secondary_cnae`, `limit` (1–100) e `after_cnpj_basico`.
 - `prospecting.companies.lookup`: consulta um CNPJ completo de 14 dígitos e identifica um estabelecimento exato.
