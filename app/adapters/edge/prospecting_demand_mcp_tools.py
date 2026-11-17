@@ -136,6 +136,19 @@ def register_prospecting_demand_tools(
             logger.warning("Prospecto consent withdrawal rejected: %s", type(exc).__name__)
             return {"success": False, "error_code": "consent_withdrawal_failed"}
 
+    @mcp.tool(name="prospecting.demands.history")
+    def prospecting_demand_history(demand_id: str) -> dict[str, Any]:
+        """Read metadata-only audit events for one private demand."""
+        try:
+            actor()
+            events = repository.list_events(UUID(demand_id), tenant_id=LOCAL_TENANT_ID)
+            return {"success": True, "demand_id": demand_id, "events": list(events)}
+        except ValueError:
+            return {"success": False, "error_code": "demand_not_found"}
+        except Exception as exc:
+            logger.warning("Prospecto demand history rejected: %s", type(exc).__name__)
+            return {"success": False, "error_code": "demand_history_unavailable"}
+
     @mcp.tool(name="prospecting.demands.list")
     def prospecting_demand_list(limit: int = 50) -> dict[str, Any]:
         """List private demands owned by the authenticated local session."""
@@ -159,6 +172,7 @@ def register_prospecting_demand_tools(
         "prospecting.demands.create",
         "prospecting.demands.get",
         "prospecting.demands.list",
+        "prospecting.demands.history",
         "prospecting.demands.withdraw_profile_consent",
     )
 
