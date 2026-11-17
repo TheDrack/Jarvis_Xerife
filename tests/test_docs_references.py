@@ -23,12 +23,13 @@ from typing import Dict, Iterator, List, Set, Tuple
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Documentos vivos: mudam com o código e são verificados aqui.
-# `docs/ARQUIVO_MAP.md` fica fora: é gerado pelo `scripts/autodoc.py` a partir do
-# codebase, então não é uma afirmação escrita à mão.
+# `docs/ARQUIVO_MAP.md` é gerado pelo `scripts/autodoc.py` e também é verificado:
+# referências emitidas pelo gerador precisam resolver para arquivos versionados.
 CHECKED_DOCS: Tuple[str, ...] = (
     "README.md",
     "docs/AGENT_GUIDE.md",
     "docs/STATUS.md",
+    "docs/ARQUIVO_MAP.md",
     "docs/NEXUS.md",
     "docs/PIPELINE_RUNNER.md",
     "scripts/README.md",
