@@ -201,6 +201,25 @@ class CnpjOpenDataAdapter:
         *,
         collected_at: Optional[datetime] = None,
     ) -> DiscoveryResult:
+        advanced_filters = (
+            query.establishment_types
+            or query.situation_codes
+            or query.neighborhoods
+            or query.postal_codes
+            or query.company_sizes
+            or query.legal_natures
+            or query.opened_from
+            or query.opened_to
+            or query.capital_min is not None
+            or query.capital_max is not None
+            or query.simples_only
+            or query.mei_only
+        )
+        if advanced_filters:
+            raise NotImplementedError(
+                "advanced CNPJ filters require the materialized DuckDB provider"
+            )
+
         missing = self._files.missing()
         if missing:
             raise FileNotFoundError(
