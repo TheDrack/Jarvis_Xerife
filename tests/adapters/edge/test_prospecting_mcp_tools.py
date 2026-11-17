@@ -226,3 +226,29 @@ async def test_mcp_search_forwards_advanced_registry_filters():
     assert arguments["opened_from"] == "20200101"
     assert arguments["capital_min"] == 100000
     assert arguments["simples_only"] is True
+
+
+@pytest.mark.asyncio
+async def test_mcp_search_forwards_presence_and_situation_filters():
+    mcp = FakeMCP()
+    dispatcher = FakeDispatcher()
+    prospecting_mcp_tools.register_prospecting_tools(mcp, dispatcher=dispatcher)
+
+    await mcp.tools["prospecting.companies.search"](
+        uf="SC",
+        cnae_prefixes=["62"],
+        country_codes=["105"],
+        reason_codes=["01"],
+        special_situation_codes=["SITUACAO-ESPECIAL"],
+        has_phone=True,
+        has_email=False,
+        has_fax=True,
+    )
+
+    arguments = dispatcher.requests[0]["arguments"]
+    assert arguments["country_codes"] == ["105"]
+    assert arguments["reason_codes"] == ["01"]
+    assert arguments["special_situation_codes"] == ["SITUACAO-ESPECIAL"]
+    assert arguments["has_phone"] is True
+    assert arguments["has_email"] is False
+    assert arguments["has_fax"] is True
