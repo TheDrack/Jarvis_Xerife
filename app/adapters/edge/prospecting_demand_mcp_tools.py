@@ -117,6 +117,25 @@ def register_prospecting_demand_tools(
             logger.warning("Prospecto demand retrieval rejected: %s", type(exc).__name__)
             return {"success": False, "error_code": "demand_retrieval_failed"}
 
+    @mcp.tool(name="prospecting.demands.withdraw_profile_consent")
+    def prospecting_demand_withdraw_profile_consent(demand_id: str) -> dict[str, Any]:
+        """Withdraw CV sharing consent for one owned job-search request."""
+        try:
+            requester_id = actor()
+            demand = repository.withdraw_profile_consent(
+                UUID(demand_id), tenant_id=LOCAL_TENANT_ID, requester_id=requester_id,
+            )
+            return {
+                "success": True,
+                "demand_id": str(demand.demand_id),
+                "profile_sharing_enabled": demand.consent_to_share_profile,
+            }
+        except (ValueError, DemandNotFound):
+            return {"success": False, "error_code": "demand_not_found"}
+        except Exception as exc:
+            logger.warning("Prospecto consent withdrawal rejected: %s", type(exc).__name__)
+            return {"success": False, "error_code": "consent_withdrawal_failed"}
+
     @mcp.tool(name="prospecting.demands.list")
     def prospecting_demand_list(limit: int = 50) -> dict[str, Any]:
         """List private demands owned by the authenticated local session."""
@@ -140,6 +159,7 @@ def register_prospecting_demand_tools(
         "prospecting.demands.create",
         "prospecting.demands.get",
         "prospecting.demands.list",
+        "prospecting.demands.withdraw_profile_consent",
     )
 
 
