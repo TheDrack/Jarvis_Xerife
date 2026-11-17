@@ -42,7 +42,8 @@ def register_prospecting_demand_tools(
 
     def actor() -> str:
         session = gateway.require(DEMAND_CAPABILITY)
-        # Local owner identity is stable across re-pairing; session auth is checked above.\n        return "local-owner"
+        # Local owner identity is stable across re-pairing; session auth is checked above.
+        return "local-owner"
 
     @mcp.tool(name="prospecting.demands.create")
     def prospecting_demand_create(
