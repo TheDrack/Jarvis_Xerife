@@ -46,8 +46,20 @@ class ProspectEvidence(BaseModel):
     source_type: ProspectEvidenceType
     url: HttpUrl
     license_or_terms: str = Field(min_length=1, max_length=500)
+    supports_fields: tuple[str, ...] = Field(min_length=1, max_length=20)
     collected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     verified_at: Optional[datetime] = None
+
+
+    @field_validator("supports_fields")
+    @classmethod
+    def validate_supported_fields(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        normalized = tuple(value.strip() for value in values)
+        if any(not value or len(value) > 80 for value in normalized):
+            raise ValueError("supported field names must contain 1-80 characters")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("supported field names must be unique")
+        return normalized
 
 
 class ProspectCompany(BaseModel):
