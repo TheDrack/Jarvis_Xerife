@@ -292,7 +292,7 @@ class CnpjStoreBuilder:
                 connection.execute(f"DELETE FROM {table_name}")
                 connection.execute(
                     f"INSERT INTO {table_name} SELECT column0, column1 FROM read_csv(?, delim=?, "
-                    "quote='\\\"', header=false, columns={'column0':'VARCHAR','column1':'VARCHAR'}, "
+                    "quote='\"', header=false, columns={'column0':'VARCHAR','column1':'VARCHAR'}, "
                     "encoding=?, ignore_errors=true)",
                     [str(source_path), self._delimiter, self._encoding],
                 )
