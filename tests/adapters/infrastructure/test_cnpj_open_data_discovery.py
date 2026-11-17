@@ -230,3 +230,22 @@ def test_query_rejects_invalid_cnae_and_blank_municipality():
         DiscoveryQuery(uf="SC", cnae_prefixes=("4120",), municipalities=(" ",))
     with pytest.raises(ValidationError):
         DiscoveryQuery(uf="SC", cnae_prefixes=("4120",), after_cnpj_basico="123")
+
+
+def test_csv_adapter_rejects_advanced_filters_it_cannot_apply(tmp_path):
+    files = sample_files(tmp_path)
+    adapter = CnpjOpenDataAdapter(
+        CnpjOpenDataFiles(
+            establishments=files.establishments[0],
+            companies=files.companies[0],
+            municipalities=files.municipalities,
+            cnaes=files.cnaes,
+        )
+    )
+    with pytest.raises(NotImplementedError, match="DuckDB"):
+        adapter.discover(DiscoveryQuery(
+            uf="SC",
+            municipalities=("São José",),
+            cnae_prefixes=("4120",),
+            company_sizes=("03",),
+        ))
