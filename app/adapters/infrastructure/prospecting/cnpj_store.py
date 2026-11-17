@@ -84,11 +84,12 @@ class CnpjStoreFiles:
     companies: tuple[Path, ...]
     municipalities: Path
     cnaes: Path
+    simples: Optional[Path] = None
 
     def missing(self) -> tuple[str, ...]:
         missing = [
             path.name
-            for path in (*self.establishments, *self.companies, self.municipalities, self.cnaes)
+            for path in (*self.establishments, *self.companies, self.municipalities, self.cnaes, *((self.simples,) if self.simples else ()))
             if not path.is_file()
         ]
         return tuple(missing)
@@ -159,12 +160,22 @@ class CnpjStoreBuilder:
         connection.execute(f"CREATE TABLE IF NOT EXISTS establishments ({columns})")
         connection.execute(
             "CREATE TABLE IF NOT EXISTS companies ("
-            "cnpj_basico VARCHAR, razao_social VARCHAR, porte VARCHAR)"
+            "cnpj_basico VARCHAR, razao_social VARCHAR, natureza VARCHAR, "
+            "qualificacao VARCHAR, capital VARCHAR, porte VARCHAR, ente VARCHAR)"
         )
         connection.execute(
             "CREATE TABLE IF NOT EXISTS municipalities (codigo VARCHAR, nome VARCHAR)"
         )
         connection.execute("CREATE TABLE IF NOT EXISTS cnaes (codigo VARCHAR, descricao VARCHAR)")
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS simples (cnpj_basico VARCHAR, opcao_simples VARCHAR, "
+            "data_opcao_simples VARCHAR, data_exclusao_simples VARCHAR, opcao_mei VARCHAR, "
+            "data_opcao_mei VARCHAR, data_exclusao_mei VARCHAR)"
+        )
+        # Backward-compatible migration for stores created by the earlier 3-column schema.
+        for name in ("natureza", "qualificacao", "capital", "ente"):
+            connection.execute(f"ALTER TABLE companies ADD COLUMN IF NOT EXISTS {name} VARCHAR")
+
         connection.execute(
             "CREATE TABLE IF NOT EXISTS ingest_log (file_name VARCHAR, rows BIGINT, "
             "ingested_at VARCHAR)"
@@ -228,8 +239,8 @@ class CnpjStoreBuilder:
                     skipped.append(path.name)
                     continue
                 connection.execute(
-                    "INSERT INTO companies "
-                    "SELECT cnpj_basico, razao_social, porte FROM read_csv(?, delim=?, "
+                    "INSERT INTO companies (cnpj_basico, razao_social, natureza, qualificacao, capital, porte, ente) "
+                    "SELECT cnpj_basico, razao_social, natureza, qualificacao, capital, porte, ente FROM read_csv(?, delim=?, "
                     "quote='\"', escape='\"', header=false, columns={'cnpj_basico': 'VARCHAR', "
                     "'razao_social': 'VARCHAR', 'natureza': 'VARCHAR', 'qualificacao': 'VARCHAR', "
                     "'capital': 'VARCHAR', 'porte': 'VARCHAR', 'ente': 'VARCHAR'}, "
@@ -251,6 +262,17 @@ class CnpjStoreBuilder:
                 "encoding=?, ignore_errors=true)",
                 [str(files.municipalities), self._delimiter, self._encoding],
             )
+            if files.simples is not None:
+                connection.execute("DELETE FROM simples")
+                connection.execute(
+                    "INSERT INTO simples SELECT * FROM read_csv(?, delim=?, quote='\\\"', "
+                    "escape='\\\"', header=false, columns={'cnpj_basico':'VARCHAR', "
+                    "'opcao_simples':'VARCHAR', 'data_opcao_simples':'VARCHAR', "
+                    "'data_exclusao_simples':'VARCHAR', 'opcao_mei':'VARCHAR', "
+                    "'data_opcao_mei':'VARCHAR', 'data_exclusao_mei':'VARCHAR'}, "
+                    "encoding=?, ignore_errors=true)",
+                    [str(files.simples), self._delimiter, self._encoding],
+                )
             connection.execute("DELETE FROM cnaes")
             connection.execute(
                 "INSERT INTO cnaes SELECT column0, column1 FROM read_csv(?, delim=?, "
