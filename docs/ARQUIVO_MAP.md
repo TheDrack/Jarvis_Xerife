@@ -111,6 +111,9 @@ graph LR
     app_domain_ports["<b>ports</b><br/><hr/>📄 device_control_port.py: from, class, DeviceControlPort<br/>📄 host_port.py: from, HostIdentity, DiskUsage"]
     class app_domain_ports port
     app_domain --> app_domain_ports
+    app_domain_prospecting["<b>prospecting</b><br/><hr/>📄 contracts.py: ProspectEvidenceType, ProspectStage, ProspectEvidence<br/>📄 lifecycle.py: InvalidProspectTransition, transition_prospect"]
+    class app_domain_prospecting support
+    app_domain --> app_domain_prospecting
     app_domain_services["<b>services</b><br/><hr/>📄 agent_service.py: AgentService, execute<br/>📄 command_interpreter.py: CommandInterpreter, execute<br/>📄 intent_processor.py: IntentProcessor<br/>📄 llm_command_interpreter.py: LLMCommandInterpreter, execute<br/>📄 reward_signal_provider.py: record<br/>📄 safety_guardian.py: SafetyGuardian, configure<br/>📄 soldier_shield.py: SoldierShield, execute<br/>📄 state_manager.py: StateManager, execute<br/>📄 system_state_tracker.py: SystemStateTracker, execute<br/>📄 vocal_orchestrator.py: VocalOrchestrator, execute"]
     class app_domain_services support
     app_domain --> app_domain_services
