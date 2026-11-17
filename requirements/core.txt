@@ -16,8 +16,9 @@ fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
 
-# Database ORM
+# Database ORM and local analytical store
 sqlmodel>=0.0.14
+duckdb>=1.0.0
 psycopg2-binary>=2.9.9
 
 # HTTP Client
