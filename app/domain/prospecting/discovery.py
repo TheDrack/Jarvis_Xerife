@@ -44,7 +44,7 @@ class DiscoveryQuery(BaseModel):
     company_sizes: tuple[str, ...] = Field(default=(), max_length=10)
     legal_natures: tuple[str, ...] = Field(default=(), max_length=100)
     opened_from: Optional[str] = Field(default=None, pattern=r"^\d{8}$")
-    opened_to: Optional[str] = Field(default=None, pattern=r"^\\d{8}$")
+    opened_to: Optional[str] = Field(default=None, pattern=r"^\d{8}$")
     capital_min: Optional[float] = Field(default=None, ge=0)
     capital_max: Optional[float] = Field(default=None, ge=0)
     simples_only: bool = False
