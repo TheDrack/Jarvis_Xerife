@@ -197,3 +197,32 @@ def test_registers_session_authorized_outreach_controls():
     assert service.calls[0][1]["authorization"].reviewed_by == "paired-session"
     assert service.calls[1] == ("approve", "plan-1", "paired-session")
     assert service.calls[2] == ("dispatch", "plan-1", "send-1")
+
+
+@pytest.mark.asyncio
+async def test_mcp_search_forwards_advanced_registry_filters():
+    mcp = FakeMCP()
+    dispatcher = FakeDispatcher()
+    prospecting_mcp_tools.register_prospecting_tools(mcp, dispatcher=dispatcher)
+
+    await mcp.tools["prospecting.companies.search"](
+        uf="SC",
+        cnae_prefixes=["62"],
+        company_sizes=["03"],
+        legal_natures=["2062"],
+        neighborhoods=["Trindade"],
+        postal_codes=["88036000"],
+        opened_from="20200101",
+        opened_to="20251231",
+        capital_min=100000,
+        simples_only=True,
+    )
+
+    arguments = dispatcher.requests[0]["arguments"]
+    assert arguments["company_sizes"] == ["03"]
+    assert arguments["legal_natures"] == ["2062"]
+    assert arguments["neighborhoods"] == ["Trindade"]
+    assert arguments["postal_codes"] == ["88036000"]
+    assert arguments["opened_from"] == "20200101"
+    assert arguments["capital_min"] == 100000
+    assert arguments["simples_only"] is True
