@@ -353,3 +353,30 @@ def test_builder_ingests_company_domain_lookup_tables(tmp_path):
         assert connection.execute("SELECT descricao FROM situation_reasons WHERE codigo='01'").fetchone()[0] == "Extinção por encerramento"
     finally:
         connection.close()
+
+
+def test_contact_presence_and_cadastral_status_filters_do_not_return_contact_values(tmp_path):
+    row = establishment()
+    row[7] = "01"
+    row[9] = "105"
+    row[21], row[22] = "48", "33334444"
+    row[25], row[26] = "48", "33335555"
+    row[27] = "CONTATO@EXEMPLO.COM"
+    row[28] = "SITUACAO-ESPECIAL"
+    files = build_files(tmp_path, [row], [company_row()])
+    database = tmp_path / "presence.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+
+    result = CnpjStoreProvider(database).discover(query(
+        has_phone=True,
+        has_email=True,
+        has_fax=True,
+        country_codes=("105",),
+        reason_codes=("01",),
+        special_situation_codes=("SITUACAO-ESPECIAL",),
+    ))
+
+    assert len(result.companies) == 1
+    serialized = result.companies[0].model_dump(mode="json")
+    assert "33334444" not in str(serialized)
+    assert "CONTATO@EXEMPLO.COM" not in str(serialized)
