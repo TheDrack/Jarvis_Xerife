@@ -42,6 +42,17 @@ class FakeStore:
             if row.requester_id == requester_id and row.tenant_id == tenant_id
         )[:limit]
 
+    def withdraw_profile_consent(self, demand_id, *, tenant_id, requester_id):
+        row = self.rows[str(demand_id)]
+        updated = row.model_copy(update={
+            "consent_to_share_profile": False,
+            "consent_recorded_at": None,
+            "consent_scope": None,
+            "profile_reference": None,
+        })
+        self.rows[str(demand_id)] = updated
+        return updated
+
 
 def test_demand_mcp_creates_and_retrieves_private_b2c_supplier_request():
     mcp, gateway, store = FakeMCP(), FakeGateway(), FakeStore()
@@ -66,6 +77,7 @@ def test_demand_mcp_creates_and_retrieves_private_b2c_supplier_request():
         "prospecting.demands.create",
         "prospecting.demands.get",
         "prospecting.demands.list",
+        "prospecting.demands.withdraw_profile_consent",
     )
     assert created["success"] is True
     assert retrieved["demand"]["direction"] == "b2c"
