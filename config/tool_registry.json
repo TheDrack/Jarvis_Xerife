@@ -723,7 +723,7 @@
       "description": "Search active or inactive Brazilian companies by state, municipality and CNAE in the materialized official CNPJ dataset. Results are grouped by the 8-digit CNPJ root.",
       "operation": "search_companies",
       "capabilities": [
-        "prospecting.companies.search"
+        "prospecting.cnpj.read"
       ],
       "input_schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -953,7 +953,7 @@
       "description": "Look up one exact 14-digit CNPJ establishment in the official materialized dataset.",
       "operation": "lookup_company",
       "capabilities": [
-        "prospecting.companies.lookup"
+        "prospecting.cnpj.read"
       ],
       "input_schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
