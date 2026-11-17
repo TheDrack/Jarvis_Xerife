@@ -12,7 +12,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from urllib.parse import urlparse
 
 
@@ -94,6 +94,8 @@ def _validate_destination(channel: Channel, destination: str) -> str:
             raise ValueError("phone_must_be_e164")
         value = normalized
     elif channel == Channel.WEB_FORM:
+        if len(value) > 2048:
+            raise ValueError("web_form_url_too_long")
         parsed = urlparse(value)
         if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
             raise ValueError("web_form_requires_https_url")
@@ -406,6 +408,12 @@ class OutreachService:
                     authorization: ContactAuthorization) -> OutreachPlan:
         if not company_id.strip() or not campaign_id.strip() or not body.strip():
             raise ValueError("company_campaign_and_message_required")
+        if len(company_id) > 64 or len(campaign_id) > 128 or len(body) > 10000:
+            raise ValueError("outreach_field_too_long")
+        if subject is not None and len(subject) > 255:
+            raise ValueError("outreach_subject_too_long")
+        if len(authorization.evidence_ref) > 512:
+            raise ValueError("authorization_evidence_too_long")
         if not isinstance(channel, Channel):
             channel = Channel(channel)
         if authorization.basis not in {"consent", "contractual_relationship",
@@ -459,7 +467,7 @@ class OutreachService:
                 raise RuntimeError(code)
             return self.store.finish_dispatch(
                 plan_id, idempotency_key, success=True,
-                provider_id=str(result.get("provider_id") or "") or None,
+                provider_id=str(result.get("provider_id") or "")[:256] or None,
             )
         except Exception:
             # A transport exception is not proof of delivery. Keep it failed and auditable.
@@ -469,6 +477,11 @@ class OutreachService:
                     plan_id, idempotency_key, success=False, error_code="transport_exception"
                 )
             raise
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, request, file_pointer, code, message, headers, new_url):
+        return None
 
 
 class WebhookOutreachTransport:
@@ -496,7 +509,9 @@ class WebhookOutreachTransport:
                      "Content-Type": "application/json", "Accept": "application/json"},
         )
         try:
-            with urlopen(request, timeout=self.timeout_seconds) as response:
+            with build_opener(_NoRedirectHandler).open(
+                request, timeout=self.timeout_seconds
+            ) as response:
                 if response.status < 200 or response.status >= 300:
                     return {"accepted": False, "error": f"http_{response.status}"}
                 result = json.loads(response.read(65536).decode("utf-8"))
