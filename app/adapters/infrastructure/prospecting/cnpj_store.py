@@ -389,9 +389,49 @@ class CnpjStoreProvider:
             if query.after_cnpj_basico:
                 conditions.append("e.cnpj_basico > ?")
                 parameters.append(query.after_cnpj_basico)
-            if query.only_active:
+            if query.situation_codes:
+                placeholders = ", ".join("?" for _ in query.situation_codes)
+                conditions.append(f"e.situacao_cadastral IN ({placeholders})")
+                parameters.extend(query.situation_codes)
+            elif query.only_active:
                 conditions.append("e.situacao_cadastral = ?")
                 parameters.append(_ACTIVE)
+            if query.establishment_types:
+                placeholders = ", ".join("?" for _ in query.establishment_types)
+                conditions.append(f"e.matriz_filial IN ({placeholders})")
+                parameters.extend(query.establishment_types)
+            if query.neighborhoods:
+                placeholders = ", ".join("?" for _ in query.neighborhoods)
+                conditions.append(f"upper(coalesce(e.bairro, '')) IN ({placeholders})")
+                parameters.extend(value.upper() for value in query.neighborhoods)
+            if query.postal_codes:
+                placeholders = ", ".join("?" for _ in query.postal_codes)
+                conditions.append(f"regexp_replace(coalesce(e.cep, ''), '[^0-9]', '', 'g') IN ({placeholders})")
+                parameters.extend("".join(ch for ch in value if ch.isdigit()) for value in query.postal_codes)
+            if query.opened_from:
+                conditions.append("e.data_inicio_atividade >= ?")
+                parameters.append(query.opened_from)
+            if query.opened_to:
+                conditions.append("e.data_inicio_atividade <= ?")
+                parameters.append(query.opened_to)
+            if query.company_sizes:
+                placeholders = ", ".join("?" for _ in query.company_sizes)
+                conditions.append(f"c.porte IN ({placeholders})")
+                parameters.extend(query.company_sizes)
+            if query.legal_natures:
+                placeholders = ", ".join("?" for _ in query.legal_natures)
+                conditions.append(f"c.natureza IN ({placeholders})")
+                parameters.extend(query.legal_natures)
+            if query.capital_min is not None:
+                conditions.append("try_cast(replace(c.capital, ',', '.') AS DOUBLE) >= ?")
+                parameters.append(query.capital_min)
+            if query.capital_max is not None:
+                conditions.append("try_cast(replace(c.capital, ',', '.') AS DOUBLE) <= ?")
+                parameters.append(query.capital_max)
+            if query.simples_only:
+                conditions.append("EXISTS (SELECT 1 FROM simples sn WHERE sn.cnpj_basico=e.cnpj_basico AND sn.opcao_simples='S')")
+            if query.mei_only:
+                conditions.append("EXISTS (SELECT 1 FROM simples sm WHERE sm.cnpj_basico=e.cnpj_basico AND sm.opcao_mei='S')")
             if municipalities is not None:
                 if not municipalities:
                     return DiscoveryResult(
@@ -417,12 +457,14 @@ class CnpjStoreProvider:
 
             where = " AND ".join(conditions)
             matched_rows = connection.execute(
-                f"SELECT count(*) FROM establishments e WHERE {where}", parameters
+                f"SELECT count(*) FROM establishments e LEFT JOIN companies c ON c.cnpj_basico=e.cnpj_basico WHERE {where}", parameters
             ).fetchone()[0]
 
             rows = connection.execute(
                 "SELECT e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv, e.nome_fantasia, "
-                "e.cnae_principal, e.municipio, c.razao_social, m.nome, n.descricao "
+                "e.cnae_principal, e.municipio, c.razao_social, m.nome, n.descricao, "
+                "c.natureza, c.capital, c.porte, e.data_inicio_atividade, e.matriz_filial, "
+                "e.bairro, e.cep "
                 "FROM establishments e "
                 "LEFT JOIN companies c ON c.cnpj_basico = e.cnpj_basico "
                 "LEFT JOIN municipalities m ON m.codigo = e.municipio "
@@ -447,6 +489,13 @@ class CnpjStoreProvider:
             legal_name,
             municipality_name,
             cnae_description,
+            legal_nature,
+            capital_social,
+            company_size,
+            opening_date,
+            establishment_type,
+            neighborhood,
+            postal_code,
         ) in rows:
             basename = (basename or "").strip()
             if basename in seen:
@@ -466,6 +515,14 @@ class CnpjStoreProvider:
                     legal_name=(legal_name or "").strip() or None,
                     cnpj=digits,
                     industry=cnae_description or f"CNAE {cnae}",
+                    primary_cnae=cnae,
+                    legal_nature=(legal_nature or "").strip() or None,
+                    capital_social=(capital_social or "").strip() or None,
+                    company_size=(company_size or "").strip() or None,
+                    opening_date=(opening_date or "").strip() or None,
+                    establishment_type=(establishment_type or "").strip() or None,
+                    neighborhood=(neighborhood or "").strip() or None,
+                    postal_code=(postal_code or "").strip() or None,
                     city=municipality_name,
                     state=query.uf,
                     country="BR",
