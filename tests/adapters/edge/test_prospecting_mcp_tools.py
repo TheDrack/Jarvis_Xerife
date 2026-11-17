@@ -54,7 +54,7 @@ async def test_registers_search_and_exact_cnpj_lookup_through_tool_dispatcher():
     assert search["companies"][0]["cnpj"] == "12345678000190"
     assert lookup["success"] is True
     assert dispatcher.requests[0]["tool_id"] == "prospecting.companies.search"
-    assert dispatcher.requests[0]["capability"] == "prospecting.companies.search"
+    assert dispatcher.requests[0]["capability"] == "prospecting.cnpj.read"
     assert dispatcher.requests[0]["arguments"]["limit"] == 25
     assert dispatcher.requests[0]["scope"] == "local"
     assert dispatcher.requests[1]["tool_id"] == "prospecting.companies.lookup"
