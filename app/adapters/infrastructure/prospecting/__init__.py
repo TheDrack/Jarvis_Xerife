@@ -11,6 +11,7 @@ from app.adapters.infrastructure.prospecting.cnpj_store import (
     CnpjStoreReport,
 )
 from app.adapters.infrastructure.prospecting.composite import CompositeDiscoveryProvider
+from app.adapters.infrastructure.prospecting.prospecting_adapter import ProspectingAdapter
 from app.adapters.infrastructure.prospecting.external_leads import (
     DEFAULT_LICENSE,
     ExternalLeadsAdapter,
@@ -28,4 +29,5 @@ __all__ = [
     "CnpjStoreReport",
     "CompositeDiscoveryProvider",
     "ExternalLeadsAdapter",
+    "ProspectingAdapter",
 ]
