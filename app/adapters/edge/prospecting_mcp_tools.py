@@ -162,6 +162,7 @@ PROSPECTING_OUTREACH_TOOLS = (
     "prospecting.outreach.approve",
     "prospecting.outreach.dispatch",
     "prospecting.outreach.block",
+    "prospecting.outreach.history",
 )
 
 
@@ -238,6 +239,22 @@ def register_prospecting_outreach_tools(
         except Exception as exc:
             logger.warning("Prospecto outreach dispatch rejected: %s", type(exc).__name__)
             return {"success": False, "error_code": str(exc) if isinstance(exc, (ValueError, PermissionError, LookupError, RuntimeError)) else "outreach_dispatch_failed"}
+
+    @mcp.tool(name="prospecting.outreach.history")
+    def prospecting_outreach_history(plan_id: str) -> dict[str, Any]:
+        """Read status and metadata-only audit events for one outreach plan."""
+        try:
+            actor()
+            plan = outreach.get_plan(plan_id)
+            return {
+                "success": True,
+                "plan_id": plan.plan_id,
+                "status": plan.status.value,
+                "events": outreach.list_events(plan_id),
+            }
+        except Exception as exc:
+            logger.warning("Prospecto outreach history rejected: %s", type(exc).__name__)
+            return {"success": False, "error_code": "outreach_history_unavailable"}
 
     @mcp.tool(name="prospecting.outreach.block")
     def prospecting_outreach_block(
