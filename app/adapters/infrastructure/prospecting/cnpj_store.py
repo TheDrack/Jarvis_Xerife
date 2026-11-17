@@ -419,6 +419,30 @@ class CnpjStoreProvider:
             elif query.only_active:
                 conditions.append("e.situacao_cadastral = ?")
                 parameters.append(_ACTIVE)
+            if query.country_codes:
+                placeholders = ", ".join("?" for _ in query.country_codes)
+                conditions.append(f"e.pais IN ({placeholders})")
+                parameters.extend(query.country_codes)
+            if query.reason_codes:
+                placeholders = ", ".join("?" for _ in query.reason_codes)
+                conditions.append(f"e.motivo_situacao_cadastral IN ({placeholders})")
+                parameters.extend(query.reason_codes)
+            if query.special_situation_codes:
+                placeholders = ", ".join("?" for _ in query.special_situation_codes)
+                conditions.append(f"e.situacao_especial IN ({placeholders})")
+                parameters.extend(query.special_situation_codes)
+            if query.has_phone is True:
+                conditions.append("(length(trim(coalesce(e.telefone1, ''))) > 0 OR length(trim(coalesce(e.telefone2, ''))) > 0)")
+            elif query.has_phone is False:
+                conditions.append("(coalesce(e.telefone1, '') = '' AND coalesce(e.telefone2, '') = '')")
+            if query.has_email is True:
+                conditions.append("length(trim(coalesce(e.correio_eletronico, ''))) > 0")
+            elif query.has_email is False:
+                conditions.append("coalesce(e.correio_eletronico, '') = ''")
+            if query.has_fax is True:
+                conditions.append("length(trim(coalesce(e.telefone3, ''))) > 0")
+            elif query.has_fax is False:
+                conditions.append("coalesce(e.telefone3, '') = ''")
             if query.establishment_types:
                 placeholders = ", ".join("?" for _ in query.establishment_types)
                 conditions.append(f"e.matriz_filial IN ({placeholders})")
