@@ -137,6 +137,14 @@ Conclusões que mudaram a campanha:
 
 O próximo ajuste estrutural é particionar o recorte (uma cidade ou um segmento por campanha) ou trocar o corte por amostragem determinística — aumentar `limit` só aumenta o viés.
 
+## 5c. Filtros cadastrais ampliados
+
+A pesquisa via DuckDB também aceita: matriz/filial, códigos de situação cadastral, bairro, CEP, data de início, porte cadastral, natureza jurídica, capital social, Simples/MEI, país, motivo da situação, situação especial e presença de telefone/e-mail/fax. Os filtros de Simples/MEI exigem a ingestão do arquivo Simples; se estiver ausente, a consulta falha explicitamente.
+
+Para ingerir arquivos auxiliares disponíveis na pasta, o comando aceita automaticamente Simples.csv, Naturezas.csv, Qualificacoes.csv, Paises.csv e Motivos.csv. Também é possível informar caminhos explícitos com --simples, --legal-natures, --qualifications, --countries e --situation-reasons.
+
+A execução direta por CSV não suporta os filtros avançados: ela falha com mensagem explícita em vez de ignorá-los. Use o DuckDB para essas consultas.
+
 ## 6. Ajustar o ICP
 
 - `weights`: distribua o que realmente distingue o comprador. Critério configurado sem peso é rejeitado na carga.
@@ -153,7 +161,7 @@ Critério de invalidação sugerido: se depois de 20 abordagens humanas menos de
 ## 8. Limites e proibições
 
 - Varredura em Python puro sobre dezenas de milhões de linhas: serve para carga mensal, não para consulta interativa. Para consulta repetida, materialize os CSVs em DuckDB/PostgreSQL.
-- O adaptador **não lê telefone nem e-mail**. A entrega é a lista de empresas com CNPJ e fonte oficial; contato exige decisão de finalidade, retenção e opt-out.
+- Os valores de telefone/e-mail não são devolvidos pelo domínio nem pelo MCP. O DuckDB mantém as colunas originais sob acesso local e permite filtrar apenas presença (has_phone, has_email, has_fax). Isso não autoriza contato; outreach continua sujeito a finalidade, retenção, revisão humana e opt-out.
 - Google Places não pode ser usado como base (os termos proíbem armazenar nome/endereço); ver [JARVIS_PROSPECTO_SOURCES.md](JARVIS_PROSPECTO_SOURCES.md).
 - O `tenant_id` da campanha é rótulo local de operador. Uma API futura deve resolver o tenant por membership autenticada, nunca por este arquivo.
 - Nada é enviado automaticamente: `DO_NOT_CONTACT` é terminal e o envio continua humano.

@@ -197,3 +197,58 @@ def test_registers_session_authorized_outreach_controls():
     assert service.calls[0][1]["authorization"].reviewed_by == "paired-session"
     assert service.calls[1] == ("approve", "plan-1", "paired-session")
     assert service.calls[2] == ("dispatch", "plan-1", "send-1")
+
+
+@pytest.mark.asyncio
+async def test_mcp_search_forwards_advanced_registry_filters():
+    mcp = FakeMCP()
+    dispatcher = FakeDispatcher()
+    prospecting_mcp_tools.register_prospecting_tools(mcp, dispatcher=dispatcher)
+
+    await mcp.tools["prospecting.companies.search"](
+        uf="SC",
+        cnae_prefixes=["62"],
+        company_sizes=["03"],
+        legal_natures=["2062"],
+        neighborhoods=["Trindade"],
+        postal_codes=["88036000"],
+        opened_from="20200101",
+        opened_to="20251231",
+        capital_min=100000,
+        simples_only=True,
+    )
+
+    arguments = dispatcher.requests[0]["arguments"]
+    assert arguments["company_sizes"] == ["03"]
+    assert arguments["legal_natures"] == ["2062"]
+    assert arguments["neighborhoods"] == ["Trindade"]
+    assert arguments["postal_codes"] == ["88036000"]
+    assert arguments["opened_from"] == "20200101"
+    assert arguments["capital_min"] == 100000
+    assert arguments["simples_only"] is True
+
+
+@pytest.mark.asyncio
+async def test_mcp_search_forwards_presence_and_situation_filters():
+    mcp = FakeMCP()
+    dispatcher = FakeDispatcher()
+    prospecting_mcp_tools.register_prospecting_tools(mcp, dispatcher=dispatcher)
+
+    await mcp.tools["prospecting.companies.search"](
+        uf="SC",
+        cnae_prefixes=["62"],
+        country_codes=["105"],
+        reason_codes=["01"],
+        special_situation_codes=["SITUACAO-ESPECIAL"],
+        has_phone=True,
+        has_email=False,
+        has_fax=True,
+    )
+
+    arguments = dispatcher.requests[0]["arguments"]
+    assert arguments["country_codes"] == ["105"]
+    assert arguments["reason_codes"] == ["01"]
+    assert arguments["special_situation_codes"] == ["SITUACAO-ESPECIAL"]
+    assert arguments["has_phone"] is True
+    assert arguments["has_email"] is False
+    assert arguments["has_fax"] is True

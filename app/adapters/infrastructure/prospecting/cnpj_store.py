@@ -73,7 +73,7 @@ ESTABELECIMENTO_COLUMNS: tuple[str, ...] = (
 )
 MINIMUM_ESTABLISHMENT_COLUMNS = 21
 _ACTIVE = "02"
-_SUPPORTED_FIELDS = ("company_name", "legal_name", "cnpj", "industry", "city", "state")
+_SUPPORTED_FIELDS = ("company_name", "legal_name", "cnpj", "industry", "city", "state", "company_size", "legal_nature", "capital_social", "opening_date", "establishment_type", "neighborhood", "postal_code", "primary_cnae", "has_phone", "has_email", "has_fax")
 
 
 @dataclass(frozen=True)
@@ -84,11 +84,16 @@ class CnpjStoreFiles:
     companies: tuple[Path, ...]
     municipalities: Path
     cnaes: Path
+    simples: Optional[Path] = None
+    legal_natures: Optional[Path] = None
+    qualifications: Optional[Path] = None
+    countries: Optional[Path] = None
+    situation_reasons: Optional[Path] = None
 
     def missing(self) -> tuple[str, ...]:
         missing = [
             path.name
-            for path in (*self.establishments, *self.companies, self.municipalities, self.cnaes)
+            for path in (*self.establishments, *self.companies, self.municipalities, self.cnaes, *((self.simples,) if self.simples else ()), *((self.legal_natures,) if self.legal_natures else ()), *((self.qualifications,) if self.qualifications else ()), *((self.countries,) if self.countries else ()), *((self.situation_reasons,) if self.situation_reasons else ()))
             if not path.is_file()
         ]
         return tuple(missing)
@@ -159,12 +164,26 @@ class CnpjStoreBuilder:
         connection.execute(f"CREATE TABLE IF NOT EXISTS establishments ({columns})")
         connection.execute(
             "CREATE TABLE IF NOT EXISTS companies ("
-            "cnpj_basico VARCHAR, razao_social VARCHAR, porte VARCHAR)"
+            "cnpj_basico VARCHAR, razao_social VARCHAR, natureza VARCHAR, "
+            "qualificacao VARCHAR, capital VARCHAR, porte VARCHAR, ente VARCHAR)"
         )
         connection.execute(
             "CREATE TABLE IF NOT EXISTS municipalities (codigo VARCHAR, nome VARCHAR)"
         )
         connection.execute("CREATE TABLE IF NOT EXISTS cnaes (codigo VARCHAR, descricao VARCHAR)")
+        connection.execute("CREATE TABLE IF NOT EXISTS legal_natures (codigo VARCHAR, descricao VARCHAR)")
+        connection.execute("CREATE TABLE IF NOT EXISTS qualifications (codigo VARCHAR, descricao VARCHAR)")
+        connection.execute("CREATE TABLE IF NOT EXISTS countries (codigo VARCHAR, descricao VARCHAR)")
+        connection.execute("CREATE TABLE IF NOT EXISTS situation_reasons (codigo VARCHAR, descricao VARCHAR)")
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS simples (cnpj_basico VARCHAR, opcao_simples VARCHAR, "
+            "data_opcao_simples VARCHAR, data_exclusao_simples VARCHAR, opcao_mei VARCHAR, "
+            "data_opcao_mei VARCHAR, data_exclusao_mei VARCHAR)"
+        )
+        # Backward-compatible migration for stores created by the earlier 3-column schema.
+        for name in ("natureza", "qualificacao", "capital", "ente"):
+            connection.execute(f"ALTER TABLE companies ADD COLUMN IF NOT EXISTS {name} VARCHAR")
+
         connection.execute(
             "CREATE TABLE IF NOT EXISTS ingest_log (file_name VARCHAR, rows BIGINT, "
             "ingested_at VARCHAR)"
@@ -228,8 +247,8 @@ class CnpjStoreBuilder:
                     skipped.append(path.name)
                     continue
                 connection.execute(
-                    "INSERT INTO companies "
-                    "SELECT cnpj_basico, razao_social, porte FROM read_csv(?, delim=?, "
+                    "INSERT INTO companies (cnpj_basico, razao_social, natureza, qualificacao, capital, porte, ente) "
+                    "SELECT cnpj_basico, razao_social, natureza, qualificacao, capital, porte, ente FROM read_csv(?, delim=?, "
                     "quote='\"', escape='\"', header=false, columns={'cnpj_basico': 'VARCHAR', "
                     "'razao_social': 'VARCHAR', 'natureza': 'VARCHAR', 'qualificacao': 'VARCHAR', "
                     "'capital': 'VARCHAR', 'porte': 'VARCHAR', 'ente': 'VARCHAR'}, "
@@ -251,6 +270,34 @@ class CnpjStoreBuilder:
                 "encoding=?, ignore_errors=true)",
                 [str(files.municipalities), self._delimiter, self._encoding],
             )
+            connection.execute("DELETE FROM simples")
+            if files.simples is not None:
+                connection.execute(
+                    "INSERT INTO simples SELECT * FROM read_csv(?, delim=?, quote='\"', "
+                    "escape='\"', header=false, columns={'cnpj_basico':'VARCHAR', "
+                    "'opcao_simples':'VARCHAR', 'data_opcao_simples':'VARCHAR', "
+                    "'data_exclusao_simples':'VARCHAR', 'opcao_mei':'VARCHAR', "
+                    "'data_opcao_mei':'VARCHAR', 'data_exclusao_mei':'VARCHAR'}, "
+                    "encoding=?, ignore_errors=true)",
+                    [str(files.simples), self._delimiter, self._encoding],
+                )
+                new_files.append(files.simples.name)
+            for source_path, table_name in (
+                (files.legal_natures, "legal_natures"),
+                (files.qualifications, "qualifications"),
+                (files.countries, "countries"),
+                (files.situation_reasons, "situation_reasons"),
+            ):
+                connection.execute(f"DELETE FROM {table_name}")
+                if source_path is None:
+                    continue
+                connection.execute(
+                    f"INSERT INTO {table_name} SELECT column0, column1 FROM read_csv(?, delim=?, "
+                    "quote='\"', header=false, columns={'column0':'VARCHAR','column1':'VARCHAR'}, "
+                    "encoding=?, ignore_errors=true)",
+                    [str(source_path), self._delimiter, self._encoding],
+                )
+                new_files.append(source_path.name)
             connection.execute("DELETE FROM cnaes")
             connection.execute(
                 "INSERT INTO cnaes SELECT column0, column1 FROM read_csv(?, delim=?, "
@@ -312,7 +359,11 @@ class CnpjStoreProvider:
         try:
             row = connection.execute(
                 "SELECT e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv, e.nome_fantasia, "
-                "e.cnae_principal, c.razao_social, m.nome, n.descricao "
+                "e.cnae_principal, c.razao_social, m.nome, n.descricao, c.natureza, c.capital, "
+                "c.porte, e.data_inicio_atividade, e.matriz_filial, e.bairro, e.cep, "
+                "(nullif(trim(e.telefone1), '') IS NOT NULL OR nullif(trim(e.telefone2), '') IS NOT NULL), "
+                "(nullif(trim(e.correio_eletronico), '') IS NOT NULL), "
+                "(nullif(trim(e.telefone3), '') IS NOT NULL) "
                 "FROM establishments e "
                 "LEFT JOIN companies c ON c.cnpj_basico = e.cnpj_basico "
                 "LEFT JOIN municipalities m ON m.codigo = e.municipio "
@@ -325,7 +376,7 @@ class CnpjStoreProvider:
         if row is None:
             return None
 
-        basename, ordem, dv, trade_name, cnae, legal_name, municipality_name, description = row
+        (basename, ordem, dv, trade_name, cnae, legal_name, municipality_name, description, legal_nature, capital_social, company_size, opening_date, establishment_type, neighborhood, postal_code, has_phone, has_email, has_fax) = row
         name = (trade_name or "").strip() or (legal_name or "").strip()
         if not name or not any(ch.isalpha() for ch in name):
             return None
@@ -335,6 +386,17 @@ class CnpjStoreProvider:
             legal_name=(legal_name or "").strip() or None,
             cnpj="".join(ch for ch in f"{basename}{ordem}{dv}" if ch.isdigit()),
             industry=description or f"CNAE {cnae}",
+            primary_cnae=cnae,
+            legal_nature=(legal_nature or "").strip() or None,
+            capital_social=(capital_social or "").strip() or None,
+            company_size=(company_size or "").strip() or None,
+            opening_date=(opening_date or "").strip() or None,
+            establishment_type=(establishment_type or "").strip() or None,
+            neighborhood=(neighborhood or "").strip() or None,
+            postal_code=(postal_code or "").strip() or None,
+            has_phone=bool(has_phone),
+            has_email=bool(has_email),
+            has_fax=bool(has_fax),
             city=municipality_name,
             country="BR",
             registry_presence=RegistryPresence.FOUND,
@@ -367,9 +429,75 @@ class CnpjStoreProvider:
             if query.after_cnpj_basico:
                 conditions.append("e.cnpj_basico > ?")
                 parameters.append(query.after_cnpj_basico)
-            if query.only_active:
+            if query.situation_codes:
+                placeholders = ", ".join("?" for _ in query.situation_codes)
+                conditions.append(f"e.situacao_cadastral IN ({placeholders})")
+                parameters.extend(query.situation_codes)
+            elif query.only_active:
                 conditions.append("e.situacao_cadastral = ?")
                 parameters.append(_ACTIVE)
+            if query.country_codes:
+                placeholders = ", ".join("?" for _ in query.country_codes)
+                conditions.append(f"e.pais IN ({placeholders})")
+                parameters.extend(query.country_codes)
+            if query.reason_codes:
+                placeholders = ", ".join("?" for _ in query.reason_codes)
+                conditions.append(f"e.motivo_situacao_cadastral IN ({placeholders})")
+                parameters.extend(query.reason_codes)
+            if query.special_situation_codes:
+                placeholders = ", ".join("?" for _ in query.special_situation_codes)
+                conditions.append(f"e.situacao_especial IN ({placeholders})")
+                parameters.extend(query.special_situation_codes)
+            if query.has_phone is True:
+                conditions.append("(length(trim(coalesce(e.telefone1, ''))) > 0 OR length(trim(coalesce(e.telefone2, ''))) > 0)")
+            elif query.has_phone is False:
+                conditions.append("(coalesce(e.telefone1, '') = '' AND coalesce(e.telefone2, '') = '')")
+            if query.has_email is True:
+                conditions.append("length(trim(coalesce(e.correio_eletronico, ''))) > 0")
+            elif query.has_email is False:
+                conditions.append("coalesce(e.correio_eletronico, '') = ''")
+            if query.has_fax is True:
+                conditions.append("length(trim(coalesce(e.telefone3, ''))) > 0")
+            elif query.has_fax is False:
+                conditions.append("coalesce(e.telefone3, '') = ''")
+            if query.establishment_types:
+                placeholders = ", ".join("?" for _ in query.establishment_types)
+                conditions.append(f"e.matriz_filial IN ({placeholders})")
+                parameters.extend(query.establishment_types)
+            if query.neighborhoods:
+                placeholders = ", ".join("?" for _ in query.neighborhoods)
+                conditions.append(f"upper(coalesce(e.bairro, '')) IN ({placeholders})")
+                parameters.extend(value.upper() for value in query.neighborhoods)
+            if query.postal_codes:
+                placeholders = ", ".join("?" for _ in query.postal_codes)
+                conditions.append(f"regexp_replace(coalesce(e.cep, ''), '[^0-9]', '', 'g') IN ({placeholders})")
+                parameters.extend("".join(ch for ch in value if ch.isdigit()) for value in query.postal_codes)
+            if query.opened_from:
+                conditions.append("e.data_inicio_atividade >= ?")
+                parameters.append(query.opened_from)
+            if query.opened_to:
+                conditions.append("e.data_inicio_atividade <= ?")
+                parameters.append(query.opened_to)
+            if query.company_sizes:
+                placeholders = ", ".join("?" for _ in query.company_sizes)
+                conditions.append(f"c.porte IN ({placeholders})")
+                parameters.extend(query.company_sizes)
+            if query.legal_natures:
+                placeholders = ", ".join("?" for _ in query.legal_natures)
+                conditions.append(f"c.natureza IN ({placeholders})")
+                parameters.extend(query.legal_natures)
+            if query.capital_min is not None:
+                conditions.append("try_cast(replace(c.capital, ',', '.') AS DOUBLE) >= ?")
+                parameters.append(query.capital_min)
+            if query.capital_max is not None:
+                conditions.append("try_cast(replace(c.capital, ',', '.') AS DOUBLE) <= ?")
+                parameters.append(query.capital_max)
+            if (query.simples_only or query.mei_only) and connection.execute("SELECT count(*) FROM simples").fetchone()[0] == 0:
+                raise RuntimeError("Simples/MEI filters require the official Simples dataset to be ingested")
+            if query.simples_only:
+                conditions.append("EXISTS (SELECT 1 FROM simples sn WHERE sn.cnpj_basico=e.cnpj_basico AND sn.opcao_simples='S')")
+            if query.mei_only:
+                conditions.append("EXISTS (SELECT 1 FROM simples sm WHERE sm.cnpj_basico=e.cnpj_basico AND sm.opcao_mei='S')")
             if municipalities is not None:
                 if not municipalities:
                     return DiscoveryResult(
@@ -395,12 +523,17 @@ class CnpjStoreProvider:
 
             where = " AND ".join(conditions)
             matched_rows = connection.execute(
-                f"SELECT count(*) FROM establishments e WHERE {where}", parameters
+                f"SELECT count(*) FROM establishments e LEFT JOIN companies c ON c.cnpj_basico=e.cnpj_basico WHERE {where}", parameters
             ).fetchone()[0]
 
             rows = connection.execute(
                 "SELECT e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv, e.nome_fantasia, "
-                "e.cnae_principal, e.municipio, c.razao_social, m.nome, n.descricao "
+                "e.cnae_principal, e.municipio, c.razao_social, m.nome, n.descricao, "
+                "c.natureza, c.capital, c.porte, e.data_inicio_atividade, e.matriz_filial, "
+                "e.bairro, e.cep, "
+                "(nullif(trim(e.telefone1), '') IS NOT NULL OR nullif(trim(e.telefone2), '') IS NOT NULL), "
+                "(nullif(trim(e.correio_eletronico), '') IS NOT NULL), "
+                "(nullif(trim(e.telefone3), '') IS NOT NULL) "
                 "FROM establishments e "
                 "LEFT JOIN companies c ON c.cnpj_basico = e.cnpj_basico "
                 "LEFT JOIN municipalities m ON m.codigo = e.municipio "
@@ -425,6 +558,16 @@ class CnpjStoreProvider:
             legal_name,
             municipality_name,
             cnae_description,
+            legal_nature,
+            capital_social,
+            company_size,
+            opening_date,
+            establishment_type,
+            neighborhood,
+            postal_code,
+            has_phone,
+            has_email,
+            has_fax,
         ) in rows:
             basename = (basename or "").strip()
             if basename in seen:
@@ -444,6 +587,17 @@ class CnpjStoreProvider:
                     legal_name=(legal_name or "").strip() or None,
                     cnpj=digits,
                     industry=cnae_description or f"CNAE {cnae}",
+                    primary_cnae=cnae,
+                    legal_nature=(legal_nature or "").strip() or None,
+                    capital_social=(capital_social or "").strip() or None,
+                    company_size=(company_size or "").strip() or None,
+                    opening_date=(opening_date or "").strip() or None,
+                    establishment_type=(establishment_type or "").strip() or None,
+                    neighborhood=(neighborhood or "").strip() or None,
+                    postal_code=(postal_code or "").strip() or None,
+                    has_phone=bool(has_phone),
+                    has_email=bool(has_email),
+                    has_fax=bool(has_fax),
                     city=municipality_name,
                     state=query.uf,
                     country="BR",

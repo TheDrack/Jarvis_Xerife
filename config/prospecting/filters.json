@@ -1,65 +1,11 @@
 {
-  "version": 1,
+  "version": 2,
   "presets": [
-    {
-      "id": "construcao-grande-florianopolis",
-      "name": "Construcao e instalacao - Grande Florianopolis",
-      "description": "Construtoras, instaladores e fabricantes de material de construcao nos quatro municipios com operacao propria.",
-      "query": {
-        "uf": "SC",
-        "municipalities": ["Florianópolis", "São José", "Palhoça", "Biguaçu"],
-        "cnae_prefixes": ["41", "43", "25", "33"],
-        "only_active": true,
-        "limit": 500
-      }
-    },
-    {
-      "id": "atacado-grande-florianopolis",
-      "name": "Comercio atacadista - Grande Florianopolis",
-      "description": "Distribuidores e atacadistas, o perfil com maior volume de compra recorrente.",
-      "query": {
-        "uf": "SC",
-        "municipalities": ["Florianópolis", "São José", "Palhoça", "Biguaçu"],
-        "cnae_prefixes": ["46"],
-        "only_active": true,
-        "limit": 500
-      }
-    },
-    {
-      "id": "metalmecanica-sc",
-      "name": "Metalurgia e metalmecanica - Santa Catarina",
-      "description": "Estado inteiro: serralherias, usinagem e fabricacao de maquinas fora da regiao metropolitana.",
-      "query": {
-        "uf": "SC",
-        "municipalities": [],
-        "cnae_prefixes": ["25", "28", "33"],
-        "only_active": true,
-        "limit": 500
-      }
-    },
-    {
-      "id": "servicos-para-obras",
-      "name": "Servicos especializados para obras",
-      "description": "Manutencao, instalacoes e servicos tecnicos que atendem construtoras e industrias.",
-      "query": {
-        "uf": "SC",
-        "municipalities": ["Florianópolis", "São José", "Palhoça", "Biguaçu"],
-        "cnae_prefixes": ["43", "71", "81"],
-        "only_active": true,
-        "limit": 500
-      }
-    },
-    {
-      "id": "todos-os-setores-grande-florianopolis",
-      "name": "Todos os setores do ICP - Grande Florianopolis",
-      "description": "Recorte amplo, sem recorte fino de CNAE: serve para medir o tamanho real do mercado antes de segmentar.",
-      "query": {
-        "uf": "SC",
-        "municipalities": ["Florianópolis", "São José", "Palhoça", "Biguaçu"],
-        "cnae_prefixes": ["46", "41", "43", "25", "28", "33", "71", "81"],
-        "only_active": true,
-        "limit": 500
-      }
-    }
+    {"id":"construcao-grande-florianopolis","name":"Construcao e instalacao - Grande Florianopolis","description":"Construtoras, instaladores e fabricantes de material de construcao nos quatro municipios com operacao propria.","query":{"uf":"SC","municipalities":["Florianópolis","São José","Palhoça","Biguaçu"],"cnae_prefixes":["41","43","25","33"],"only_active":true,"limit":500}},
+    {"id":"atacado-grande-florianopolis","name":"Comercio atacadista - Grande Florianopolis","description":"Distribuidores e atacadistas, o perfil com maior volume de compra recorrente.","query":{"uf":"SC","municipalities":["Florianópolis","São José","Palhoça","Biguaçu"],"cnae_prefixes":["46"],"only_active":true,"limit":500}},
+    {"id":"metalmecanica-sc","name":"Metalurgia e metalmecanica - Santa Catarina","description":"Estado inteiro: serralherias, usinagem e fabricacao de maquinas fora da regiao metropolitana.","query":{"uf":"SC","municipalities":[],"cnae_prefixes":["25","28","33"],"only_active":true,"limit":500}},
+    {"id":"servicos-para-obras","name":"Servicos especializados para obras","description":"Manutencao, instalacoes e servicos tecnicos que atendem construtoras e industrias.","query":{"uf":"SC","municipalities":["Florianópolis","São José","Palhoça","Biguaçu"],"cnae_prefixes":["43","71","81"],"only_active":true,"limit":500}},
+    {"id":"todos-os-setores-grande-florianopolis","name":"Todos os setores do ICP - Grande Florianopolis","description":"Recorte amplo, sem recorte fino de CNAE: serve para medir o tamanho real do mercado antes de segmentar.","query":{"uf":"SC","municipalities":["Florianópolis","São José","Palhoça","Biguaçu"],"cnae_prefixes":["46","41","43","25","28","33","71","81"],"only_active":true,"limit":500}},
+    {"id":"tecnologia-florianopolis","name":"Tecnologia, software e inovação - Florianópolis","description":"Recorte inicial para tecnologia: software, TI, telecom, dados, P&D e fabricação eletrônica. Usar CNAE principal e secundário; segmentar depois pelas verticais ACATE e por evidências de mercado.","query":{"uf":"SC","municipalities":["Florianópolis"],"cnae_prefixes":["26","27","58","61","62","63","72"],"only_active":true,"include_secondary_cnae":true,"limit":5000}}
   ]
 }

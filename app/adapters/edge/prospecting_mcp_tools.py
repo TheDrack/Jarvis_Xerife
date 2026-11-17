@@ -90,6 +90,24 @@ def register_prospecting_tools(
         include_secondary_cnae: bool = True,
         limit: int = 50,
         after_cnpj_basico: Optional[str] = None,
+        establishment_types: Optional[list[str]] = None,
+        situation_codes: Optional[list[str]] = None,
+        neighborhoods: Optional[list[str]] = None,
+        postal_codes: Optional[list[str]] = None,
+        company_sizes: Optional[list[str]] = None,
+        legal_natures: Optional[list[str]] = None,
+        opened_from: Optional[str] = None,
+        opened_to: Optional[str] = None,
+        capital_min: Optional[float] = None,
+        capital_max: Optional[float] = None,
+        simples_only: bool = False,
+        mei_only: bool = False,
+        country_codes: Optional[list[str]] = None,
+        reason_codes: Optional[list[str]] = None,
+        special_situation_codes: Optional[list[str]] = None,
+        has_phone: Optional[bool] = None,
+        has_email: Optional[bool] = None,
+        has_fax: Optional[bool] = None,
     ) -> dict[str, Any]:
         """Search Brazilian companies by UF, municipality and CNAE.
 
@@ -108,6 +126,35 @@ def register_prospecting_tools(
                 arguments["municipalities"] = municipalities
             if after_cnpj_basico is not None:
                 arguments["after_cnpj_basico"] = after_cnpj_basico
+            optional_lists = {
+                "establishment_types": establishment_types,
+                "situation_codes": situation_codes,
+                "neighborhoods": neighborhoods,
+                "postal_codes": postal_codes,
+                "company_sizes": company_sizes,
+                "legal_natures": legal_natures,
+            }
+            arguments.update({key: value for key, value in optional_lists.items() if value is not None})
+            optional_values = {
+                "opened_from": opened_from,
+                "opened_to": opened_to,
+                "capital_min": capital_min,
+                "capital_max": capital_max,
+            }
+            arguments.update({key: value for key, value in optional_values.items() if value is not None})
+            if simples_only:
+                arguments["simples_only"] = True
+            if mei_only:
+                arguments["mei_only"] = True
+            optional_metadata = {
+                "country_codes": country_codes,
+                "reason_codes": reason_codes,
+                "special_situation_codes": special_situation_codes,
+                "has_phone": has_phone,
+                "has_email": has_email,
+                "has_fax": has_fax,
+            }
+            arguments.update({key: value for key, value in optional_metadata.items() if value is not None})
             result = await tool_dispatcher.dispatch_async(
                 {
                     "tool_id": "prospecting.companies.search",

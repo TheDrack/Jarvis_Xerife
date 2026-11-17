@@ -36,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--companies", action="append", help="explicit companies CSV")
     parser.add_argument("--municipalities", help="explicit municipalities CSV")
     parser.add_argument("--cnaes", help="explicit CNAEs CSV")
+    parser.add_argument("--simples", help="optional Simples/MEI CSV")
+    parser.add_argument("--legal-natures", help="optional Naturezas CSV")
+    parser.add_argument("--qualifications", help="optional Qualificacoes CSV")
+    parser.add_argument("--countries", help="optional Paises CSV")
+    parser.add_argument("--situation-reasons", help="optional Motivos CSV")
     parser.add_argument("--memory-limit", default="2GB", help="DuckDB memory limit (default 2GB)")
     parser.add_argument("--threads", type=int, default=4, help="DuckDB threads (default 4)")
     parser.add_argument("--force", action="store_true", help="recreate the store from scratch")
@@ -61,6 +66,21 @@ def main(argv: list[str] | None = None) -> int:
         companies=companies,
         municipalities=Path(args.municipalities) if args.municipalities else data_dir / "Municipios.csv",
         cnaes=Path(args.cnaes) if args.cnaes else data_dir / "Cnaes.csv",
+        simples=Path(args.simples) if args.simples else (
+            data_dir / "Simples.csv" if (data_dir / "Simples.csv").is_file() else None
+        ),
+        legal_natures=Path(args.legal_natures) if args.legal_natures else (
+            data_dir / "Naturezas.csv" if (data_dir / "Naturezas.csv").is_file() else None
+        ),
+        qualifications=Path(args.qualifications) if args.qualifications else (
+            data_dir / "Qualificacoes.csv" if (data_dir / "Qualificacoes.csv").is_file() else None
+        ),
+        countries=Path(args.countries) if args.countries else (
+            data_dir / "Paises.csv" if (data_dir / "Paises.csv").is_file() else None
+        ),
+        situation_reasons=Path(args.situation_reasons) if args.situation_reasons else (
+            data_dir / "Motivos.csv" if (data_dir / "Motivos.csv").is_file() else None
+        ),
     )
 
     builder = CnpjStoreBuilder(
@@ -78,6 +98,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"store: {report.database}")
     print(f"estados materializados: {', '.join(uf.upper() for uf in args.uf)}")
     print(f"estabelecimentos: {report.establishment_rows} | empresas: {report.company_rows}")
+    print(f"arquivos auxiliares opcionais: {sum(path is not None for path in (files.simples, files.legal_natures, files.qualifications, files.countries, files.situation_reasons))}")
     print(f"arquivos carregados agora: {len(report.ingested_files)}")
     for name in report.ingested_files:
         print(f"  + {name}")

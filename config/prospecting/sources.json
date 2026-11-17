@@ -1,0 +1,399 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "source_id": "receita_federal_cnpj_open_data",
+      "name": "Receita Federal - Dados Abertos do CNPJ",
+      "kind": "company_registry",
+      "acquisition_mode": "official_open_data",
+      "status": "available",
+      "homepage": "https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/dados-abertos/cadastros/cnpj",
+      "description": "Cadastro empresarial oficial por estabelecimento e empresa, com CNAE, situação cadastral, endereço, porte e natureza jurídica.",
+      "yields_company_records": true,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": true,
+      "geographic_coverage": [
+        "BR"
+      ],
+      "data_dimensions": [
+        "cnpj",
+        "cnae",
+        "status",
+        "address",
+        "company_size",
+        "legal_nature"
+      ],
+      "limitations": [
+        "Não fornece faturamento, quantidade de empregados, website ou coordenadas.",
+        "Dados de contato cadastrais exigem política própria de finalidade, retenção e oposição.",
+        "Layout e identificadores CNPJ devem ser versionados."
+      ]
+    },
+    {
+      "source_id": "acate_associados",
+      "name": "ACATE - Diretório de Associados",
+      "kind": "association_directory",
+      "acquisition_mode": "official_export",
+      "status": "requires_terms_review",
+      "homepage": "https://www.acate.com.br/associados/",
+      "description": "Diretório de empresas associadas com busca por palavra-chave, polo e segmentos tecnológicos.",
+      "yields_company_records": true,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": false,
+      "geographic_coverage": [
+        "SC"
+      ],
+      "data_dimensions": [
+        "company_name",
+        "technology_vertical",
+        "regional_pole",
+        "solution_description"
+      ],
+      "limitations": [
+        "Não há API pública de reutilização identificada.",
+        "Não fazer scraping nem persistir cópia até confirmar autorização e termos.",
+        "Associação não comprova demanda, orçamento ou permissão para contato."
+      ]
+    },
+    {
+      "source_id": "observatorio_acate",
+      "name": "Observatório ACATE",
+      "kind": "market_intelligence",
+      "acquisition_mode": "aggregate_indicators",
+      "status": "research_only",
+      "homepage": "https://www.observatorioacate.com.br/",
+      "description": "Indicadores agregados de empresas, empregos, faturamento, produtividade, polos regionais e verticais de tecnologia.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": true,
+      "durable_storage_allowed": true,
+      "geographic_coverage": [
+        "SC",
+        "Florianópolis",
+        "Grande Florianópolis"
+      ],
+      "data_dimensions": [
+        "company_count",
+        "jobs",
+        "revenue",
+        "growth",
+        "regional_share",
+        "technology_vertical"
+      ],
+      "limitations": [
+        "Indicadores agregados não identificam empresas individualmente.",
+        "Guardar período de referência, publicação, metodologia e atribuição.",
+        "Não converter estatística agregada em atributo de uma empresa."
+      ]
+    },
+    {
+      "source_id": "mapa_empresas_mdic",
+      "name": "Mapa de Empresas - MDIC",
+      "kind": "public_statistics",
+      "acquisition_mode": "official_open_data",
+      "status": "research_only",
+      "homepage": "https://www.gov.br/pt-br/servicos/obter-dados-estatisticos-no-mapa-de-empresa",
+      "description": "Painéis estatísticos mensais sobre abertura, baixa, tempo de registro e Empresas Simples de Inovação.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": true,
+      "durable_storage_allowed": true,
+      "geographic_coverage": [
+        "BR"
+      ],
+      "data_dimensions": [
+        "business_openings",
+        "business_closures",
+        "registration_time",
+        "inova_simples"
+      ],
+      "limitations": [
+        "Painel estatístico; não é lista de leads individualizados."
+      ]
+    },
+    {
+      "source_id": "ibge_sidra",
+      "name": "IBGE - SIDRA e Estatísticas Econômicas",
+      "kind": "public_statistics",
+      "acquisition_mode": "official_api",
+      "status": "planned",
+      "homepage": "https://sidra.ibge.gov.br/",
+      "description": "Indicadores demográficos, econômicos, empresariais e territoriais para dimensionamento de mercado.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": true,
+      "durable_storage_allowed": true,
+      "geographic_coverage": [
+        "BR",
+        "SC",
+        "municipal"
+      ],
+      "data_dimensions": [
+        "population",
+        "economic_activity",
+        "regional_gdp",
+        "services",
+        "industry"
+      ],
+      "limitations": [
+        "Dados agregados; granularidade e periodicidade variam por tabela."
+      ]
+    },
+    {
+      "source_id": "fiesc_observatorio",
+      "name": "FIESC - Observatório da Indústria",
+      "kind": "market_intelligence",
+      "acquisition_mode": "official_export",
+      "status": "planned",
+      "homepage": "https://observatorio.fiesc.com.br/",
+      "description": "Indicadores industriais, setores, emprego, competitividade, comércio exterior e cadeia produtiva catarinense.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": true,
+      "durable_storage_allowed": null,
+      "geographic_coverage": [
+        "SC"
+      ],
+      "data_dimensions": [
+        "industrial_employment",
+        "industrial_output",
+        "exports",
+        "supply_chain",
+        "sector_growth"
+      ],
+      "limitations": [
+        "Verificar licença e possibilidade de exportação antes de persistir séries."
+      ]
+    },
+    {
+      "source_id": "jucesc_sicos",
+      "name": "JUCESC / SICOS - Registro e abertura de empresas",
+      "kind": "public_statistics",
+      "acquisition_mode": "not_yet_integrated",
+      "status": "planned",
+      "homepage": "https://www.jucesc.sc.gov.br/",
+      "description": "Possível fonte de registros, constituições e alterações empresariais em Santa Catarina.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": true,
+      "durable_storage_allowed": null,
+      "geographic_coverage": [
+        "SC"
+      ],
+      "data_dimensions": [
+        "company_formation",
+        "legal_changes",
+        "registration_events"
+      ],
+      "limitations": [
+        "Validar API, acesso, custos, termos e sobreposição com CNPJ antes da integração."
+      ]
+    },
+    {
+      "source_id": "pncp_compras_gov",
+      "name": "PNCP - Portal Nacional de Contratações Públicas",
+      "kind": "procurement",
+      "acquisition_mode": "official_api",
+      "status": "planned",
+      "homepage": "https://pncp.gov.br/",
+      "description": "Oportunidades de fornecimento, editais, contratos e compras públicas.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": null,
+      "geographic_coverage": [
+        "BR"
+      ],
+      "data_dimensions": [
+        "procurement_notices",
+        "items",
+        "buyers",
+        "deadlines",
+        "contract_awards"
+      ],
+      "limitations": [
+        "Modelar edital e item como oportunidade, não como cadastro de fornecedor.",
+        "Validar documentação da API e regras de atualização."
+      ]
+    },
+    {
+      "source_id": "empresas_carreiras",
+      "name": "Páginas oficiais de carreira das empresas",
+      "kind": "jobs",
+      "acquisition_mode": "manual_research",
+      "status": "planned",
+      "homepage": "https://www.gov.br/trabalho-e-emprego/",
+      "description": "Vagas publicadas diretamente por empregadores para o fluxo C2B.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": null,
+      "geographic_coverage": [
+        "BR"
+      ],
+      "data_dimensions": [
+        "vacancy",
+        "role",
+        "location",
+        "remote_policy",
+        "published_at",
+        "deadline"
+      ],
+      "limitations": [
+        "Exigir evidência de vaga ativa e URL oficial; não inferir contratação por CNAE."
+      ]
+    },
+    {
+      "source_id": "rede_inovacao_floripa",
+      "name": "Rede de Inovação Florianópolis",
+      "kind": "innovation_ecosystem",
+      "acquisition_mode": "manual_research",
+      "status": "research_only",
+      "homepage": "https://redeinovacao.floripa.br/",
+      "description": "Ecossistema de incubadoras, centros de inovação, programas, atores e conexões locais.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": null,
+      "geographic_coverage": [
+        "Florianópolis",
+        "Grande Florianópolis"
+      ],
+      "data_dimensions": [
+        "incubators",
+        "innovation_centers",
+        "programs",
+        "startups",
+        "ecosystem_links"
+      ],
+      "limitations": [
+        "Tratar como descoberta de entidades e programas; validar cada empresa em fonte própria."
+      ]
+    },
+    {
+      "source_id": "inpi",
+      "name": "INPI - Propriedade Industrial",
+      "kind": "public_statistics",
+      "acquisition_mode": "official_open_data",
+      "status": "planned",
+      "homepage": "https://www.gov.br/inpi/pt-br",
+      "description": "Marcas, patentes e ativos de propriedade industrial que podem sinalizar inovação e especialização tecnológica.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": null,
+      "geographic_coverage": [
+        "BR"
+      ],
+      "data_dimensions": [
+        "trademarks",
+        "patents",
+        "technology_classes",
+        "filings"
+      ],
+      "limitations": [
+        "Titularidade e autoria podem envolver pessoas físicas; aplicar minimização e validação jurídica."
+      ]
+    },
+    {
+      "source_id": "comexstat_mdic",
+      "name": "Comex Stat - MDIC",
+      "kind": "trade",
+      "acquisition_mode": "official_open_data",
+      "status": "research_only",
+      "homepage": "https://www.gov.br/mdic/pt-br/assuntos/comercio-exterior/estatisticas/base-de-dados-bruta",
+      "description": "Séries mensais de exportação e importação por NCM, país, município, UF, via e classificações econômicas.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": true,
+      "durable_storage_allowed": true,
+      "geographic_coverage": [
+        "BR",
+        "SC",
+        "municipal"
+      ],
+      "data_dimensions": [
+        "exports",
+        "imports",
+        "ncm",
+        "destination_country",
+        "origin_country",
+        "municipality",
+        "fob_value",
+        "net_weight"
+      ],
+      "limitations": [
+        "Dados por município não devem ser interpretados como prova de uma empresa específica exportar ou importar.",
+        "Exige tabelas de correlação e dicionários de códigos."
+      ]
+    },
+    {
+      "source_id": "fapesc_chamadas",
+      "name": "FAPESC - Chamadas em andamento",
+      "kind": "funding",
+      "acquisition_mode": "official_open_data",
+      "status": "research_only",
+      "homepage": "https://fapesc.sc.gov.br/chamadas-em-andamento/",
+      "description": "Editais e chamadas de fomento, bolsas, inovação, pesquisa aplicada e programas de empreendedorismo em Santa Catarina.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": true,
+      "geographic_coverage": [
+        "SC"
+      ],
+      "data_dimensions": [
+        "funding_call",
+        "eligibility",
+        "deadline",
+        "funding_amount",
+        "research_area",
+        "partner_requirements"
+      ],
+      "limitations": [
+        "Tratar como oportunidade de financiamento, não como lead empresarial.",
+        "Validar elegibilidade, prazo, retificações e documentos do edital."
+      ]
+    },
+    {
+      "source_id": "finep_chamadas",
+      "name": "FINEP - Chamadas públicas",
+      "kind": "funding",
+      "acquisition_mode": "official_open_data",
+      "status": "planned",
+      "homepage": "https://www.finep.gov.br/chamadas-publicas",
+      "description": "Chamadas de subvenção, crédito e apoio à inovação para empresas e instituições.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": null,
+      "geographic_coverage": [
+        "BR"
+      ],
+      "data_dimensions": [
+        "funding_call",
+        "credit_line",
+        "grant",
+        "eligibility",
+        "deadline",
+        "technology_area"
+      ],
+      "limitations": [
+        "Validar regras e requisitos específicos de cada chamada antes de recomendar."
+      ]
+    },
+    {
+      "source_id": "ceis_cnep",
+      "name": "CEIS/CNEP - Cadastro de empresas sancionadas",
+      "kind": "compliance",
+      "acquisition_mode": "official_open_data",
+      "status": "planned",
+      "homepage": "https://portaldatransparencia.gov.br/sancoes",
+      "description": "Dados públicos de sanções e impedimentos para diligência de fornecedores e parceiros.",
+      "yields_company_records": false,
+      "yields_aggregate_indicators": false,
+      "durable_storage_allowed": null,
+      "geographic_coverage": [
+        "BR"
+      ],
+      "data_dimensions": [
+        "sanction",
+        "legal_basis",
+        "start_date",
+        "end_date",
+        "sanctioning_body"
+      ],
+      "limitations": [
+        "Uso para due diligence e prevenção de risco, nunca como ranking comercial sem contexto e validação."
+      ]
+    }
+  ]
+}

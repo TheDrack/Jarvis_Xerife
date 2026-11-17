@@ -87,6 +87,17 @@ class ProspectCompany(BaseModel):
     industry: Optional[str] = Field(default=None, max_length=120)
     segment: Optional[str] = Field(default=None, max_length=120)
     employee_count: Optional[int] = Field(default=None, ge=1, le=1_000_000)
+    company_size: Optional[str] = Field(default=None, max_length=20)
+    legal_nature: Optional[str] = Field(default=None, max_length=20)
+    capital_social: Optional[str] = Field(default=None, max_length=40)
+    opening_date: Optional[str] = Field(default=None, min_length=8, max_length=8)
+    establishment_type: Optional[str] = Field(default=None, max_length=2)
+    neighborhood: Optional[str] = Field(default=None, max_length=120)
+    postal_code: Optional[str] = Field(default=None, max_length=8)
+    primary_cnae: Optional[str] = Field(default=None, max_length=7)
+    has_phone: Optional[bool] = None
+    has_email: Optional[bool] = None
+    has_fax: Optional[bool] = None
     city: Optional[str] = Field(default=None, max_length=120)
     state: Optional[str] = Field(default=None, min_length=2, max_length=2)
     country: str = Field(default="BR", min_length=2, max_length=2)

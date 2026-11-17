@@ -77,12 +77,33 @@ def test_search_companies_uses_validated_query_and_discloses_root_granularity(
         cnae_prefixes=["4120", "25"],
         limit=25,
         after_cnpj_basico="00000001",
+        company_sizes=["03"],
+        legal_natures=["2062"],
+        neighborhoods=["Trindade"],
+        opened_from="20200101",
+        opened_to="20251231",
+        capital_min=1000,
+        simples_only=True,
+        country_codes=["105"],
+        has_phone=True,
+        has_email=False,
+        has_fax=True,
     )
 
     assert provider.query.uf == "SC"
     assert provider.query.municipalities == ("São José",)
     assert provider.query.cnae_prefixes == ("4120", "25")
     assert provider.query.after_cnpj_basico == "00000001"
+    assert provider.query.company_sizes == ("03",)
+    assert provider.query.legal_natures == ("2062",)
+    assert provider.query.neighborhoods == ("Trindade",)
+    assert provider.query.opened_from == "20200101"
+    assert provider.query.capital_min == 1000
+    assert provider.query.simples_only is True
+    assert provider.query.country_codes == ("105",)
+    assert provider.query.has_phone is True
+    assert provider.query.has_email is False
+    assert provider.query.has_fax is True
     assert result["identity_granularity"] == "cnpj_basico"
     assert result["companies"][0]["cnpj"] == "12345678000190"
     assert result["truncated"] is True
