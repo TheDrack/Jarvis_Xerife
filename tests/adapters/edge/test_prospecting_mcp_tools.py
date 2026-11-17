@@ -110,3 +110,20 @@ def test_dispatcher_uses_the_session_gateway_capability(monkeypatch):
     assert calls == ["prospecting.cnpj.read"]
     assert principal.principal_id == "local-owner"
     assert principal.capabilities == frozenset({"prospecting.cnpj.read"})
+
+
+@pytest.mark.asyncio
+async def test_search_omits_optional_nulls_before_tool_schema_validation():
+    mcp = FakeMCP()
+    dispatcher = FakeDispatcher()
+
+    prospecting_mcp_tools.register_prospecting_tools(mcp, dispatcher=dispatcher)
+    await mcp.tools["prospecting.companies.search"](
+        uf="SC",
+        cnae_prefixes=["4120"],
+    )
+
+    arguments = dispatcher.requests[0]["arguments"]
+    assert "municipalities" not in arguments
+    assert "after_cnpj_basico" not in arguments
+    assert arguments["limit"] == 50
