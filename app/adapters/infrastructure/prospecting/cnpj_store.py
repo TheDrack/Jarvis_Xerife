@@ -357,7 +357,8 @@ class CnpjStoreProvider:
         try:
             row = connection.execute(
                 "SELECT e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv, e.nome_fantasia, "
-                "e.cnae_principal, c.razao_social, m.nome, n.descricao "
+                "e.cnae_principal, c.razao_social, m.nome, n.descricao, c.natureza, c.capital, "
+                "c.porte, e.data_inicio_atividade, e.matriz_filial, e.bairro, e.cep "
                 "FROM establishments e "
                 "LEFT JOIN companies c ON c.cnpj_basico = e.cnpj_basico "
                 "LEFT JOIN municipalities m ON m.codigo = e.municipio "
@@ -370,7 +371,7 @@ class CnpjStoreProvider:
         if row is None:
             return None
 
-        basename, ordem, dv, trade_name, cnae, legal_name, municipality_name, description = row
+        (basename, ordem, dv, trade_name, cnae, legal_name, municipality_name, description, legal_nature, capital_social, company_size, opening_date, establishment_type, neighborhood, postal_code) = row
         name = (trade_name or "").strip() or (legal_name or "").strip()
         if not name or not any(ch.isalpha() for ch in name):
             return None
@@ -380,6 +381,14 @@ class CnpjStoreProvider:
             legal_name=(legal_name or "").strip() or None,
             cnpj="".join(ch for ch in f"{basename}{ordem}{dv}" if ch.isdigit()),
             industry=description or f"CNAE {cnae}",
+            primary_cnae=cnae,
+            legal_nature=(legal_nature or "").strip() or None,
+            capital_social=(capital_social or "").strip() or None,
+            company_size=(company_size or "").strip() or None,
+            opening_date=(opening_date or "").strip() or None,
+            establishment_type=(establishment_type or "").strip() or None,
+            neighborhood=(neighborhood or "").strip() or None,
+            postal_code=(postal_code or "").strip() or None,
             city=municipality_name,
             country="BR",
             registry_presence=RegistryPresence.FOUND,
