@@ -55,8 +55,8 @@ def _valid_completion_evidence(evidence: object) -> bool:
                 not isinstance(relative_path, str)
                 or not relative_path
                 or relative_path != relative_path.strip()
-                or relative_path.startswith(("/", "\\\\"))
-                or "\\\\" in relative_path
+                or relative_path.startswith(("/", "\\"))
+                or "\\" in relative_path
                 or ".." in relative_path.split("/")
             ):
                 return False
