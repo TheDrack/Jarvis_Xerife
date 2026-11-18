@@ -48,9 +48,9 @@ def _status_text(states: dict[str, str]) -> str:
                         ["https://github.com/TheDrack/Jarvis_Xerife/actions/runs/123"]
                         if verified else []
                     ),
-                    "implementation_paths": ["app/services/example.py"] if verified else [],
-                    "consumer_paths": ["app/services/consumer.py"] if verified else [],
-                    "test_paths": ["tests/test_example.py"] if verified else [],
+                    "implementation_paths": ["scripts/hourly_curiosity_audit.py"] if verified else [],
+                    "consumer_paths": [".github/workflows/hourly_curiosity_audit.yml"] if verified else [],
+                    "test_paths": ["tests/test_hourly_curiosity_audit_report.py"] if verified else [],
                 },
             }
         )
@@ -264,6 +264,40 @@ def test_verified_evidence_with_windows_path_is_not_trusted():
                     "implementation_paths": ["app\\\\services\\\\example.py"],
                     "consumer_paths": ["app/services/consumer.py"],
                     "test_paths": ["tests/test_example.py"],
+                },
+            }
+        ],
+    }
+    status = (
+        "# Status\n\n"
+        + _STATUS_START
+        + "\n```json\n"
+        + json.dumps(payload)
+        + "\n```\n"
+        + _STATUS_END
+        + "\n"
+    )
+
+    report = audit.roadmap_candidates(_roadmap_text(), status)
+    rendered = "\n".join(report)
+
+    assert "C0-CAPABILITY-MAP" in rendered
+    assert "invalid_evidence" in rendered
+
+def test_verified_state_with_missing_repository_path_is_not_trusted():
+    payload = {
+        "schema_version": 1,
+        "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
+        "criteria": [
+            {
+                "criterion_id": "C0-CAPABILITY-MAP",
+                "state": "verified",
+                "evidence": {
+                    "commit_url": "https://github.com/TheDrack/Jarvis_Xerife/commit/" + "a" * 40,
+                    "check_urls": ["https://github.com/TheDrack/Jarvis_Xerife/actions/runs/123"],
+                    "implementation_paths": ["app/missing-production-target.py"],
+                    "consumer_paths": [".github/workflows/hourly_curiosity_audit.yml"],
+                    "test_paths": ["tests/test_hourly_curiosity_audit_report.py"],
                 },
             }
         ],
