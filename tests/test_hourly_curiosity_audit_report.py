@@ -325,9 +325,9 @@ def test_script_can_import_repository_policy_when_launched_outside_checkout(tmp_
     script_path = audit.ROOT / "scripts" / "hourly_curiosity_audit.py"
     script_directory = script_path.parent
     code = (
-        "import runpy, sys\\n"
-        + f"sys.path = [item for item in sys.path if item not in ('', {str(audit.ROOT)!r}, {str(script_directory)!r})]\\n"
-        + f"runpy.run_path({str(script_path)!r}, run_name='audit_import_only')\\n"
+        "import runpy, sys\n"
+        + f"sys.path = [item for item in sys.path if item not in ('', {str(audit.ROOT)!r}, {str(script_directory)!r})]\n"
+        + f"runpy.run_path({str(script_path)!r}, run_name='audit_import_only')\n"
     )
     environment = os.environ.copy()
     environment.pop("PYTHONPATH", None)
