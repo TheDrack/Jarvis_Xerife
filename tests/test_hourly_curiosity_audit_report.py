@@ -200,3 +200,17 @@ def test_malformed_status_state_is_treated_as_unknown():
 
     assert "C0-CAPABILITY-MAP" in rendered
     assert "unknown" in rendered
+
+def test_phase_without_machine_readable_ids_remains_unknown_after_c0():
+    roadmap = _roadmap_text().replace(
+        "- `C1-ENTITY-CONTRACTS`: contratos de entidade.",
+        "- Definir contratos de entidade, relação, observação e proveniência.",
+    )
+    states = {criterion_id: "verified" for criterion_id in C0}
+
+    report = audit.roadmap_candidates(roadmap, _status_text(states))
+    rendered = "\n".join(report)
+
+    assert "Fase 1" in rendered
+    assert "unknown" in rendered
+    assert "C1-ENTITY-CONTRACTS" not in rendered
