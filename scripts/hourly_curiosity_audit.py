@@ -16,8 +16,8 @@ REPORT = REPORT_DIR / "hourly-curiosity-report.md"
 TEST_LOG = REPORT_DIR / "pytest.log"
 _STATUS_START = "<!-- JARVIS_COGNITIVE_EVIDENCE_START -->"
 _STATUS_END = "<!-- JARVIS_COGNITIVE_EVIDENCE_END -->"
-_COMMIT_URL_RE = re.compile(r"^https://github\\.com/[^/]+/[^/]+/commit/[0-9a-f]{40}$")
-_ACTIONS_RUN_URL_RE = re.compile(r"^https://github\\.com/[^/]+/[^/]+/actions/runs/[0-9]+$")
+_COMMIT_URL_RE = re.compile(r"^https://github\.com/[^/]+/[^/]+/commit/[0-9a-f]{40}$")
+_ACTIONS_RUN_URL_RE = re.compile(r"^https://github\.com/[^/]+/[^/]+/actions/runs/[0-9]+$")
 
 
 def git_lines(*args: str) -> list[str]:
@@ -81,7 +81,7 @@ def _status_criterion_states(status_text: str) -> dict[str, str]:
     if end <= start:
         return {}
     block = status_text[start:end]
-    match = re.fullmatch(r"\\s*```json\\s*(\\{.*\\})\\s*```\\s*", block, re.DOTALL)
+    match = re.fullmatch(r"\s*```json\s*(\{.*\})\s*```\s*", block, re.DOTALL)
     if match is None:
         return {}
     try:
@@ -122,7 +122,7 @@ def _roadmap_phase_criteria(roadmap_text: str) -> list[tuple[int, str, list[str]
     for index, heading in enumerate(lines):
         if not heading.startswith("## "):
             continue
-        phase_match = re.search(r"\\bFase\\s+([0-8])\\b", heading, re.IGNORECASE)
+        phase_match = re.search(r"\bFase\s+([0-8])\b", heading, re.IGNORECASE)
         if phase_match is None:
             continue
         phase_number = int(phase_match.group(1))
@@ -134,7 +134,7 @@ def _roadmap_phase_criteria(roadmap_text: str) -> list[tuple[int, str, list[str]
             ),
             len(lines),
         )
-        section = "\\n".join(lines[index:end])
+        section = "\n".join(lines[index:end])
         pattern = re.compile(rf"`(C{phase_number}-[A-Z0-9]+(?:-[A-Z0-9]+)*)`")
         criterion_ids = list(dict.fromkeys(pattern.findall(section)))
         if criterion_ids:
