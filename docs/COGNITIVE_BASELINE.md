@@ -748,11 +748,3 @@ A captura MCP de curiosidade desta revalidação foi aceita com ID `ab56c1cc462e
 - Classificação: consumer e policy existem em source e testes; processo Termux ativo, sessão real, perfil OAuth/scopes e resposta de provider não foram verificados. O uso transmite o prompt ao provider e requer consentimento/classificação de dados.
 - Limite: este caminho não torna `TaskRunner.execute_plan()` operacional nem conecta genericamente ferramentas `active_bounded`/ `intervention`. O approval store e os resolvers de owner/executor/verifier continuam necessários para essas classes de execução.
 
-## Automação do relatório recorrente C0 — 2026-11-18
-
-O workflow `.github/workflows/hourly_curiosity_audit.yml` executa a suíte e publica um relatório somente de leitura. A implementação anterior de `scripts/hourly_curiosity_audit.py` procurava uma seção `## Roadmap` dentro de `docs/STATUS.md`; essa seção não existe no STATUS versionado, e o relatório deixava de listar os critérios pendentes.
-
-A correção passa a usar `docs/COGNITIVE_ROADMAP.md` para enumerar os critérios por fase e o ledger delimitado de `docs/STATUS.md` para consultar o estado. A primeira fase incompleta é reportada antes das seguintes. Registro ausente, duplicado ou malformado é tratado como `unknown`; um estado `verified` sem commit, check e caminhos de implementação/consumidor/teste não é aceito como concluído.
-
-O relatório não altera o ledger, não seleciona missões, não promove critérios e não substitui a validação de `RoadmapMissionSelector`, revisão humana ou verificação de runtime/produção. Os testes de regressão correspondentes estão em `tests/test_hourly_curiosity_audit_report.py`.
-
