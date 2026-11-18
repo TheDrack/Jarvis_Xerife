@@ -249,3 +249,37 @@ def test_verified_evidence_from_another_repository_is_not_trusted():
 
     assert "C0-CAPABILITY-MAP" in rendered
     assert "invalid_evidence" in rendered
+
+def test_verified_evidence_with_windows_path_is_not_trusted():
+    payload = {
+        "schema_version": 1,
+        "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
+        "criteria": [
+            {
+                "criterion_id": "C0-CAPABILITY-MAP",
+                "state": "verified",
+                "evidence": {
+                    "commit_url": "https://github.com/TheDrack/Jarvis_Xerife/commit/" + "a" * 40,
+                    "check_urls": ["https://github.com/TheDrack/Jarvis_Xerife/actions/runs/123"],
+                    "implementation_paths": ["app\\\\services\\\\example.py"],
+                    "consumer_paths": ["app/services/consumer.py"],
+                    "test_paths": ["tests/test_example.py"],
+                },
+            }
+        ],
+    }
+    status = (
+        "# Status\n\n"
+        + _STATUS_START
+        + "\n```json\n"
+        + json.dumps(payload)
+        + "\n```\n"
+        + _STATUS_END
+        + "\n"
+    )
+
+    report = audit.roadmap_candidates(_roadmap_text(), status)
+    rendered = "\n".join(report)
+
+    assert "C0-CAPABILITY-MAP" in rendered
+    assert "invalid_evidence" in rendered
