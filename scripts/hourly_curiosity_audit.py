@@ -8,6 +8,11 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from app.application.security.repository_path_policy import (
+    UnsafeRepositoryPath,
+    resolve_repository_path,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 STATUS = ROOT / "docs" / "STATUS.md"
 ROADMAP = ROOT / "docs" / "COGNITIVE_ROADMAP.md"
@@ -55,14 +60,19 @@ def _valid_completion_evidence(evidence: object) -> bool:
                 not isinstance(relative_path, str)
                 or not relative_path
                 or relative_path != relative_path.strip()
-                or relative_path.startswith(("/", "\\"))
-                or "\\" in relative_path
-                or ".." in relative_path.split("/")
             ):
                 return False
+            try:
+                path, normalized, resolved_relative = resolve_repository_path(
+                    ROOT, relative_path, reject_symlinks=True
+                )
+            except (UnsafeRepositoryPath, OSError, RuntimeError):
+                return False
+            if normalized != resolved_relative or not path.is_file():
+                return False
             if field == "test_paths" and (
-                not relative_path.startswith("tests/")
-                or not relative_path.endswith(".py")
+                not normalized.startswith("tests/")
+                or path.suffix.casefold() != ".py"
             ):
                 return False
     return True
