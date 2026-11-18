@@ -227,9 +227,9 @@ def test_verified_evidence_from_another_repository_is_not_trusted():
                 "evidence": {
                     "commit_url": "https://github.com/other/repo/commit/" + "a" * 40,
                     "check_urls": ["https://github.com/other/repo/actions/runs/123"],
-                    "implementation_paths": ["app/services/example.py"],
-                    "consumer_paths": ["app/services/consumer.py"],
-                    "test_paths": ["tests/test_example.py"],
+                    "implementation_paths": ["scripts/hourly_curiosity_audit.py"],
+                    "consumer_paths": [".github/workflows/hourly_curiosity_audit.yml"],
+                    "test_paths": ["tests/test_hourly_curiosity_audit_report.py"],
                 },
             }
         ],
@@ -262,8 +262,8 @@ def test_verified_evidence_with_windows_path_is_not_trusted():
                     "commit_url": "https://github.com/TheDrack/Jarvis_Xerife/commit/" + "a" * 40,
                     "check_urls": ["https://github.com/TheDrack/Jarvis_Xerife/actions/runs/123"],
                     "implementation_paths": ["app\\\\services\\\\example.py"],
-                    "consumer_paths": ["app/services/consumer.py"],
-                    "test_paths": ["tests/test_example.py"],
+                    "consumer_paths": [".github/workflows/hourly_curiosity_audit.yml"],
+                    "test_paths": ["tests/test_hourly_curiosity_audit_report.py"],
                 },
             }
         ],
