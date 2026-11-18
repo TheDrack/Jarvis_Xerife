@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from scripts import hourly_curiosity_audit as audit
 
 
@@ -317,3 +320,25 @@ def test_verified_state_with_missing_repository_path_is_not_trusted():
 
     assert "C0-CAPABILITY-MAP" in rendered
     assert "invalid_evidence" in rendered
+
+def test_script_can_import_repository_policy_when_launched_outside_checkout(tmp_path):
+    script_path = audit.ROOT / "scripts" / "hourly_curiosity_audit.py"
+    script_directory = script_path.parent
+    code = (
+        "import runpy, sys\\n"
+        + f"sys.path = [item for item in sys.path if item not in ('', {str(audit.ROOT)!r}, {str(script_directory)!r})]\\n"
+        + f"runpy.run_path({str(script_path)!r}, run_name='audit_import_only')\\n"
+    )
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
