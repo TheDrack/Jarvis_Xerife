@@ -6,7 +6,7 @@
 
 - `docs/COGNITIVE_ROADMAP.md` é a fonte dos critérios e da ordem das fases.
 - `docs/STATUS.md` fornece o estado por meio do ledger delimitado `JARVIS_COGNITIVE_EVIDENCE`.
-- O relatório exibe a primeira fase com critério não verificado. Registro ausente, duplicado, malformado ou com evidência incompleta não pode ser tratado como concluído.
+- O relatório exibe a primeira fase com critério não verificado. Uma fase sem IDs machine-readable (como C1 no roadmap atual) é reportada como `unknown`, nunca ignorada nem presumida concluída. Registro ausente, duplicado, malformado ou com evidência incompleta também não pode ser tratado como concluído.
 - Um estado `verified` precisa conter referência de commit, check de Actions e caminhos de implementação, consumidor e teste. A validação de existência/semântica continua pertencendo ao selector e à revisão.
 
 ## Limites
