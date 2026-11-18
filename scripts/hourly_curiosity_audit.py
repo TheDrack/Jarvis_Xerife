@@ -91,6 +91,7 @@ def _status_criterion_states(status_text: str) -> dict[str, str]:
     if (
         not isinstance(payload, dict)
         or payload.get("schema_version") != 1
+        or isinstance(payload.get("schema_version"), bool)
         or payload.get("roadmap_path") != "docs/COGNITIVE_ROADMAP.md"
         or not isinstance(payload.get("criteria"), list)
     ):
@@ -105,6 +106,7 @@ def _status_criterion_states(status_text: str) -> dict[str, str]:
         if (
             not isinstance(criterion_id, str)
             or not re.fullmatch(r"C[0-8]-[A-Z0-9]+(?:-[A-Z0-9]+)*", criterion_id)
+            or not isinstance(state, str)
             or state not in {"pending", "blocked", "verified"}
             or criterion_id in states
         ):
