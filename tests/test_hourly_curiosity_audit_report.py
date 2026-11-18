@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-
 from scripts import hourly_curiosity_audit as audit
 
 
@@ -144,3 +142,31 @@ def test_main_uses_roadmap_and_status_as_report_sources(tmp_path, monkeypatch):
     rendered = report_path.read_text(encoding="utf-8")
     assert all(criterion_id in rendered for criterion_id in C0)
     assert "pending" in rendered
+
+def test_verified_state_without_required_evidence_is_not_hidden():
+    payload = {
+        "schema_version": 1,
+        "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
+        "criteria": [
+            {
+                "criterion_id": "C0-CAPABILITY-MAP",
+                "state": "verified",
+                "evidence": {},
+            }
+        ],
+    }
+    status = (
+        "# Status\n\n"
+        + _STATUS_START
+        + "\n```json\n"
+        + json.dumps(payload)
+        + "\n```\n"
+        + _STATUS_END
+        + "\n"
+    )
+
+    report = audit.roadmap_candidates(_roadmap_text(), status)
+    rendered = "\n".join(report)
+
+    assert "C0-CAPABILITY-MAP" in rendered
+    assert "invalid_evidence" in rendered
