@@ -143,6 +143,7 @@ def test_main_uses_roadmap_and_status_as_report_sources(tmp_path, monkeypatch):
     assert all(criterion_id in rendered for criterion_id in C0)
     assert "pending" in rendered
 
+
 def test_verified_state_without_required_evidence_is_not_hidden():
     payload = {
         "schema_version": 1,
@@ -170,3 +171,32 @@ def test_verified_state_without_required_evidence_is_not_hidden():
 
     assert "C0-CAPABILITY-MAP" in rendered
     assert "invalid_evidence" in rendered
+
+
+def test_malformed_status_state_is_treated_as_unknown():
+    payload = {
+        "schema_version": 1,
+        "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
+        "criteria": [
+            {
+                "criterion_id": "C0-CAPABILITY-MAP",
+                "state": [],
+                "evidence": {},
+            }
+        ],
+    }
+    status = (
+        "# Status\n\n"
+        + _STATUS_START
+        + "\n```json\n"
+        + json.dumps(payload)
+        + "\n```\n"
+        + _STATUS_END
+        + "\n"
+    )
+
+    report = audit.roadmap_candidates(_roadmap_text(), status)
+    rendered = "\n".join(report)
+
+    assert "C0-CAPABILITY-MAP" in rendered
+    assert "unknown" in rendered
