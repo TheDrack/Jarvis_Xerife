@@ -118,7 +118,7 @@ def _status_criterion_states(status_text: str) -> dict[str, str]:
 
 
 def _roadmap_phase_criteria(roadmap_text: str) -> list[tuple[int, str, list[str]]]:
-    """Extract explicit criterion IDs from each numbered Cognitive Roadmap phase."""
+    """Extract numbered roadmap phases, retaining phases with no machine-readable IDs."""
     lines = roadmap_text.splitlines()
     phases: list[tuple[int, str, list[str]]] = []
     for index, heading in enumerate(lines):
@@ -139,7 +139,7 @@ def _roadmap_phase_criteria(roadmap_text: str) -> list[tuple[int, str, list[str]
         section = "\n".join(lines[index:end])
         pattern = re.compile(rf"`(C{phase_number}-[A-Z0-9]+(?:-[A-Z0-9]+)*)`")
         criterion_ids = list(dict.fromkeys(pattern.findall(section)))
-            phases.append((phase_number, heading[3:].strip(), criterion_ids))
+        phases.append((phase_number, heading[3:].strip(), criterion_ids))
     return sorted(phases, key=lambda item: item[0])
 
 
