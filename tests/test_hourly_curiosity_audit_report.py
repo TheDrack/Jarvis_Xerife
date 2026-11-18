@@ -201,6 +201,7 @@ def test_malformed_status_state_is_treated_as_unknown():
     assert "C0-CAPABILITY-MAP" in rendered
     assert "unknown" in rendered
 
+
 def test_phase_without_machine_readable_ids_remains_unknown_after_c0():
     roadmap = _roadmap_text().replace(
         "- `C1-ENTITY-CONTRACTS`: contratos de entidade.",
