@@ -253,7 +253,7 @@ def test_verified_evidence_from_another_repository_is_not_trusted():
     assert "C0-CAPABILITY-MAP" in rendered
     assert "invalid_evidence" in rendered
 
-def test_verified_evidence_with_windows_path_is_not_trusted():
+def test_verified_evidence_with_windows_drive_path_is_not_trusted():
     payload = {
         "schema_version": 1,
         "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
@@ -264,7 +264,7 @@ def test_verified_evidence_with_windows_path_is_not_trusted():
                 "evidence": {
                     "commit_url": "https://github.com/TheDrack/Jarvis_Xerife/commit/" + "a" * 40,
                     "check_urls": ["https://github.com/TheDrack/Jarvis_Xerife/actions/runs/123"],
-                    "implementation_paths": ["app\\\\services\\\\example.py"],
+                    "implementation_paths": [r"C:\app\application\security\repository_path_policy.py"],
                     "consumer_paths": [".github/workflows/hourly_curiosity_audit.yml"],
                     "test_paths": ["tests/test_hourly_curiosity_audit_report.py"],
                 },
