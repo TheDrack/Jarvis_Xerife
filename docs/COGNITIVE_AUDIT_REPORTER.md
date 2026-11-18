@@ -7,11 +7,11 @@
 - `docs/COGNITIVE_ROADMAP.md` é a fonte dos critérios e da ordem das fases.
 - `docs/STATUS.md` fornece o estado por meio do ledger delimitado `JARVIS_COGNITIVE_EVIDENCE`.
 - O relatório exibe a primeira fase com critério não verificado. Uma fase sem IDs machine-readable (como C1 no roadmap atual) é reportada como `unknown`, nunca ignorada nem presumida concluída. Registro ausente, duplicado, malformado ou com evidência incompleta também não pode ser tratado como concluído.
-- Um estado `verified` precisa conter referência de commit e check de Actions deste repositório, além de caminhos de implementação, consumidor e teste. A validação de existência/semântica continua pertencendo ao selector e à revisão.
+- Um estado `verified` precisa conter referência de commit e check de Actions deste repositório. Os caminhos de implementação, consumidor e teste são resolvidos pela política compartilhada `repository_path_policy`, precisam apontar para arquivos existentes e rejeitam symlinks/escapes. A validação semântica de consumidor e runtime continua pertencendo ao selector e à revisão.
 
 ## Limites
 
-O relatório é somente leitura. Não altera STATUS, não cria missões, não executa código candidato e não promove critérios. Uma saída sem critérios pendentes não comprova runtime ou produção; apenas indica que os IDs explícitos do roadmap estão marcados como `verified` no ledger.
+O relatório é somente leitura. Não altera STATUS, não cria missões, não executa código candidato e não promove critérios. O entrypoint adiciona a raiz do checkout ao caminho de importação para funcionar no comando direto usado pelo workflow horário, mesmo sem `PYTHONPATH`. Uma saída sem critérios pendentes não comprova runtime ou produção; apenas indica que os IDs explícitos do roadmap estão marcados como `verified` no ledger.
 
 ## Regressão corrigida — 2026-11-18
 
