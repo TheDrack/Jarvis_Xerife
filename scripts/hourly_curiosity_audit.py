@@ -2,16 +2,33 @@
 """Read-only hourly curiosity audit: roadmap, unfinished markers, and test outcome."""
 from __future__ import annotations
 
+import json
 import re
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from app.application.security.repository_path_policy import (
+    UnsafeRepositoryPath,
+    resolve_repository_path,
+)
+
 STATUS = ROOT / "docs" / "STATUS.md"
+ROADMAP = ROOT / "docs" / "COGNITIVE_ROADMAP.md"
 REPORT_DIR = ROOT / "audit-output"
 REPORT = REPORT_DIR / "hourly-curiosity-report.md"
 TEST_LOG = REPORT_DIR / "pytest.log"
+_STATUS_START = "<!-- JARVIS_COGNITIVE_EVIDENCE_START -->"
+_STATUS_END = "<!-- JARVIS_COGNITIVE_EVIDENCE_END -->"
+_REPOSITORY_URL = "https://github.com/TheDrack/Jarvis_Xerife"
+_COMMIT_URL_RE = re.compile(rf"^{re.escape(_REPOSITORY_URL)}/commit/[0-9a-f]{{40}}$")
+_ACTIONS_RUN_URL_RE = re.compile(rf"^{re.escape(_REPOSITORY_URL)}/actions/runs/[0-9]+$")
 
 
 def git_lines(*args: str) -> list[str]:
@@ -21,30 +38,183 @@ def git_lines(*args: str) -> list[str]:
     return result.stdout.splitlines() if result.returncode == 0 else []
 
 
-def roadmap_candidates(text: str) -> list[str]:
-    section = text.split("## Roadmap", 1)
-    if len(section) < 2:
-        return ["Não foi possível localizar a seção 'Roadmap' em docs/STATUS.md."]
-    lines = section[1].splitlines()
-    candidates: list[str] = []
-    for line in lines:
-        if line.startswith("## "):
-            break
-        if not line.startswith("|") or "---" in line or "Fase / trilha" in line:
-            continue
-        cells = [cell.strip() for cell in line.strip("|").split("|")]
-        if len(cells) < 3:
-            continue
-        status = cells[1].lower()
-        if any(term in status for term in ("parcial", "progresso", "pendente", "requer")):
-            candidates.append(f"- **{cells[0]}** — {cells[1]}. Critério: {cells[2]}")
-    return candidates[:5] or ["Nenhuma trilha parcial foi identificada automaticamente; revisar STATUS.md."]
+def _valid_completion_evidence(
+    evidence: object, repository_root: Path | None = None
+) -> bool:
+    """Require the same minimum immutable evidence shape as the roadmap ledger."""
+    if not isinstance(evidence, dict):
+        return False
+    commit_url = evidence.get("commit_url")
+    check_urls = evidence.get("check_urls")
+    if not isinstance(commit_url, str) or not _COMMIT_URL_RE.fullmatch(commit_url):
+        return False
+    if (
+        not isinstance(check_urls, list)
+        or not check_urls
+        or any(
+            not isinstance(url, str) or not _ACTIONS_RUN_URL_RE.fullmatch(url)
+            for url in check_urls
+        )
+    ):
+        return False
 
+    root = ROOT if repository_root is None else Path(repository_root)
+    for field in ("implementation_paths", "consumer_paths", "test_paths"):
+        values = evidence.get(field)
+        if not isinstance(values, list) or not values:
+            return False
+        for relative_path in values:
+            if (
+                not isinstance(relative_path, str)
+                or not relative_path
+                or relative_path != relative_path.strip()
+            ):
+                return False
+            try:
+                path, normalized, resolved_relative = resolve_repository_path(
+                    root, relative_path, reject_symlinks=True
+                )
+            except (UnsafeRepositoryPath, OSError, RuntimeError):
+                return False
+            if normalized != resolved_relative or not path.is_file():
+                return False
+            if field == "test_paths" and (
+                not normalized.startswith("tests/")
+                or path.suffix.casefold() != ".py"
+            ):
+                return False
+    return True
+
+
+def _status_criterion_states(
+    status_text: str, repository_root: Path | None = None
+) -> dict[str, str]:
+    """Read criterion states from the machine-readable STATUS evidence ledger.
+
+    A missing, malformed, or duplicated ledger is treated as unknown. A record
+    marked verified without the required commit/check/path evidence is not
+    trusted as complete.
+    """
+    if status_text.count(_STATUS_START) != 1 or status_text.count(_STATUS_END) != 1:
+        return {}
+    start = status_text.index(_STATUS_START) + len(_STATUS_START)
+    end = status_text.index(_STATUS_END)
+    if end <= start:
+        return {}
+    block = status_text[start:end]
+    match = re.fullmatch(r"\s*```json\s*(\{.*\})\s*```\s*", block, re.DOTALL)
+    if match is None:
+        return {}
+    try:
+        payload = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return {}
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != 1
+        or isinstance(payload.get("schema_version"), bool)
+        or payload.get("roadmap_path") != "docs/COGNITIVE_ROADMAP.md"
+        or not isinstance(payload.get("criteria"), list)
+    ):
+        return {}
+
+    states: dict[str, str] = {}
+    for entry in payload["criteria"]:
+        if not isinstance(entry, dict):
+            return {}
+        criterion_id = entry.get("criterion_id")
+        state = entry.get("state")
+        if (
+            not isinstance(criterion_id, str)
+            or not re.fullmatch(r"C[0-8]-[A-Z0-9]+(?:-[A-Z0-9]+)*", criterion_id)
+            or not isinstance(state, str)
+            or state not in {"pending", "blocked", "verified"}
+            or criterion_id in states
+        ):
+            return {}
+        if state == "verified" and not _valid_completion_evidence(
+            entry.get("evidence"), repository_root
+        ):
+            state = "invalid_evidence"
+        states[criterion_id] = state
+    return states
+
+
+def _roadmap_phase_criteria(roadmap_text: str) -> list[tuple[int, str, list[str]]]:
+    """Extract numbered roadmap phases, retaining phases with no machine-readable IDs."""
+    lines = roadmap_text.splitlines()
+    phases: list[tuple[int, str, list[str]]] = []
+    for index, heading in enumerate(lines):
+        if not heading.startswith("## "):
+            continue
+        phase_match = re.search(r"\bFase\s+([0-8])\b", heading, re.IGNORECASE)
+        if phase_match is None:
+            continue
+        phase_number = int(phase_match.group(1))
+        end = next(
+            (
+                position
+                for position in range(index + 1, len(lines))
+                if lines[position].startswith("## ")
+            ),
+            len(lines),
+        )
+        section = "\n".join(lines[index:end])
+        pattern = re.compile(rf"`(C{phase_number}-[A-Z0-9]+(?:-[A-Z0-9]+)*)`")
+        criterion_ids = list(dict.fromkeys(pattern.findall(section)))
+        phases.append((phase_number, heading[3:].strip(), criterion_ids))
+    return sorted(phases, key=lambda item: item[0])
+
+
+def roadmap_candidates(
+    roadmap_text: str,
+    status_text: str,
+    limit: int = 5,
+    repository_root: Path | None = None,
+) -> list[str]:
+    """Report the first incomplete roadmap phase using STATUS evidence.
+
+    The roadmap defines the criteria; STATUS supplies their current evidence
+    state. Missing or invalid records remain unknown and therefore cannot be
+    silently skipped.
+    """
+    if not roadmap_text.strip():
+        return ["docs/COGNITIVE_ROADMAP.md ausente; nenhum critério foi considerado concluído."]
+    phases = _roadmap_phase_criteria(roadmap_text)
+    if not phases:
+        return ["Nenhum critério com ID explícito foi encontrado em docs/COGNITIVE_ROADMAP.md."]
+
+    states = _status_criterion_states(status_text, repository_root)
+    for _phase_number, heading, criterion_ids in phases:
+        if not criterion_ids:
+            return [
+                f"- **{heading}** — unknown (a fase não possui IDs machine-readable; "
+                "seus critérios não podem ser considerados verificados)."
+            ]
+        incomplete = [
+            (criterion_id, states.get(criterion_id, "unknown"))
+            for criterion_id in criterion_ids
+            if states.get(criterion_id) != "verified"
+        ]
+        if not incomplete:
+            continue
+        visible = incomplete[: max(1, limit)]
+        details = "; ".join(f"`{criterion_id}`: {state}" for criterion_id, state in visible)
+        omitted = len(incomplete) - len(visible)
+        if omitted:
+            details += f"; mais {omitted} critério(s) pendente(s) não exibido(s)"
+        return [f"- **{heading}** — {details}"]
+
+    return [
+        "Todos os critérios com ID explícito estão marcados como verified no ledger; "
+        "isso não substitui revisão humana nem verificação de runtime/produção."
+    ]
 
 def main() -> None:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     status_text = STATUS.read_text(encoding="utf-8") if STATUS.exists() else ""
+    roadmap_text = ROADMAP.read_text(encoding="utf-8") if ROADMAP.exists() else ""
     tests = TEST_LOG.read_text(encoding="utf-8", errors="replace") if TEST_LOG.exists() else "pytest não executado."
     test_lines = [line.strip() for line in tests.splitlines() if re.search(r"\b(passed|failed|error|skipped|no tests ran)\b", line, re.I)]
     test_summary = test_lines[-5:] or ["Não foi possível extrair um resumo do log de pytest."]
@@ -75,7 +245,7 @@ def main() -> None:
         "\n## Resultado dos testes",
         *[f"- {line}" for line in test_summary],
         "\n## Próximas trilhas do roadmap",
-        *roadmap_candidates(status_text),
+        *roadmap_candidates(roadmap_text, status_text),
         "\n## Marcadores de trabalho encontrados (amostra limitada a 80)",
         *(markers or ["Nenhum marcador TODO/FIXME/XXX/NotImplementedError encontrado nos arquivos Python rastreados."]),
         "\n## Commits recentes para investigação",
