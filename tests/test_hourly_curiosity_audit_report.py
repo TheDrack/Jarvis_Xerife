@@ -73,7 +73,7 @@ def _status_text(states: dict[str, str]) -> str:
     )
 
 
-def _prepare_evidence_repository(tmp_path, monkeypatch):
+def _prepare_evidence_repository(tmp_path):
     """Use an explicit checkout fixture for paths referenced by verified evidence."""
     root = tmp_path / "repository"
     relative_paths = (
@@ -85,7 +85,6 @@ def _prepare_evidence_repository(tmp_path, monkeypatch):
         path = root / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("fixture\\n", encoding="utf-8")
-    monkeypatch.setattr(audit, "ROOT", root)
     evidence = {
         "commit_url": (
             "https://github.com/TheDrack/Jarvis_Xerife/commit/" + "a" * 40
@@ -110,7 +109,7 @@ def _prepare_evidence_repository(tmp_path, monkeypatch):
             for url in evidence["check_urls"]
         ],
     }
-    assert audit._valid_completion_evidence(evidence), diagnostics
+    assert audit._valid_completion_evidence(evidence, repository_root=root), diagnostics
     return root
 
 
@@ -138,17 +137,33 @@ def test_missing_status_criterion_is_unknown_not_verified():
     assert "C1-ENTITY-CONTRACTS" not in rendered
 
 
-def test_next_phase_is_reported_only_after_all_prior_criteria_are_verified(tmp_path, monkeypatch):
-    _prepare_evidence_repository(tmp_path, monkeypatch)
+def test_next_phase_is_reported_only_after_all_prior_criteria_are_verified(tmp_path):
+    root = _prepare_evidence_repository(tmp_path)
     states = {criterion_id: "verified" for criterion_id in C0}
     states["C1-ENTITY-CONTRACTS"] = "pending"
 
-    report = audit.roadmap_candidates(_roadmap_text(), _status_text(states))
+    report = audit.roadmap_candidates(
+        _roadmap_text(), _status_text(states), repository_root=root
+    )
     rendered = "\n".join(report)
 
     assert "C1-ENTITY-CONTRACTS" in rendered
     assert "pending" in rendered
     assert all(criterion_id not in rendered for criterion_id in C0)
+
+
+def test_verified_evidence_with_missing_repository_path_is_invalid(tmp_path):
+    root = _prepare_evidence_repository(tmp_path)
+    (root / "tests/test_hourly_curiosity_audit_report.py").unlink()
+    states = {criterion_id: "verified" for criterion_id in C0}
+
+    report = audit.roadmap_candidates(
+        _roadmap_text(), _status_text(states), repository_root=root
+    )
+    rendered = "\n".join(report)
+
+    assert "invalid_evidence" in rendered
+    assert "C1-ENTITY-CONTRACTS" not in rendered
 
 
 def test_missing_or_invalid_ledger_never_implies_completion():
@@ -247,15 +262,17 @@ def test_malformed_status_state_is_treated_as_unknown():
     assert "unknown" in rendered
 
 
-def test_phase_without_machine_readable_ids_remains_unknown_after_c0(tmp_path, monkeypatch):
-    _prepare_evidence_repository(tmp_path, monkeypatch)
+def test_phase_without_machine_readable_ids_remains_unknown_after_c0(tmp_path):
+    root = _prepare_evidence_repository(tmp_path)
     roadmap = _roadmap_text().replace(
         "- `C1-ENTITY-CONTRACTS`: contratos de entidade.",
         "- Definir contratos de entidade, relação, observação e proveniência.",
     )
     states = {criterion_id: "verified" for criterion_id in C0}
 
-    report = audit.roadmap_candidates(roadmap, _status_text(states))
+    report = audit.roadmap_candidates(
+        roadmap, _status_text(states), repository_root=root
+    )
     rendered = "\n".join(report)
 
     assert "Fase 1" in rendered
