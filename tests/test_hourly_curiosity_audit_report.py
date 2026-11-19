@@ -73,6 +73,22 @@ def _status_text(states: dict[str, str]) -> str:
     )
 
 
+def _prepare_evidence_repository(tmp_path, monkeypatch):
+    """Use an explicit checkout fixture for paths referenced by verified evidence."""
+    root = tmp_path / "repository"
+    relative_paths = (
+        "scripts/hourly_curiosity_audit.py",
+        ".github/workflows/hourly_curiosity_audit.yml",
+        "tests/test_hourly_curiosity_audit_report.py",
+    )
+    for relative_path in relative_paths:
+        path = root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("fixture\\n", encoding="utf-8")
+    monkeypatch.setattr(audit, "ROOT", root)
+    return root
+
+
 def test_report_prioritizes_first_incomplete_roadmap_phase():
     report = audit.roadmap_candidates(
         _roadmap_text(),
@@ -97,7 +113,8 @@ def test_missing_status_criterion_is_unknown_not_verified():
     assert "C1-ENTITY-CONTRACTS" not in rendered
 
 
-def test_next_phase_is_reported_only_after_all_prior_criteria_are_verified():
+def test_next_phase_is_reported_only_after_all_prior_criteria_are_verified(tmp_path, monkeypatch):
+    _prepare_evidence_repository(tmp_path, monkeypatch)
     states = {criterion_id: "verified" for criterion_id in C0}
     states["C1-ENTITY-CONTRACTS"] = "pending"
 
@@ -205,7 +222,8 @@ def test_malformed_status_state_is_treated_as_unknown():
     assert "unknown" in rendered
 
 
-def test_phase_without_machine_readable_ids_remains_unknown_after_c0():
+def test_phase_without_machine_readable_ids_remains_unknown_after_c0(tmp_path, monkeypatch):
+    _prepare_evidence_repository(tmp_path, monkeypatch)
     roadmap = _roadmap_text().replace(
         "- `C1-ENTITY-CONTRACTS`: contratos de entidade.",
         "- Definir contratos de entidade, relação, observação e proveniência.",
