@@ -27,7 +27,7 @@ TEST_LOG = REPORT_DIR / "pytest.log"
 _STATUS_START = "<!-- JARVIS_COGNITIVE_EVIDENCE_START -->"
 _STATUS_END = "<!-- JARVIS_COGNITIVE_EVIDENCE_END -->"
 _REPOSITORY_URL = "https://github.com/TheDrack/Jarvis_Xerife"
-_COMMIT_URL_RE = re.compile(rf"^{re.escape(_REPOSITORY_URL)}/commit/[0-9a-f]{40}$")
+_COMMIT_URL_RE = re.compile(rf"^{re.escape(_REPOSITORY_URL)}/commit/[0-9a-f]{{40}}$")
 _ACTIONS_RUN_URL_RE = re.compile(rf"^{re.escape(_REPOSITORY_URL)}/actions/runs/[0-9]+$")
 
 
