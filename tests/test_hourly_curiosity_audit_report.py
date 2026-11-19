@@ -86,6 +86,31 @@ def _prepare_evidence_repository(tmp_path, monkeypatch):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("fixture\\n", encoding="utf-8")
     monkeypatch.setattr(audit, "ROOT", root)
+    evidence = {
+        "commit_url": (
+            "https://github.com/TheDrack/Jarvis_Xerife/commit/" + "a" * 40
+        ),
+        "check_urls": [
+            "https://github.com/TheDrack/Jarvis_Xerife/actions/runs/123"
+        ],
+        "implementation_paths": ["scripts/hourly_curiosity_audit.py"],
+        "consumer_paths": [".github/workflows/hourly_curiosity_audit.yml"],
+        "test_paths": ["tests/test_hourly_curiosity_audit_report.py"],
+    }
+    diagnostics = {
+        "root": str(root),
+        "root_exists": root.is_dir(),
+        "files": {
+            relative_path: (root / relative_path).is_file()
+            for relative_path in relative_paths
+        },
+        "commit_url_valid": bool(audit._COMMIT_URL_RE.fullmatch(evidence["commit_url"])),
+        "check_urls_valid": [
+            bool(audit._ACTIONS_RUN_URL_RE.fullmatch(url))
+            for url in evidence["check_urls"]
+        ],
+    }
+    assert audit._valid_completion_evidence(evidence), diagnostics
     return root
 
 
