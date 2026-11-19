@@ -38,7 +38,9 @@ def git_lines(*args: str) -> list[str]:
     return result.stdout.splitlines() if result.returncode == 0 else []
 
 
-def _valid_completion_evidence(evidence: object) -> bool:
+def _valid_completion_evidence(
+    evidence: object, repository_root: Path | None = None
+) -> bool:
     """Require the same minimum immutable evidence shape as the roadmap ledger."""
     if not isinstance(evidence, dict):
         return False
@@ -56,6 +58,7 @@ def _valid_completion_evidence(evidence: object) -> bool:
     ):
         return False
 
+    root = ROOT if repository_root is None else Path(repository_root)
     for field in ("implementation_paths", "consumer_paths", "test_paths"):
         values = evidence.get(field)
         if not isinstance(values, list) or not values:
@@ -69,7 +72,7 @@ def _valid_completion_evidence(evidence: object) -> bool:
                 return False
             try:
                 path, normalized, resolved_relative = resolve_repository_path(
-                    ROOT, relative_path, reject_symlinks=True
+                    root, relative_path, reject_symlinks=True
                 )
             except (UnsafeRepositoryPath, OSError, RuntimeError):
                 return False
@@ -83,7 +86,9 @@ def _valid_completion_evidence(evidence: object) -> bool:
     return True
 
 
-def _status_criterion_states(status_text: str) -> dict[str, str]:
+def _status_criterion_states(
+    status_text: str, repository_root: Path | None = None
+) -> dict[str, str]:
     """Read criterion states from the machine-readable STATUS evidence ledger.
 
     A missing, malformed, or duplicated ledger is treated as unknown. A record
@@ -127,7 +132,9 @@ def _status_criterion_states(status_text: str) -> dict[str, str]:
             or criterion_id in states
         ):
             return {}
-        if state == "verified" and not _valid_completion_evidence(entry.get("evidence")):
+        if state == "verified" and not _valid_completion_evidence(
+            entry.get("evidence"), repository_root
+        ):
             state = "invalid_evidence"
         states[criterion_id] = state
     return states
@@ -159,7 +166,12 @@ def _roadmap_phase_criteria(roadmap_text: str) -> list[tuple[int, str, list[str]
     return sorted(phases, key=lambda item: item[0])
 
 
-def roadmap_candidates(roadmap_text: str, status_text: str, limit: int = 5) -> list[str]:
+def roadmap_candidates(
+    roadmap_text: str,
+    status_text: str,
+    limit: int = 5,
+    repository_root: Path | None = None,
+) -> list[str]:
     """Report the first incomplete roadmap phase using STATUS evidence.
 
     The roadmap defines the criteria; STATUS supplies their current evidence
@@ -172,7 +184,7 @@ def roadmap_candidates(roadmap_text: str, status_text: str, limit: int = 5) -> l
     if not phases:
         return ["Nenhum critério com ID explícito foi encontrado em docs/COGNITIVE_ROADMAP.md."]
 
-    states = _status_criterion_states(status_text)
+    states = _status_criterion_states(status_text, repository_root)
     for _phase_number, heading, criterion_ids in phases:
         if not criterion_ids:
             return [
