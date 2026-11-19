@@ -152,6 +152,25 @@ def test_next_phase_is_reported_only_after_all_prior_criteria_are_verified(tmp_p
     assert all(criterion_id not in rendered for criterion_id in C0)
 
 
+def test_commit_evidence_requires_exactly_40_hex_characters(tmp_path):
+    root = _prepare_evidence_repository(tmp_path)
+    base_url = "https://github.com/TheDrack/Jarvis_Xerife/commit/"
+    evidence = {
+        "commit_url": base_url + "a" * 40,
+        "check_urls": [
+            "https://github.com/TheDrack/Jarvis_Xerife/actions/runs/123"
+        ],
+        "implementation_paths": ["scripts/hourly_curiosity_audit.py"],
+        "consumer_paths": [".github/workflows/hourly_curiosity_audit.yml"],
+        "test_paths": ["tests/test_hourly_curiosity_audit_report.py"],
+    }
+
+    assert audit._valid_completion_evidence(evidence, repository_root=root)
+    for invalid_sha in ("a" * 39, "a" * 41, "g" * 40):
+        evidence["commit_url"] = base_url + invalid_sha
+        assert not audit._valid_completion_evidence(evidence, repository_root=root)
+
+
 def test_verified_evidence_with_missing_repository_path_is_invalid(tmp_path):
     root = _prepare_evidence_repository(tmp_path)
     (root / "tests/test_hourly_curiosity_audit_report.py").unlink()
