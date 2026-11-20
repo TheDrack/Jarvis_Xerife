@@ -103,6 +103,7 @@ _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
 _WORLD_LAND_PATH = _REPO_ROOT / "app" / "static" / "world-land.json"
 _WORLD_ADMIN_BOUNDARIES_PATH = _REPO_ROOT / "app" / "static" / "world-admin-boundaries.json.gz.b64"
 _GEO_LAYER_PATH = _REPO_ROOT / "app" / "static" / "jarvis-geospatial-layer.js"
+_PROSPECTING_MAP_PATH = _REPO_ROOT / "app" / "static" / "jarvis-prospecting-map.js"
 _ICON_PATH = _REPO_ROOT / "app" / "static" / "jarvis-icon.svg"
 _PWA_MANIFEST_PATH = _REPO_ROOT / "app" / "static" / "manifest.webmanifest"
 _SERVICE_WORKER_PATH = _REPO_ROOT / "app" / "static" / "service-worker.js"
@@ -138,10 +139,10 @@ def _prospecting_geocoding_repository():
     if not database.is_file():
         return None
     from app.adapters.infrastructure.prospecting.geocoding_store import (
-        DuckDBGeocodingRepository,
+        DuckDBGeocodingReader,
     )
 
-    return DuckDBGeocodingRepository(database)
+    return DuckDBGeocodingReader(database)
 
 
 def _attach_cached_geocoding(payload: dict[str, Any]) -> dict[str, Any]:
@@ -881,6 +882,16 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         if not _GEO_LAYER_PATH.is_file():
             raise HTTPException(status_code=404, detail="Camada geoespacial indisponível.")
         return FileResponse(_GEO_LAYER_PATH, media_type="application/javascript")
+
+    @app.get("/static/jarvis-prospecting-map.js", include_in_schema=False)
+    async def desktop_prospecting_map() -> FileResponse:
+        if not _PROSPECTING_MAP_PATH.is_file():
+            raise HTTPException(status_code=404, detail="Mapa do Prospecto indisponível.")
+        return FileResponse(
+            _PROSPECTING_MAP_PATH,
+            media_type="application/javascript",
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
 
     @app.get("/favicon.ico", include_in_schema=False)
     async def desktop_icon_ico() -> FileResponse:
