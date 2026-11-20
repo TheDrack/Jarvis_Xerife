@@ -4,7 +4,7 @@
 
 **Snapshot original:** `main` em `82ca2ac70f67e8418f62079f7d94e3fc8b4d1230` (pós-PR #774; histórico)
 **Última revalidação funcional abrangente:** `main` em `d83c0b81898ab45de75f7583b3a7bf830dfcb88c` (2026-11-14), após o merge documental da PR #821.
-**Última verificação incremental:** `main` em `2bf151052f1a25f088030bfafec5d31d58f18e11` (2026-11-19), limitada a reporter C0, critérios do roadmap, CI e fronteiras de self-healing.
+**Última verificação incremental:** `main` em `32cf7e94ed54d577c85cc503b1480ef1c765399d` (2026-11-20), limitada a reporter C0, critérios do roadmap, CI, consumidores do roteamento cognitivo, Prospecto geoespacial e fronteiras de self-healing.
 **Auditoria original:** 2026-11-07
 **Estado atual:** parcial; C0 permanece aberto.
 **Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação, complementada por probes remotos somente leitura. Não é confirmação de deploy completo, execução ponta a ponta ou comportamento de todos os providers.
