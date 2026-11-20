@@ -93,7 +93,7 @@ def test_external_leads_come_last_and_record_registry_presence(tmp_path):
     assert by_name["Fora do cadastro"].registry_presence is RegistryPresence.NOT_FOUND
     assert by_name["Sem cnpj"].registry_presence is RegistryPresence.UNVERIFIED
     assert registry.lookups == ["99999999000199"]
-    assert any("2 added, 1 already present" in note for note in result.notes)
+    assert any("2 added, 1 duplicates skipped" in note for note in result.notes)
 
 
 def test_known_cnpj_is_reported_as_found_even_when_outside_the_filter(tmp_path):
@@ -193,7 +193,7 @@ def test_external_duplicate_candidates_are_removed_before_bulk_lookup(tmp_path):
     ]
     assert registry.bulk_lookups == [("99999999000199",)]
     assert result.matched_rows == 2
-    assert any("2 added, 3 already present" in note for note in result.notes)
+    assert any("2 added, 3 duplicates skipped" in note for note in result.notes)
 
 
 def test_without_an_external_source_it_behaves_like_the_registry():
