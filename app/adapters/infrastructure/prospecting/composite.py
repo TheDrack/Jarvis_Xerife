@@ -121,7 +121,7 @@ class CompositeDiscoveryProvider:
             source_id=self.source_id,
             companies=tuple(companies),
             scanned_rows=registry_result.scanned_rows + external_result.scanned_rows,
-            matched_rows=registry_result.matched_rows + external_result.matched_rows,
+            matched_rows=registry_result.matched_rows + added,
             skipped_malformed_rows=(
                 registry_result.skipped_malformed_rows + external_result.skipped_malformed_rows
             ),
