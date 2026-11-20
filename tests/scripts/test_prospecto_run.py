@@ -410,3 +410,74 @@ def test_cli_reports_missing_dataset_without_writing_outputs(tmp_path, capsys):
     assert exit_code == 2
     assert "erro:" in capsys.readouterr().err
     assert not out_dir.exists()
+
+
+def test_cli_geocodes_delivered_companies_only_when_enabled(tmp_path, capsys, monkeypatch):
+    from app.domain.prospecting.geography import (
+        AddressGeocoding,
+        GeoCoordinate,
+        GeocodingPrecision,
+        GeocodingStatus,
+    )
+    import scripts.prospecto_run as prospecto_cli
+
+    class FakeGeocodingService:
+        def geocode_companies(self, companies):
+            return [
+                AddressGeocoding(
+                    address=company.geocoding_address,
+                    status=GeocodingStatus.SUCCESS,
+                    coordinate=GeoCoordinate(
+                        latitude=-27.5969,
+                        longitude=-48.5495,
+                        accuracy_m=25,
+                        crs="EPSG:4674",
+                    ),
+                    precision=GeocodingPrecision.PREMISE,
+                    provider="fake:cnefe",
+                )
+                for company in companies
+            ]
+
+    monkeypatch.setattr(
+        prospecto_cli,
+        "_build_geocoding_service",
+        lambda database=None: FakeGeocodingService(),
+    )
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    prepare_data(data_dir)
+    establishment_path = data_dir / "Estabelecimentos0.csv"
+    rows = list(csv.reader(establishment_path.open(encoding="latin-1"), delimiter=";"))
+    row = rows[0]
+    row[13:19] = ["RUA", "DAS FLORES", "100", "SALA 2", "CENTRO", "88010000"]
+    write_csv(establishment_path, [row])
+    campaign_path = write_campaign(tmp_path / "campaign.json")
+    out_dir = tmp_path / "out"
+
+    exit_code = prospecto_cli.main(
+        [
+            "--campaign",
+            str(campaign_path),
+            "--data-dir",
+            str(data_dir),
+            "--out",
+            str(out_dir),
+            "--now",
+            NOW,
+            "--no-history",
+            "--geocode",
+        ]
+    )
+
+    assert exit_code == 0
+    csv_rows = list(csv.DictReader(next(out_dir.glob("*.csv")).open(encoding="utf-8")))
+    assert csv_rows[0]["latitude"] == "-27.5969"
+    assert csv_rows[0]["longitude"] == "-48.5495"
+    assert csv_rows[0]["precisao_geocodificacao"] == "premise"
+    assert csv_rows[0]["crs_coordenadas"] == "EPSG:4674"
+    manifest = json.loads(next(out_dir.glob("*.json")).read_text(encoding="utf-8"))
+    assert manifest["geocoding_enabled"] is True
+    assert manifest["geocoding_success"] == 1
+    assert manifest["coordinate_reference_system"] == "EPSG:4674"
+    assert "geocodificacao: tentativas=1" in capsys.readouterr().out
