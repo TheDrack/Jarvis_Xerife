@@ -194,3 +194,73 @@ def test_geocoding_store_migrates_legacy_geocodebr_rows_to_sirgas_2000(tmp_path)
 
     assert loaded is not None
     assert loaded.coordinate.crs == "EPSG:4674"
+
+
+def test_geocoding_cache_reader_reads_legacy_schema_without_migrating(tmp_path):
+    import duckdb
+
+    from app.adapters.infrastructure.prospecting.geocoding_store import (
+        DuckDBGeocodingReader,
+    )
+    from app.domain.prospecting.geography import address_fingerprint
+
+    database = tmp_path / "legacy-read-only.duckdb"
+    address = "Rua B, 20, São José, SC, Brasil"
+    connection = duckdb.connect(str(database))
+    connection.execute(
+        """
+        CREATE TABLE prospect_geocoding (
+            address_hash VARCHAR PRIMARY KEY,
+            address VARCHAR NOT NULL,
+            status VARCHAR NOT NULL,
+            latitude DOUBLE,
+            longitude DOUBLE,
+            accuracy_m DOUBLE,
+            geocoding_precision VARCHAR,
+            provider VARCHAR NOT NULL,
+            confidence DOUBLE,
+            geocoded_at VARCHAR NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        "INSERT INTO prospect_geocoding VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            address_fingerprint(address), address, "success", -27.6, -48.6,
+            25, "premise", "geocodebr:cnefe", None,
+            "2026-11-20T00:00:00+00:00",
+        ],
+    )
+    original_columns = [
+        row[1] for row in connection.execute(
+            "PRAGMA table_info('prospect_geocoding')"
+        ).fetchall()
+    ]
+    connection.close()
+
+    reader = DuckDBGeocodingReader(database)
+    loaded = reader.get_many([address])[address_fingerprint(address)]
+
+    connection = duckdb.connect(str(database), read_only=True)
+    final_columns = [
+        row[1] for row in connection.execute(
+            "PRAGMA table_info('prospect_geocoding')"
+        ).fetchall()
+    ]
+    connection.close()
+
+    assert loaded.coordinate.crs == "EPSG:4674"
+    assert loaded.formatted_address is None
+    assert final_columns == original_columns
+
+
+def test_geocoding_cache_reader_does_not_create_missing_database(tmp_path):
+    from app.adapters.infrastructure.prospecting.geocoding_store import (
+        DuckDBGeocodingReader,
+    )
+
+    database = tmp_path / "missing" / "cache.duckdb"
+    reader = DuckDBGeocodingReader(database)
+
+    assert reader.get_many(["Rua A, 1, São José, SC"]) == {}
+    assert not database.exists()
