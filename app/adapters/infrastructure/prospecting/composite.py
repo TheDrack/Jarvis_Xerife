@@ -68,6 +68,7 @@ class CompositeDiscoveryProvider:
 
         added = 0
         duplicates = 0
+        candidates = []
         for company in external_result.companies:
             if company.cnpj:
                 if company.cnpj in seen_cnpj:
@@ -76,10 +77,32 @@ class CompositeDiscoveryProvider:
             elif normalize_text(company.company_name) in seen_names:
                 duplicates += 1
                 continue
+            candidates.append(company)
 
-            presence = (
-                self._presence(company.cnpj) if company.cnpj else RegistryPresence.UNVERIFIED
-            )
+        bulk_lookup = getattr(self._registry, "lookup_company_presence", None)
+        candidate_cnpjs = tuple(
+            company.cnpj for company in candidates if company.cnpj
+        )
+        found_cnpjs = (
+            bulk_lookup(candidate_cnpjs)
+            if candidate_cnpjs and callable(bulk_lookup)
+            else set()
+        )
+
+        for company in candidates:
+            if company.cnpj:
+                presence = (
+                    RegistryPresence.FOUND
+                    if company.cnpj in found_cnpjs
+                    else (
+                        RegistryPresence.NOT_FOUND
+                        if callable(bulk_lookup)
+                        else self._presence(company.cnpj)
+                    )
+                )
+            else:
+                presence = RegistryPresence.UNVERIFIED
+
             companies.append(company.model_copy(update={"registry_presence": presence}))
             if company.cnpj:
                 seen_cnpj.add(company.cnpj)
