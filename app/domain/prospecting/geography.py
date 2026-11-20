@@ -35,13 +35,14 @@ class GeocodingPrecision(str, Enum):
 
 
 class GeoCoordinate(BaseModel):
-    """WGS84 coordinate; accuracy is an estimated radius in meters."""
+    """Geographic coordinate with explicit CRS and estimated accuracy radius."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     accuracy_m: Optional[float] = Field(default=None, ge=0)
+    crs: str = Field(default="EPSG:4326", min_length=5, max_length=32)
 
 
 class AddressGeocoding(BaseModel):
