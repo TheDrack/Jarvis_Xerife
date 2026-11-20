@@ -36,7 +36,7 @@ jobs:
           node-version: "22"
 
       - name: Run geospatial frontend unit tests
-        run: node --test tests/frontend/jarvis-geospatial-layer.test.mjs
+        run: node --test tests/frontend/jarvis-geospatial-layer.test.mjs tests/frontend/jarvis-prospecting-map.test.mjs
 
       - name: Install complete test dependencies
         run: |
