@@ -200,4 +200,112 @@ class DuckDBGeocodingRepository:
 
 
 
-__all__ = ["DuckDBGeocodingRepository"]
+
+class DuckDBGeocodingReader:
+    """Non-migrating, read-only access to an existing geocoding cache."""
+
+    def __init__(self, database: Path | str) -> None:
+        self._database = Path(database)
+
+    def get_many(
+        self, addresses: list[str] | tuple[str, ...]
+    ) -> dict[str, AddressGeocoding]:
+        keys = tuple(dict.fromkeys(address_fingerprint(item) for item in addresses))
+        if not keys or not self._database.is_file():
+            return {}
+
+        import duckdb
+
+        connection = duckdb.connect(str(self._database), read_only=True)
+        try:
+            table = connection.execute(
+                """
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'main' AND table_name = 'prospect_geocoding'
+                """
+            ).fetchone()
+            if table is None:
+                return {}
+
+            columns = {
+                row[1]
+                for row in connection.execute(
+                    "PRAGMA table_info('prospect_geocoding')"
+                ).fetchall()
+            }
+            required = {"address_hash", "address", "status", "provider", "geocoded_at"}
+            if not required.issubset(columns):
+                return {}
+
+            def column_or_null(name: str) -> str:
+                return name if name in columns else "NULL"
+
+            crs_expression = (
+                "coordinate_crs"
+                if "coordinate_crs" in columns
+                else (
+                    "CASE WHEN provider = 'geocodebr:cnefe' "
+                    "THEN 'EPSG:4674' ELSE 'EPSG:4326' END"
+                )
+            )
+            selected = [
+                "address_hash",
+                "address",
+                column_or_null("formatted_address"),
+                "status",
+                column_or_null("latitude"),
+                column_or_null("longitude"),
+                column_or_null("accuracy_m"),
+                crs_expression,
+                column_or_null("geocoding_precision"),
+                "provider",
+                column_or_null("confidence"),
+                "geocoded_at",
+            ]
+            rows = []
+            for offset in range(0, len(keys), 1000):
+                chunk = keys[offset : offset + 1000]
+                placeholders = ", ".join("?" for _ in chunk)
+                rows.extend(
+                    connection.execute(
+                        "SELECT " + ", ".join(selected)
+                        + f" FROM prospect_geocoding WHERE address_hash IN ({placeholders})",
+                        list(chunk),
+                    ).fetchall()
+                )
+        finally:
+            connection.close()
+
+        results: dict[str, AddressGeocoding] = {}
+        for row in rows:
+            (
+                key, stored_address, formatted_address, status, latitude, longitude,
+                accuracy_m, coordinate_crs, precision, provider, confidence, geocoded_at,
+            ) = row
+            coordinate = None
+            if latitude is not None and longitude is not None:
+                coordinate = GeoCoordinate(
+                    latitude=latitude,
+                    longitude=longitude,
+                    accuracy_m=accuracy_m,
+                    crs=coordinate_crs or "EPSG:4326",
+                )
+            results[key] = AddressGeocoding(
+                address=stored_address,
+                formatted_address=formatted_address,
+                status=GeocodingStatus(status),
+                coordinate=coordinate,
+                precision=GeocodingPrecision(precision) if precision else None,
+                provider=provider,
+                confidence=confidence,
+                geocoded_at=datetime.fromisoformat(geocoded_at),
+            )
+        return results
+
+    def get(self, address: str) -> Optional[AddressGeocoding]:
+        key = address_fingerprint(address)
+        return self.get_many([address]).get(key)
+
+
+__all__ = ["DuckDBGeocodingReader", "DuckDBGeocodingRepository"]

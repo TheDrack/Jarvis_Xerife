@@ -42,3 +42,22 @@ def test_prospecting_hud_discloses_identity_granularity_and_no_automatic_outreac
 def test_prospecting_hud_is_responsive_on_small_screens():
     assert "@media(max-width:620px)" in CSS
     assert ".prospecting-form{grid-template-columns:1fr}" in CSS
+
+
+def test_prospecting_hud_exposes_an_independent_company_map():
+    MAP_JS = (ROOT / "app" / "static" / "jarvis-prospecting-map.js").read_text(encoding="utf-8")
+    assert 'id="prospectingMapToggle"' in HTML
+    assert 'id="prospectingMapPanel"' in HTML
+    assert 'id="prospectingMapCanvas"' in HTML
+    assert 'src="/static/jarvis-prospecting-map.js"' in HTML
+    assert "include_geocoding" in JS
+    assert "window.JarvisProspectingMap" in JS
+    assert "renderer.render" in JS
+    assert "buildCompanyMarkers" in MAP_JS
+    assert "geocodebr" not in MAP_JS.lower()
+
+
+def test_prospecting_cluster_members_can_be_selected_individually():
+    assert "cluster.members.forEach" in JS
+    assert "button.type='button'" in JS
+    assert "renderMapSelection({count:1,members:[marker]})" in JS

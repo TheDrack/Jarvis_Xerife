@@ -19,6 +19,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -145,11 +146,12 @@ def _build_geocoding_service(database: str | Path | None = None):
     from app.adapters.infrastructure.prospecting.geocoding_store import DuckDBGeocodingRepository
     from app.application.services.prospecting.geocoding import GeocodingService
 
-    cache_path = (
-        Path(database).expanduser()
-        if database
-        else Path.home() / ".local" / "share" / "jarvis" / "prospecto" / "geocoding.duckdb"
+    configured_database = (
+        database
+        or os.getenv("JARVIS_PROSPECTO_GEOCODING_DB")
+        or Path.home() / ".local" / "share" / "jarvis" / "prospecto" / "geocoding.duckdb"
     )
+    cache_path = Path(configured_database).expanduser()
     return GeocodingService(
         GeocodeBrGeocoder(),
         DuckDBGeocodingRepository(cache_path),

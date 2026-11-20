@@ -525,9 +525,15 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
      </div>
      <div class="prospecting-actions"><button class="mini" id="prospectingSearch" type="submit">PESQUISAR</button><span id="prospectingStatus" class="prospecting-status" role="status" aria-live="polite">Informe a atividade e a região para iniciar.</span></div>
     </form>
-    <div class="prospecting-meta"><span id="prospectingSummary">0 empresas</span><span id="prospectingSourceNote">BASE OFICIAL · AGUARDANDO CONSULTA</span></div>
+    <div class="prospecting-meta"><span id="prospectingSummary">0 empresas</span><span id="prospectingSourceNote">BASE OFICIAL · AGUARDANDO CONSULTA</span><button class="mini" id="prospectingMapToggle" type="button" disabled>MAPA</button></div>
     <div id="prospectingIdentityNote" class="prospecting-note">A busca atual agrupa resultados pela raiz do CNPJ. O CNPJ completo exibido identifica o estabelecimento representativo.</div>
     <div id="prospectingResults" class="prospecting-results"><div class="prospecting-empty">Nenhuma consulta executada.</div></div>
+    <section id="prospectingMapPanel" class="prospecting-map-panel" hidden aria-label="Mapa das empresas geocodificadas">
+     <div class="prospecting-map-toolbar"><span id="prospectingMapSummary">AGUARDANDO COORDENADAS</span><span>AZUL = PRECISO · ÂMBAR = APROXIMADO · SEM RUAS</span></div>
+     <div id="prospectingMapCanvas" class="prospecting-map-canvas"><div class="prospecting-map-empty">Execute uma pesquisa e abra o mapa.</div></div>
+     <div id="prospectingMapSelection" class="prospecting-map-selection" aria-live="polite">Selecione um ponto para consultar a empresa e a precisão da coordenada.</div>
+     <div id="prospectingMapNote" class="prospecting-note">O mapa exibe somente coordenadas já existentes no cache. Não inicia geocodificação nem chamadas externas.</div>
+    </section>
     <div class="prospecting-actions"><button class="mini" id="prospectingNext" type="button" hidden>PRÓXIMA PÁGINA →</button></div>
    </div>
   </div>
@@ -562,6 +568,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 </div>
 <script src="/static/jarvis-geospatial-layer.js"></script>
 <script src="/static/jarvis-intelligence-status.js"></script>
+<script src="/static/jarvis-prospecting-map.js"></script>
 <script src="/static/jarvis-prospecting.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
 <script>
