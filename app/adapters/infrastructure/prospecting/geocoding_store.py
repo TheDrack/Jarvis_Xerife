@@ -36,6 +36,7 @@ class DuckDBGeocodingRepository:
                     latitude DOUBLE,
                     longitude DOUBLE,
                     accuracy_m DOUBLE,
+                    coordinate_crs VARCHAR NOT NULL DEFAULT 'EPSG:4326',
                     geocoding_precision VARCHAR,
                     provider VARCHAR NOT NULL,
                     confidence DOUBLE,
@@ -45,6 +46,9 @@ class DuckDBGeocodingRepository:
             )
             connection.execute(
                 "ALTER TABLE prospect_geocoding ADD COLUMN IF NOT EXISTS formatted_address VARCHAR"
+            )
+            connection.execute(
+                "ALTER TABLE prospect_geocoding ADD COLUMN IF NOT EXISTS coordinate_crs VARCHAR DEFAULT 'EPSG:4326'"
             )
         finally:
             connection.close()
@@ -62,7 +66,7 @@ class DuckDBGeocodingRepository:
             row = connection.execute(
                 """
                 SELECT address, formatted_address, status, latitude, longitude, accuracy_m,
-                       geocoding_precision, provider, confidence, geocoded_at
+                       coordinate_crs, geocoding_precision, provider, confidence, geocoded_at
                 FROM prospect_geocoding
                 WHERE address_hash = ?
                 """,
@@ -80,6 +84,7 @@ class DuckDBGeocodingRepository:
             latitude,
             longitude,
             accuracy_m,
+            coordinate_crs,
             precision,
             provider,
             confidence,
@@ -91,6 +96,7 @@ class DuckDBGeocodingRepository:
                 latitude=latitude,
                 longitude=longitude,
                 accuracy_m=accuracy_m,
+                crs=coordinate_crs or "EPSG:4326",
             )
         return AddressGeocoding(
             address=stored_address,
@@ -117,8 +123,8 @@ class DuckDBGeocodingRepository:
                 """
                 INSERT INTO prospect_geocoding (
                     address_hash, address, formatted_address, status, latitude, longitude,
-                    accuracy_m, geocoding_precision, provider, confidence, geocoded_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    accuracy_m, coordinate_crs, geocoding_precision, provider, confidence, geocoded_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     key,
@@ -128,6 +134,7 @@ class DuckDBGeocodingRepository:
                     coordinate.latitude if coordinate else None,
                     coordinate.longitude if coordinate else None,
                     coordinate.accuracy_m if coordinate else None,
+                    coordinate.crs if coordinate else "EPSG:4326",
                     result.precision.value if result.precision else None,
                     result.provider,
                     result.confidence,
