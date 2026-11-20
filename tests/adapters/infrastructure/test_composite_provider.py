@@ -173,11 +173,11 @@ def test_external_duplicate_candidates_are_removed_before_bulk_lookup(tmp_path):
 
     leads = tmp_path / "duplicate-leads.csv"
     leads.write_text(
-        "empresa;cnpj;cidade;uf;fonte_url\\n"
-        "Lead CNPJ;99999999000199;São José;SC;https://exemplo.com/1\\n"
-        "Lead CNPJ duplicado;99999999000199;São José;SC;https://exemplo.com/2\\n"
-        "Lead sem CNPJ;;São José;SC;https://exemplo.com/3\\n"
-        " lead SEM CNPJ ;;São José;SC;https://exemplo.com/4\\n",
+        "empresa;cnpj;cidade;uf;fonte_url\n"
+        "Lead CNPJ;99999999000199;São José;SC;https://exemplo.com/1\n"
+        "Lead CNPJ duplicado;99999999000199;São José;SC;https://exemplo.com/2\n"
+        "Lead sem CNPJ;;São José;SC;https://exemplo.com/3\n"
+        " lead SEM CNPJ ;;São José;SC;https://exemplo.com/4\n",
         encoding="utf-8",
     )
     registry = BulkRegistry()
