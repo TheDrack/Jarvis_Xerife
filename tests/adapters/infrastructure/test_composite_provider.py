@@ -177,7 +177,8 @@ def test_external_duplicate_candidates_are_removed_before_bulk_lookup(tmp_path):
         "Lead CNPJ;99999999000199;São José;SC;https://exemplo.com/1\n"
         "Lead CNPJ duplicado;99999999000199;São José;SC;https://exemplo.com/2\n"
         "Lead sem CNPJ;;São José;SC;https://exemplo.com/3\n"
-        " lead SEM CNPJ ;;São José;SC;https://exemplo.com/4\n",
+        " lead SEM CNPJ ;;São José;SC;https://exemplo.com/4\n"
+        "Lead CNPJ;;São José;SC;https://exemplo.com/5\n",
         encoding="utf-8",
     )
     registry = BulkRegistry()
@@ -192,7 +193,7 @@ def test_external_duplicate_candidates_are_removed_before_bulk_lookup(tmp_path):
     ]
     assert registry.bulk_lookups == [("99999999000199",)]
     assert result.matched_rows == 2
-    assert any("2 added, 2 already present" in note for note in result.notes)
+    assert any("2 added, 3 already present" in note for note in result.notes)
 
 
 def test_without_an_external_source_it_behaves_like_the_registry():
