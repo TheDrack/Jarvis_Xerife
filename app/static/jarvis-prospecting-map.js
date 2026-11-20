@@ -6,6 +6,7 @@
   'use strict';
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
+  const GEOGRAPHIC_CRS = new Set(['EPSG:4326', 'EPSG:4674']);
   const validCoordinate = (value, min, max) => {
     if (value === null || value === undefined || typeof value === 'boolean') return false;
     if (typeof value === 'string' && value.trim() === '') return false;
@@ -18,9 +19,11 @@
       .filter((company) => {
         const geocoding = company && company.geocoding;
         const coordinate = geocoding && geocoding.coordinate;
+        const crs = String(coordinate && coordinate.crs || 'EPSG:4326').toUpperCase();
         return geocoding &&
           (geocoding.status === 'success' || geocoding.status === 'partial') &&
           coordinate &&
+          GEOGRAPHIC_CRS.has(crs) &&
           validCoordinate(coordinate.latitude, -90, 90) &&
           validCoordinate(coordinate.longitude, -180, 180);
       })
