@@ -92,3 +92,55 @@ def test_duckdb_geocoding_repository_round_trips_coordinate_crs(tmp_path):
 
     assert loaded is not None
     assert loaded.coordinate.crs == "EPSG:4674"
+
+
+def test_geocoding_store_migrates_existing_rows_to_default_crs(tmp_path):
+    import duckdb
+
+    from app.domain.prospecting.geography import address_fingerprint
+
+    database = tmp_path / "legacy-geo.duckdb"
+    address = "Rua A, 10, São José, SC, Brasil"
+    connection = duckdb.connect(str(database))
+    connection.execute(
+        """
+        CREATE TABLE prospect_geocoding (
+            address_hash VARCHAR PRIMARY KEY,
+            address VARCHAR NOT NULL,
+            formatted_address VARCHAR,
+            status VARCHAR NOT NULL,
+            latitude DOUBLE,
+            longitude DOUBLE,
+            accuracy_m DOUBLE,
+            geocoding_precision VARCHAR,
+            provider VARCHAR NOT NULL,
+            confidence DOUBLE,
+            geocoded_at VARCHAR NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO prospect_geocoding VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            address_fingerprint(address),
+            address,
+            None,
+            "success",
+            -27.6,
+            -48.6,
+            25,
+            "premise",
+            "legacy-provider",
+            0.9,
+            "2026-11-20T00:00:00+00:00",
+        ],
+    )
+    connection.close()
+
+    repository = DuckDBGeocodingRepository(database)
+    loaded = repository.get(address)
+
+    assert loaded is not None
+    assert loaded.coordinate.crs == "EPSG:4326"
