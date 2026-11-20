@@ -68,18 +68,44 @@ class CompositeDiscoveryProvider:
 
         added = 0
         duplicates = 0
+        candidates = []
         for company in external_result.companies:
+            normalized_name = normalize_text(company.company_name)
             if company.cnpj:
                 if company.cnpj in seen_cnpj:
                     duplicates += 1
                     continue
-            elif normalize_text(company.company_name) in seen_names:
+                seen_cnpj.add(company.cnpj)
+            elif normalized_name in seen_names:
                 duplicates += 1
                 continue
+            seen_names.add(normalized_name)
+            candidates.append(company)
 
-            presence = (
-                self._presence(company.cnpj) if company.cnpj else RegistryPresence.UNVERIFIED
-            )
+        bulk_lookup = getattr(self._registry, "lookup_company_presence", None)
+        candidate_cnpjs = tuple(
+            company.cnpj for company in candidates if company.cnpj
+        )
+        found_cnpjs = (
+            bulk_lookup(candidate_cnpjs)
+            if candidate_cnpjs and callable(bulk_lookup)
+            else set()
+        )
+
+        for company in candidates:
+            if company.cnpj:
+                presence = (
+                    RegistryPresence.FOUND
+                    if company.cnpj in found_cnpjs
+                    else (
+                        RegistryPresence.NOT_FOUND
+                        if callable(bulk_lookup)
+                        else self._presence(company.cnpj)
+                    )
+                )
+            else:
+                presence = RegistryPresence.UNVERIFIED
+
             companies.append(company.model_copy(update={"registry_presence": presence}))
             if company.cnpj:
                 seen_cnpj.add(company.cnpj)
@@ -89,13 +115,13 @@ class CompositeDiscoveryProvider:
         notes = list(registry_result.notes) + list(external_result.notes)
         notes.append(
             f"external leads: {len(external_result.companies)} in scope, {added} added, "
-            f"{duplicates} already present in the registry result"
+            f"{duplicates} duplicates skipped (registry or external source)"
         )
         return DiscoveryResult(
             source_id=self.source_id,
             companies=tuple(companies),
             scanned_rows=registry_result.scanned_rows + external_result.scanned_rows,
-            matched_rows=registry_result.matched_rows + external_result.matched_rows,
+            matched_rows=registry_result.matched_rows + added,
             skipped_malformed_rows=(
                 registry_result.skipped_malformed_rows + external_result.skipped_malformed_rows
             ),

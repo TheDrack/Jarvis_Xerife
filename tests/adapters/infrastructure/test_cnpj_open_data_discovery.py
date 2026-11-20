@@ -71,6 +71,34 @@ def query(**overrides) -> DiscoveryQuery:
     return DiscoveryQuery(**values)
 
 
+def test_lookup_company_presence_scans_csv_once_and_matches_full_cnpj(tmp_path):
+    files = build_files(
+        tmp_path,
+        establishments=[
+            establishment(cnpj_basico="12345678", ordem="0001", dv="90"),
+            establishment(cnpj_basico="12345678", ordem="0002", dv="07"),
+            establishment(cnpj_basico="87654321", ordem="0001", dv="90"),
+        ],
+        companies=[company_row(), company_row("87654321", "BETA LTDA")],
+    )
+    adapter = CnpjOpenDataAdapter(files)
+    original_rows = adapter._rows
+    reads = []
+
+    def recording_rows(path):
+        reads.append(path)
+        yield from original_rows(path)
+
+    adapter._rows = recording_rows
+
+    found = adapter.lookup_company_presence(
+        ["12345678000190", "12345678000207", "99999999000199", "invalid"]
+    )
+
+    assert found == {"12345678000190", "12345678000207"}
+    assert reads == [files.establishments]
+
+
 def test_finds_active_company_in_the_requested_slice(tmp_path):
     files = build_files(
         tmp_path,

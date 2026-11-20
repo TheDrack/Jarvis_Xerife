@@ -22,7 +22,7 @@ import csv
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from app.adapters.infrastructure.prospecting.cnpj_open_data import (
     DATASET_LICENSE,
@@ -346,6 +346,39 @@ class CnpjStoreProvider:
         codes = [row[0] for row in rows if normalize_text(row[1] or "") in wanted]
         return sorted(set(codes))
 
+    def lookup_company_presence(self, cnpjs: Sequence[str]) -> set[str]:
+        """Resolve registry presence for many CNPJs with one read-only connection."""
+        normalized = sorted(
+            {
+                "".join(character for character in value if character.isdigit())
+                for value in cnpjs
+                if isinstance(value, str)
+            }
+        )
+        normalized = [value for value in normalized if len(value) == 14]
+        if not normalized:
+            return set()
+
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                """
+                WITH requested AS (
+                    SELECT unnest(?) AS cnpj
+                )
+                SELECT DISTINCT requested.cnpj
+                FROM requested
+                INNER JOIN establishments AS e
+                    ON e.cnpj_basico = substr(requested.cnpj, 1, 8)
+                    AND e.cnpj_ordem = substr(requested.cnpj, 9, 4)
+                    AND e.cnpj_dv = substr(requested.cnpj, 13, 2)
+                """,
+                [normalized],
+            ).fetchall()
+        finally:
+            connection.close()
+        return {row[0] for row in rows}
+
     def lookup_company(self, cnpj: str) -> Optional[ProspectCompany]:
         """Look one CNPJ up in the whole store, outside the campaign filter.
 
@@ -522,25 +555,30 @@ class CnpjStoreProvider:
             conditions.append(f"({cnae_conditions})")
 
             where = " AND ".join(conditions)
-            matched_rows = connection.execute(
-                f"SELECT count(*) FROM establishments e LEFT JOIN companies c ON c.cnpj_basico=e.cnpj_basico WHERE {where}", parameters
-            ).fetchone()[0]
-
             rows = connection.execute(
-                "SELECT e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv, e.nome_fantasia, "
-                "e.cnae_principal, e.municipio, c.razao_social, m.nome, n.descricao, "
-                "c.natureza, c.capital, c.porte, e.data_inicio_atividade, e.matriz_filial, "
-                "e.bairro, e.cep, "
-                "(nullif(trim(e.telefone1), '') IS NOT NULL OR nullif(trim(e.telefone2), '') IS NOT NULL), "
-                "(nullif(trim(e.correio_eletronico), '') IS NOT NULL), "
-                "(nullif(trim(e.telefone3), '') IS NOT NULL) "
+                "WITH filtered AS ("
+                "SELECT e.*, c.razao_social, c.natureza, c.capital, c.porte, "
+                "(nullif(trim(e.telefone1), '') IS NOT NULL OR nullif(trim(e.telefone2), '') IS NOT NULL) AS has_phone, "
+                "(nullif(trim(e.correio_eletronico), '') IS NOT NULL) AS has_email, "
+                "(nullif(trim(e.telefone3), '') IS NOT NULL) AS has_fax, "
+                "count(*) OVER() AS matched_rows "
                 "FROM establishments e "
                 "LEFT JOIN companies c ON c.cnpj_basico = e.cnpj_basico "
-                "LEFT JOIN municipalities m ON m.codigo = e.municipio "
-                "LEFT JOIN cnaes n ON n.codigo = e.cnae_principal "
-                f"WHERE {where} ORDER BY e.cnpj_basico, e.cnpj_ordem LIMIT ?",
+                f"WHERE {where}"
+                ") "
+                "SELECT f.cnpj_basico, f.cnpj_ordem, f.cnpj_dv, f.nome_fantasia, "
+                "f.cnae_principal, f.municipio, f.razao_social, m.nome, n.descricao, "
+                "f.natureza, f.capital, f.porte, f.data_inicio_atividade, f.matriz_filial, "
+                "f.bairro, f.cep, f.has_phone, f.has_email, f.has_fax, f.matched_rows "
+                "FROM filtered f "
+                "LEFT JOIN (SELECT codigo, min(nome) AS nome FROM municipalities GROUP BY codigo) m "
+                "ON m.codigo = f.municipio "
+                "LEFT JOIN (SELECT codigo, min(descricao) AS descricao FROM cnaes GROUP BY codigo) n "
+                "ON n.codigo = f.cnae_principal "
+                "ORDER BY f.cnpj_basico, f.cnpj_ordem LIMIT ?",
                 [*parameters, query.limit],
             ).fetchall()
+            matched_rows = int(rows[0][-1]) if rows else 0
         finally:
             connection.close()
 
@@ -568,6 +606,7 @@ class CnpjStoreProvider:
             has_phone,
             has_email,
             has_fax,
+            _total_matches,
         ) in rows:
             basename = (basename or "").strip()
             if basename in seen:

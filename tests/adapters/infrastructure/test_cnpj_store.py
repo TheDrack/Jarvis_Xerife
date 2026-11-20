@@ -156,6 +156,37 @@ def test_rebuild_skips_files_already_ingested(tmp_path):
     assert second.establishment_rows == 5
 
 
+def test_discovery_uses_one_filtered_scan_for_count_and_page(tmp_path):
+    files = sample_files(tmp_path)
+    database = tmp_path / "single-pass.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+    provider = CnpjStoreProvider(database)
+    connection = provider._connect()
+    statements = []
+
+    class RecordingConnection:
+        def execute(self, statement, parameters=None):
+            statements.append(statement)
+            if parameters is None:
+                return connection.execute(statement)
+            return connection.execute(statement, parameters)
+
+        def close(self):
+            connection.close()
+
+    provider._connect = lambda: RecordingConnection()
+
+    result = provider.discover(query(limit=1))
+
+    assert len(result.companies) == 1
+    assert result.matched_rows == 3
+    assert result.truncated is True
+    assert not any(
+        "SELECT count(*) FROM establishments" in statement
+        for statement in statements
+    )
+
+
 def test_truncation_is_reported_with_the_ordering_caveat(tmp_path):
     files = sample_files(tmp_path)
     database = tmp_path / "store.duckdb"
@@ -171,6 +202,39 @@ def test_truncation_is_reported_with_the_ordering_caveat(tmp_path):
     assert result.matched_rows == 3
     assert any("CNPJ base order" in note for note in result.notes)
 
+
+def test_discovery_count_and_page_ignore_duplicate_lookup_keys(tmp_path):
+    files = build_files(
+        tmp_path / "data",
+        [
+            establishment(),
+            establishment(basico="87654321", fantasia="Beta Obras"),
+        ],
+        [
+            company_row(),
+            company_row("87654321", "BETA OBRAS LTDA"),
+        ],
+    )
+    write_csv(
+        files.municipalities,
+        [["8000", "SAO JOSE"], ["8000", "SAO JOSE"]],
+    )
+    write_csv(
+        files.cnaes,
+        [["4120400", "CONSTRUCAO DE EDIFICIOS"], ["4120400", "CONSTRUCAO DE EDIFICIOS"]],
+    )
+    database = tmp_path / "duplicate-lookups.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+
+    result = CnpjStoreProvider(database).discover(query(limit=2))
+
+    assert [company.company_name for company in result.companies] == [
+        "Alfa Serralheria",
+        "Beta Obras",
+    ]
+    assert result.matched_rows == 2
+    assert result.truncated is False
+    assert result.next_cursor is None
 
 def test_unknown_municipality_returns_an_explanation(tmp_path):
     files = sample_files(tmp_path)
@@ -233,6 +297,18 @@ def test_store_pages_through_the_whole_slice_like_the_csv_adapter(tmp_path):
     assert first.next_cursor == "00000001"
     assert third.next_cursor is None
     assert third.truncated is False
+
+
+def test_bulk_registry_presence_lookup_matches_exact_cnpj_and_normalizes_input(tmp_path):
+    files = sample_files(tmp_path)
+    database = tmp_path / "bulk-lookup.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+
+    found = CnpjStoreProvider(database).lookup_company_presence(
+        ["123.456.780/0019-0", "44444444000190", "invalid"]
+    )
+
+    assert found == {"12345678000190", "44444444000190"}
 
 
 def test_lookup_finds_a_cnpj_outside_the_campaign_filter(tmp_path):

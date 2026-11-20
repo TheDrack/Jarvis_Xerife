@@ -93,7 +93,7 @@ def test_external_leads_come_last_and_record_registry_presence(tmp_path):
     assert by_name["Fora do cadastro"].registry_presence is RegistryPresence.NOT_FOUND
     assert by_name["Sem cnpj"].registry_presence is RegistryPresence.UNVERIFIED
     assert registry.lookups == ["99999999000199"]
-    assert any("2 added, 1 already present" in note for note in result.notes)
+    assert any("2 added, 1 duplicates skipped" in note for note in result.notes)
 
 
 def test_known_cnpj_is_reported_as_found_even_when_outside_the_filter(tmp_path):
@@ -128,6 +128,72 @@ def test_pages_keep_coming_without_external_until_the_registry_is_exhausted(tmp_
     assert [item.company_name for item in page_one.companies] == ["Primeira"]
     assert page_one.next_cursor == "1"
     assert "Fora do cadastro" in [item.company_name for item in page_two.companies]
+
+
+def test_bulk_registry_presence_lookup_avoids_one_connection_per_external_lead(tmp_path):
+    class BulkRegistry(StubRegistry):
+        def __init__(self):
+            super().__init__(
+                [([company("Ja no resultado", cnpj="12345678000190")], None)],
+                known={"99999999000199"},
+            )
+            self.bulk_lookups = []
+
+        def lookup_company_presence(self, cnpjs):
+            self.bulk_lookups.append(tuple(sorted(cnpjs)))
+            return self._known.intersection(cnpjs)
+
+        def lookup_company(self, cnpj: str):
+            raise AssertionError("bulk lookup must replace per-lead lookups")
+
+    registry = BulkRegistry()
+    external = ExternalLeadsAdapter(
+        write_leads(tmp_path / "bulk-leads.csv"),
+        source_url="https://exemplo.com/leads",
+    )
+
+    result = CompositeDiscoveryProvider(registry, external).discover(query(), collected_at=NOW)
+
+    by_name = {item.company_name: item for item in result.companies}
+    assert by_name["Fora do cadastro"].registry_presence is RegistryPresence.FOUND
+    assert by_name["Sem cnpj"].registry_presence is RegistryPresence.UNVERIFIED
+    assert registry.bulk_lookups == [("99999999000199",)]
+    assert registry.lookups == []
+
+
+def test_external_duplicate_candidates_are_removed_before_bulk_lookup(tmp_path):
+    class BulkRegistry(StubRegistry):
+        def __init__(self):
+            super().__init__([([], None)], known=set())
+            self.bulk_lookups = []
+
+        def lookup_company_presence(self, cnpjs):
+            self.bulk_lookups.append(tuple(cnpjs))
+            return set()
+
+    leads = tmp_path / "duplicate-leads.csv"
+    leads.write_text(
+        "empresa;cnpj;cidade;uf;fonte_url\n"
+        "Lead CNPJ;99999999000199;São José;SC;https://exemplo.com/1\n"
+        "Lead CNPJ duplicado;99999999000199;São José;SC;https://exemplo.com/2\n"
+        "Lead sem CNPJ;;São José;SC;https://exemplo.com/3\n"
+        " lead SEM CNPJ ;;São José;SC;https://exemplo.com/4\n"
+        "Lead CNPJ;;São José;SC;https://exemplo.com/5\n",
+        encoding="utf-8",
+    )
+    registry = BulkRegistry()
+    result = CompositeDiscoveryProvider(
+        registry,
+        ExternalLeadsAdapter(leads, source_url="https://exemplo.com/leads"),
+    ).discover(query(), collected_at=NOW)
+
+    assert [item.company_name for item in result.companies] == [
+        "Lead CNPJ",
+        "Lead sem CNPJ",
+    ]
+    assert registry.bulk_lookups == [("99999999000199",)]
+    assert result.matched_rows == 2
+    assert any("2 added, 3 duplicates skipped" in note for note in result.notes)
 
 
 def test_without_an_external_source_it_behaves_like_the_registry():

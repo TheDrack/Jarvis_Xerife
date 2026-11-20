@@ -18,7 +18,7 @@ import csv
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from app.domain.prospecting.contracts import (
     ProspectCompany,
@@ -140,6 +140,36 @@ class CnpjOpenDataAdapter:
                 if len(names) == len(wanted):
                     break
         return names
+
+    def lookup_company_presence(self, cnpjs: Sequence[str]) -> set[str]:
+        """Check many exact CNPJs in one streaming pass over establishments."""
+        normalized = {
+            _digits(value)
+            for value in cnpjs
+            if isinstance(value, str) and len(_digits(value)) == 14
+        }
+        if not normalized:
+            return set()
+
+        wanted_by_basename: dict[str, set[str]] = {}
+        for cnpj in normalized:
+            wanted_by_basename.setdefault(cnpj[:8], set()).add(cnpj)
+
+        found: set[str] = set()
+        for row in self._rows(self._files.establishments):
+            if len(row) < _MIN_ESTABLISHMENT_COLUMNS:
+                continue
+            candidates = wanted_by_basename.get(row[_CNPJ_BASICO].strip())
+            if not candidates:
+                continue
+            full_cnpj = _digits(
+                row[_CNPJ_BASICO] + row[_CNPJ_ORDEM] + row[_CNPJ_DV]
+            )
+            if full_cnpj in candidates:
+                found.add(full_cnpj)
+                if len(found) == len(normalized):
+                    break
+        return found
 
     def lookup_company(self, cnpj: str) -> Optional[ProspectCompany]:
         """Look one CNPJ up by streaming the extract, outside the query filter."""
