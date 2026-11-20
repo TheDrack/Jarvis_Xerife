@@ -861,7 +861,7 @@ Esta verificação é source-level e baseada em CI identificado por SHA. Não é
 
 ### CI, gates e governança
 - Main head: `32cf7e94ed54d577c85cc503b1480ef1c765399d`; último commit funcional: `fc30d6a`. Task Queue run [44819128465](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44819128465): 3.672 passed, 21 skipped, 181 warnings. O commit `32cf7e9` é documental.
-- PR #867: PR Validation run [44822315142](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44822315142) — 3.661 passed, 38 skipped, 8 warnings; Task Queue run [44822314948](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44822314948) — 3.683 passed, 21 skipped, 181 warnings; 15 testes específicos de fila passaram. Sem review formal; não mesclada.
+- PR #867: PR Validation run [44822315142](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44822315142) — 3.661 passed, 38 skipped, 8 warnings; Task Queue run [44822314948](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44822314948) — 3.683 passed, 21 skipped, 181 warnings; 15 testes específicos de fila passaram. Estado no snapshot anterior à integração; a PR foi mesclada posteriormente.
 - Integrated Evolution run [44753845068](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44753845068) passou somente pelo gate; `EVOLUTION_ENABLED` estava vazio e geração/publicação foram ignoradas. `data/roadmap_missions.json` continua vazio.
 - Self Healing V3 run [44753874490](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44753874490) foi ignorado. O workflow atual permanece restrito a falhas de workflows confiáveis em main; não cobre PR Validation/Task Queue.
 - `main.protected=false`, rulesets vazios e issue #682 aberta. A integração não consegue ler branch protection (403); nenhuma alteração foi tentada.
