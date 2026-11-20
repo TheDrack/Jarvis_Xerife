@@ -95,7 +95,9 @@ def address_fingerprint(address: str) -> str:
 
 
 def distance_km(origin: GeoCoordinate, destination: GeoCoordinate) -> float:
-    """Great-circle distance between two WGS84 coordinates (Haversine)."""
+    """Great-circle distance between coordinates expressed in the same CRS."""
+    if origin.crs != destination.crs:
+        raise ValueError("coordinates must use the same coordinate reference system")
     earth_radius_km = 6371.0088
     lat1, lat2 = math.radians(origin.latitude), math.radians(destination.latitude)
     delta_lat = lat2 - lat1
