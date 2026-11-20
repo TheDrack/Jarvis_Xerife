@@ -556,19 +556,26 @@ class CnpjStoreProvider:
 
             where = " AND ".join(conditions)
             rows = connection.execute(
-                "SELECT e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv, e.nome_fantasia, "
-                "e.cnae_principal, e.municipio, c.razao_social, m.nome, n.descricao, "
-                "c.natureza, c.capital, c.porte, e.data_inicio_atividade, e.matriz_filial, "
-                "e.bairro, e.cep, "
-                "(nullif(trim(e.telefone1), '') IS NOT NULL OR nullif(trim(e.telefone2), '') IS NOT NULL), "
-                "(nullif(trim(e.correio_eletronico), '') IS NOT NULL), "
-                "(nullif(trim(e.telefone3), '') IS NOT NULL), "
+                "WITH filtered AS ("
+                "SELECT e.*, c.razao_social, c.natureza, c.capital, c.porte, "
+                "(nullif(trim(e.telefone1), '') IS NOT NULL OR nullif(trim(e.telefone2), '') IS NOT NULL) AS has_phone, "
+                "(nullif(trim(e.correio_eletronico), '') IS NOT NULL) AS has_email, "
+                "(nullif(trim(e.telefone3), '') IS NOT NULL) AS has_fax, "
                 "count(*) OVER() AS matched_rows "
                 "FROM establishments e "
                 "LEFT JOIN companies c ON c.cnpj_basico = e.cnpj_basico "
-                "LEFT JOIN municipalities m ON m.codigo = e.municipio "
-                "LEFT JOIN cnaes n ON n.codigo = e.cnae_principal "
-                f"WHERE {where} ORDER BY e.cnpj_basico, e.cnpj_ordem LIMIT ?",
+                f"WHERE {where}"
+                ") "
+                "SELECT f.cnpj_basico, f.cnpj_ordem, f.cnpj_dv, f.nome_fantasia, "
+                "f.cnae_principal, f.municipio, f.razao_social, m.nome, n.descricao, "
+                "f.natureza, f.capital, f.porte, f.data_inicio_atividade, f.matriz_filial, "
+                "f.bairro, f.cep, f.has_phone, f.has_email, f.has_fax, f.matched_rows "
+                "FROM filtered f "
+                "LEFT JOIN (SELECT codigo, min(nome) AS nome FROM municipalities GROUP BY codigo) m "
+                "ON m.codigo = f.municipio "
+                "LEFT JOIN (SELECT codigo, min(descricao) AS descricao FROM cnaes GROUP BY codigo) n "
+                "ON n.codigo = f.cnae_principal "
+                "ORDER BY f.cnpj_basico, f.cnpj_ordem LIMIT ?",
                 [*parameters, query.limit],
             ).fetchall()
             matched_rows = int(rows[0][-1]) if rows else 0
