@@ -78,11 +78,21 @@ class GeocodingService:
                 )
             fingerprint = address_fingerprint(address)
             requested.append(fingerprint)
-            if fingerprint in unique_companies:
-                continue
-            unique_companies[fingerprint] = (company, address)
-            if not force:
-                cached = self._repository.get(address)
+            if fingerprint not in unique_companies:
+                unique_companies[fingerprint] = (company, address)
+
+        if not force:
+            get_many = getattr(self._repository, "get_many", None)
+            if callable(get_many):
+                cached_by_fingerprint = get_many(
+                    [address for _, address in unique_companies.values()]
+                )
+            else:
+                cached_by_fingerprint = {
+                    fingerprint: self._repository.get(address)
+                    for fingerprint, (_, address) in unique_companies.items()
+                }
+            for fingerprint, cached in cached_by_fingerprint.items():
                 if cached is not None and cached.status in {
                     GeocodingStatus.SUCCESS,
                     GeocodingStatus.PARTIAL,
@@ -110,10 +120,24 @@ class GeocodingService:
             if len(provider_results) != len(pending):
                 raise ValueError("geocoder returned an unexpected number of batch results")
 
+            cacheable_results = []
             for index, (fingerprint, _, address) in enumerate(pending):
                 result = provider_results[index]
-                self._validate_and_cache(address, result)
+                if address_fingerprint(result.address) != address_fingerprint(address):
+                    raise ValueError(
+                        "geocoder returned a result for a different address"
+                    )
                 results_by_fingerprint[fingerprint] = result
+                if result.status in {GeocodingStatus.SUCCESS, GeocodingStatus.PARTIAL}:
+                    cacheable_results.append(result)
+
+            if cacheable_results:
+                save_many = getattr(self._repository, "save_many", None)
+                if callable(save_many):
+                    save_many(cacheable_results)
+                else:
+                    for result in cacheable_results:
+                        self._repository.save(result)
 
         return [results_by_fingerprint[fingerprint] for fingerprint in requested]
 
