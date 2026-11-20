@@ -1,7 +1,7 @@
 """Application service coordinating geocoding providers and persistent cache."""
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Sequence, Union
 
 from app.application.ports.geocoding import (
     CompanyGeocoder,
@@ -26,7 +26,7 @@ class GeocodingService:
 
     def __init__(
         self,
-        geocoder: Geocoder | CompanyGeocoder,
+        geocoder: Union[Geocoder, CompanyGeocoder],
         repository: GeocodingRepository,
     ) -> None:
         self._geocoder = geocoder
@@ -64,7 +64,7 @@ class GeocodingService:
         if not companies:
             return []
 
-        addresses = []
+        requested = []
         unique_companies = {}
         results_by_fingerprint = {}
         for company in companies:
@@ -74,10 +74,10 @@ class GeocodingService:
                     f"company {company.company_name!r} has no postal address to geocode"
                 )
             fingerprint = address_fingerprint(address)
-            addresses.append((fingerprint, address))
+            requested.append(fingerprint)
             if fingerprint in unique_companies:
                 continue
-            unique_companies[fingerprint] = company
+            unique_companies[fingerprint] = (company, address)
             if not force:
                 cached = self._repository.get(address)
                 if cached is not None and cached.status in {
@@ -87,29 +87,30 @@ class GeocodingService:
                     results_by_fingerprint[fingerprint] = cached
 
         pending = [
-            (fingerprint, company)
-            for fingerprint, company in unique_companies.items()
+            (fingerprint, company, address)
+            for fingerprint, (company, address) in unique_companies.items()
             if fingerprint not in results_by_fingerprint
         ]
         if pending:
             batch_method = getattr(self._geocoder, "geocode_companies", None)
             if callable(batch_method):
-                provider_results = batch_method([company for _, company in pending])
+                provider_results = batch_method(
+                    [company for _, company, _ in pending]
+                )
             else:
                 provider_results = [
-                    self._geocoder.geocode(company.geocoding_address)
-                    for _, company in pending
+                    self._geocoder.geocode(address)
+                    for _, _, address in pending
                 ]
             if len(provider_results) != len(pending):
                 raise ValueError("geocoder returned an unexpected number of batch results")
 
-            for (fingerprint, company), result in zip(
-                pending, provider_results, strict=True
-            ):
-                self._validate_and_cache(company.geocoding_address, result)
+            for index, (fingerprint, _, address) in enumerate(pending):
+                result = provider_results[index]
+                self._validate_and_cache(address, result)
                 results_by_fingerprint[fingerprint] = result
 
-        return [results_by_fingerprint[fingerprint] for fingerprint, _ in addresses]
+        return [results_by_fingerprint[fingerprint] for fingerprint in requested]
 
     def _validate_and_cache(
         self, address: str, result: AddressGeocoding
