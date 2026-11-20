@@ -1,10 +1,10 @@
-> **Baseline histórico com revalidação limitada.** A última revalidação funcional abrangente permanece em 2026-11-14. O adendo incremental de 2026-11-19 revalida o reporter C0, os gates de evolução, CI recente e as fronteiras de self-healing na main `2bf151052f1a25f088030bfafec5d31d58f18e11`; ele não substitui a auditoria comportamental completa exigida por C0. Use [docs/STATUS.md](STATUS.md) para o snapshot atual do código. Não copie snapshots de produção sem consulta ao ambiente.
+> **Baseline histórico com revalidação limitada.** A última revalidação funcional abrangente permanece em 2026-11-14. Os adendos incrementais de 2026-11-19 e 2026-11-20 revalidam reporter C0, gates de evolução, CI, consumidores do roteamento cognitivo e fronteiras de self-healing; eles não substituem a auditoria comportamental completa exigida por C0. Use [docs/STATUS.md](STATUS.md) para o snapshot atual do código. Não copie snapshots de produção sem consulta ao ambiente.
 
 # Cognitive Baseline — Fase C0
 
 **Snapshot original:** `main` em `82ca2ac70f67e8418f62079f7d94e3fc8b4d1230` (pós-PR #774; histórico)
 **Última revalidação funcional abrangente:** `main` em `d83c0b81898ab45de75f7583b3a7bf830dfcb88c` (2026-11-14), após o merge documental da PR #821.
-**Última verificação incremental:** `main` em `2bf151052f1a25f088030bfafec5d31d58f18e11` (2026-11-19), limitada a reporter C0, critérios do roadmap, CI e fronteiras de self-healing.
+**Última verificação incremental:** `main` em `fdc51057c84cef8a0949ca59ccba6bcafe71da8a` (2026-11-20), incluindo CI, consumidores do roteamento cognitivo e integração da geocodificação às campanhas Prospecto.
 **Auditoria original:** 2026-11-07
 **Estado atual:** parcial; C0 permanece aberto.
 **Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação, complementada por probes remotos somente leitura. Não é confirmação de deploy completo, execução ponta a ponta ou comportamento de todos os providers.
@@ -838,3 +838,42 @@ Esta seção atualiza evidências após o merge da PR #864. Não declara a Fase 
 - A PR [#862](https://github.com/TheDrack/Jarvis_Xerife/pull/862) é o veículo documental existente para atualizar a matriz após Prospecto. No início desta revalidação estava aberta, sem review formal; o head `493007a` tinha `JARVIS PR Validation` verde no run `44325535034`. O workflow Task Queue não foi disparado para aquele diff documental. Não foi feito merge.
 - Issues abertas consultadas: [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682) (proteção de main), [#723](https://github.com/TheDrack/Jarvis_Xerife/issues/723) (reconciliação provider-aware já merged, pendência histórica ligada ao Preview) e [#732](https://github.com/TheDrack/Jarvis_Xerife/issues/732) (reconciliação do ledger de migrations).
 - Próximo critério: concluir o mapa comportamental de C0, incluindo composição/consumidor real e teste integrado do roteamento cognitivo, além das lacunas de iniciativa, memória, planejamento e execução já registradas. Não iniciar C1 nem criar componentes duplicados.
+
+## 12. Revalidação incremental C0 — 2026-11-20 — main `32cf7e94ed54d577c85cc503b1480ef1c765399d` (histórico)
+
+Esta verificação é source-level e baseada em CI identificado por SHA. Não é teste de runtime, deploy ou produção.
+
+### Composição e consumo do roteamento cognitivo
+- Graphify index: commit `32cf7e94ed54d577c85cc503b1480ef1c765399d`, indexado em 2026-11-20T21:24:44Z.
+- `CognitiveRouter.execute()` tem um único caller estrito: `tests/domain/test_cognitive_router.py::test_execute_initializes_missing_metadata`. Não foi localizado caller de aplicação.
+- `run_pipeline()` tem callers estritos no CLI de `app/runtime/pipeline_runner.py` e em testes; não há caller de serviço/aplicação no grafo. O CLI chama o runner sem `inputs`.
+- `AssistantService.process_command()` chama seus próprios helpers de decisão, interpretação, memória e despacho de providers; não há caminho estrito para `CognitiveRouter.execute()` nem para `run_pipeline()`.
+- `jarvis_chat` está presente no YAML, documentação e teste de declaração de configuração. Isso não comprova composição de runtime. Sem `inputs.metadata.user_input`, `CognitiveRouter.execute()` lê string vazia. Não há teste integrado que demonstre input real → router → LlmEngine.
+- A implementação de `CognitiveRouter` faz bypass por substrings para automação e, no restante, usa classificação opcional via LiteLLM com fallback para conversa. Não é um Reasoning Engine nem um ciclo cognitivo integrado.
+- **Decisão:** não conectar o router ao AssistantService nesta execução. O contrato de decisão, ownership do contexto, política de fallback e semântica de saída precisam ser definidos e testados antes de alterar o composition root.
+
+### Prospecto geoespacial — baseline da main
+- Commits funcionais em main: `b9754d387c8fe5bed9ee69cb1d4b611e7cb61868` (otimização de discovery/reconciliação) e `fc30d6ab215ea428e77e794bbd9f9c99fbdd53e7` (extração de endereço, contratos geográficos, cache DuckDB e distância Haversine).
+- Naquele snapshot, o grafo encontrava `GeocodingService` e `DuckDBGeocodingRepository` apenas em testes. Essa lacuna foi parcialmente fechada pela PR #869, que integrou o serviço ao runner de campanhas e ao CLI.
+- PR [#867](https://github.com/TheDrack/Jarvis_Xerife/pull/867) adicionou o adapter opcional Ipea `geocodebr`/CNEFE e lote/cache; foi mesclada antes da PR #869. Não há evidência de execução real com download CNEFE nem benchmark de produção.
+- **Correção posterior:** a PR #869 preservou o CRS explícito do GeocodeBR (`EPSG:4674`), adicionou migração do cache e bloqueou cálculo de distância entre coordenadas com CRS diferentes. O domínio ainda não reprojeta automaticamente para um CRS métrico comum.
+- A PR [#869](https://github.com/TheDrack/Jarvis_Xerife/pull/869) integrou o geocoding opcional ao `run_campaign` e ao CLI, exportando coordenadas e metadados no CSV/manifesto. Não há evidência de execução real CNEFE, filtro espacial de prospects ou mapa de empresas.
+
+### CI, gates e governança
+- Main head: `32cf7e94ed54d577c85cc503b1480ef1c765399d`; último commit funcional: `fc30d6a`. Task Queue run [44819128465](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44819128465): 3.672 passed, 21 skipped, 181 warnings. O commit `32cf7e9` é documental.
+- PR #867: PR Validation run [44822315142](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44822315142) — 3.661 passed, 38 skipped, 8 warnings; Task Queue run [44822314948](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44822314948) — 3.683 passed, 21 skipped, 181 warnings; 15 testes específicos de fila passaram. Sem review formal; não mesclada.
+- Integrated Evolution run [44753845068](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44753845068) passou somente pelo gate; `EVOLUTION_ENABLED` estava vazio e geração/publicação foram ignoradas. `data/roadmap_missions.json` continua vazio.
+- Self Healing V3 run [44753874490](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44753874490) foi ignorado. O workflow atual permanece restrito a falhas de workflows confiáveis em main; não cobre PR Validation/Task Queue.
+- `main.protected=false`, rulesets vazios e issue #682 aberta. A integração não consegue ler branch protection (403); nenhuma alteração foi tentada.
+
+**Conclusão:** C0 continua aberto. Os critérios `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` permanecem `pending`; C1 permanece bloqueado. A próxima capacidade pendente é resolver a composição real do roteamento conversacional e estabelecer um teste comportamental integrado antes de qualquer World Model.
+
+
+## 13. Atualização pós-geocodificação de campanhas — 2026-11-20 — main `fdc51057c84cef8a0949ca59ccba6bcafe71da8a`
+
+- PR [#867](https://github.com/TheDrack/Jarvis_Xerife/pull/867): adapter opcional GeocodeBR/CNEFE, batch service e cache DuckDB; mesclada.
+- PR [#869](https://github.com/TheDrack/Jarvis_Xerife/pull/869): integração do serviço ao `run_campaign` e ao CLI `--geocode`; mesclada no commit `fdc51057c84cef8a0949ca59ccba6bcafe71da8a`.
+- A campanha mantém geocodificação opt-in. Sem `--geocode`, o fluxo padrão permanece sem baixar ou inicializar CNEFE.
+- CSV e manifesto registram coordenadas, precisão, desvio estimado, CRS, provedor e métricas da etapa. O cache preserva SIRGAS 2000 / EPSG:4674.
+- A UI de Prospecto ainda consulta a base CNPJ e mostra resultados sem coordenadas; não há endpoint de leitura do cache/campanha nem mapa de empresas. O mapa geoespacial existente é voltado a dispositivos e não deve receber registros empresariais.
+- Não foi executado benchmark com dataset CNEFE real nem validação visual em produção. C0 permanece aberto; esta atualização não altera os critérios C0 nem libera C1.
