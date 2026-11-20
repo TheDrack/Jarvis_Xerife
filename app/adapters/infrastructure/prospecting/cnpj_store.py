@@ -363,7 +363,8 @@ class CnpjStoreProvider:
                 "c.porte, e.data_inicio_atividade, e.matriz_filial, e.bairro, e.cep, "
                 "(nullif(trim(e.telefone1), '') IS NOT NULL OR nullif(trim(e.telefone2), '') IS NOT NULL), "
                 "(nullif(trim(e.correio_eletronico), '') IS NOT NULL), "
-                "(nullif(trim(e.telefone3), '') IS NOT NULL) "
+                "(nullif(trim(e.telefone3), '') IS NOT NULL), "
+                "count(*) OVER() AS matched_rows "
                 "FROM establishments e "
                 "LEFT JOIN companies c ON c.cnpj_basico = e.cnpj_basico "
                 "LEFT JOIN municipalities m ON m.codigo = e.municipio "
@@ -522,10 +523,6 @@ class CnpjStoreProvider:
             conditions.append(f"({cnae_conditions})")
 
             where = " AND ".join(conditions)
-            matched_rows = connection.execute(
-                f"SELECT count(*) FROM establishments e LEFT JOIN companies c ON c.cnpj_basico=e.cnpj_basico WHERE {where}", parameters
-            ).fetchone()[0]
-
             rows = connection.execute(
                 "SELECT e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv, e.nome_fantasia, "
                 "e.cnae_principal, e.municipio, c.razao_social, m.nome, n.descricao, "
@@ -541,6 +538,7 @@ class CnpjStoreProvider:
                 f"WHERE {where} ORDER BY e.cnpj_basico, e.cnpj_ordem LIMIT ?",
                 [*parameters, query.limit],
             ).fetchall()
+            matched_rows = int(rows[0][-1]) if rows else 0
         finally:
             connection.close()
 
@@ -568,6 +566,7 @@ class CnpjStoreProvider:
             has_phone,
             has_email,
             has_fax,
+            _total_matches,
         ) in rows:
             basename = (basename or "").strip()
             if basename in seen:
