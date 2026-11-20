@@ -110,3 +110,15 @@ def test_company_without_address_does_not_produce_a_geocoding_query():
 
     assert company.geocoding_address is None
 
+
+
+def test_distance_rejects_coordinates_with_different_crs():
+    import pytest
+
+    from app.domain.prospecting.geography import distance_km
+
+    origin = GeoCoordinate(latitude=-27.6, longitude=-48.6, crs="EPSG:4326")
+    destination = GeoCoordinate(latitude=-27.61, longitude=-48.61, crs="EPSG:4674")
+
+    with pytest.raises(ValueError, match="same coordinate reference system"):
+        distance_km(origin, destination)

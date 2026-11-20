@@ -91,6 +91,7 @@ def test_geocodebr_geocodes_structured_company_batch(monkeypatch):
     assert result[0].coordinate.latitude == -27.5969
     assert result[0].coordinate.longitude == -48.5495
     assert result[0].coordinate.accuracy_m == 25
+    assert result[0].coordinate.crs == "EPSG:4674"
     assert result[0].formatted_address == "RUA DAS FLORES, 100 - CENTRO"
     assert calls["fields"] == {
         "logradouro": "logradouro",

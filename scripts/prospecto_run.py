@@ -103,6 +103,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="do not persist a snapshot or print the monthly diff",
     )
     parser.add_argument(
+        "--geocode",
+        action="store_true",
+        help="geocode delivered Brazilian companies using the local CNEFE dataset",
+    )
+    parser.add_argument(
+        "--geocoding-db",
+        help="DuckDB cache for geocoding results (default: ~/.local/share/jarvis/prospecto/geocoding.duckdb)",
+    )
+    parser.add_argument(
         "--external-leads",
         help="CSV with leads that are not in the registry (referral, site, inbound)",
     )
@@ -130,6 +139,23 @@ def _apply_preset(campaign: CampaignDefinition, preset_id: str, catalog_path: st
     )
 
 
+def _build_geocoding_service(database: str | Path | None = None):
+    """Build the optional local CNEFE geocoder without affecting default startup."""
+    from app.adapters.infrastructure.prospecting.geocodebr_geocoder import GeocodeBrGeocoder
+    from app.adapters.infrastructure.prospecting.geocoding_store import DuckDBGeocodingRepository
+    from app.application.services.prospecting.geocoding import GeocodingService
+
+    cache_path = (
+        Path(database).expanduser()
+        if database
+        else Path.home() / ".local" / "share" / "jarvis" / "prospecto" / "geocoding.duckdb"
+    )
+    return GeocodingService(
+        GeocodeBrGeocoder(),
+        DuckDBGeocodingRepository(cache_path),
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -139,6 +165,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if not args.campaign:
         print("erro: informe --campaign (ou use --list-presets)", file=sys.stderr)
+        return 2
+
+    if args.geocoding_db and not args.geocode:
+        print("erro: --geocoding-db exige --geocode", file=sys.stderr)
         return 2
 
     campaign = load_campaign(args.campaign)
@@ -193,14 +223,18 @@ def main(argv: list[str] | None = None) -> int:
         provider = CompositeDiscoveryProvider(registry, external)
 
     try:
+        geocoding_service = (
+            _build_geocoding_service(args.geocoding_db) if args.geocode else None
+        )
         run = run_campaign(
             provider,
             campaign,
             now=now,
             include_unqualified=args.include_unqualified,
             max_companies=args.max_companies,
+            geocoding_service=geocoding_service,
         )
-    except FileNotFoundError as error:
+    except (FileNotFoundError, RuntimeError, ValueError, TypeError, ImportError) as error:
         print(f"erro: {error}", file=sys.stderr)
         return 2
 
@@ -217,6 +251,17 @@ def main(argv: list[str] | None = None) -> int:
     print(f"empresas descobertas: {manifest.discovered_companies}")
     print(f"entregues no CSV: {manifest.delivered_rows} | fora do ICP: {manifest.excluded_not_fit}")
     print(f"a verificar: {manifest.needs_verification}")
+    if manifest.geocoding_enabled:
+        print(
+            "geocodificacao: "
+            f"tentativas={manifest.geocoding_attempted} | "
+            f"precisas={manifest.geocoding_success} | "
+            f"parciais={manifest.geocoding_partial} | "
+            f"sem resultado={manifest.geocoding_failed} | "
+            f"sem endereco={manifest.geocoding_skipped}"
+        )
+        if manifest.coordinate_reference_system:
+            print(f"crs: {manifest.coordinate_reference_system}")
     if manifest.truncated:
         print(f"aviso: teto de {manifest.max_companies} empresas atingido; o filtro tem mais resultados")
     for note in manifest.discovery_notes:

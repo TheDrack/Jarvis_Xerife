@@ -22,6 +22,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.prospecting.contracts import ProspectCompany, ProspectRecord
+from app.application.services.prospecting.geocoding import GeocodingService
 from app.domain.prospecting.deliverable import (
     DeliverableRow,
     build_deliverable_csv,
@@ -29,6 +30,7 @@ from app.domain.prospecting.deliverable import (
 )
 from app.domain.prospecting.discovery import DiscoveryProvider, DiscoveryQuery
 from app.domain.prospecting.icp import IcpProfile
+from app.domain.prospecting.geography import GeocodingStatus, address_fingerprint
 from app.domain.prospecting.qualification import QualificationTier, qualify_prospect
 
 
@@ -78,6 +80,14 @@ class RunManifest(BaseModel):
     skipped_malformed_rows: int = Field(default=0, ge=0)
     discovery_notes: tuple[str, ...] = ()
     csv_filename: Optional[str] = None
+    geocoding_enabled: bool = False
+    geocoding_attempted: int = Field(default=0, ge=0)
+    geocoding_success: int = Field(default=0, ge=0)
+    geocoding_partial: int = Field(default=0, ge=0)
+    geocoding_failed: int = Field(default=0, ge=0)
+    geocoding_skipped: int = Field(default=0, ge=0)
+    geocoding_provider: Optional[str] = None
+    coordinate_reference_system: Optional[str] = None
 
 
 class CampaignRun(BaseModel):
@@ -103,6 +113,7 @@ def run_campaign(
     include_unqualified: bool = False,
     max_companies: Optional[int] = None,
     page_size: Optional[int] = None,
+    geocoding_service: Optional[GeocodingService] = None,
 ) -> CampaignRun:
     """Discover, qualify and serialize one campaign.
 
@@ -161,16 +172,62 @@ def run_campaign(
         ProspectRecord(tenant_id=campaign.tenant_id, company=company)
         for company in companies
     ]
-    rows = tuple(
+    rows = [
         DeliverableRow(
             prospect=prospect,
             assessment=qualify_prospect(prospect, campaign.icp, now=reference),
         )
         for prospect in prospects
-    )
+    ]
 
+    geocoding_results = []
+    geocoding_skipped = 0
+    if geocoding_service is not None:
+        selected_indexes = [
+            index
+            for index, row in enumerate(rows)
+            if include_unqualified or row.assessment.tier is not QualificationTier.NOT_FIT
+        ]
+        geocodable = [
+            (index, rows[index].prospect.company)
+            for index in selected_indexes
+            if rows[index].prospect.company.country == "BR"
+            and rows[index].prospect.company.city
+            and rows[index].prospect.company.state
+            and rows[index].prospect.company.geocoding_address
+        ]
+        geocoding_skipped = len(selected_indexes) - len(geocodable)
+        if geocodable:
+            geocoding_results = geocoding_service.geocode_companies(
+                [company for _, company in geocodable]
+            )
+            if len(geocoding_results) != len(geocodable):
+                raise ValueError("geocoding service returned an unexpected number of results")
+            for (index, company), result in zip(geocodable, geocoding_results):
+                if address_fingerprint(result.address) != address_fingerprint(
+                    company.geocoding_address
+                ):
+                    raise ValueError(
+                        "geocoding service returned coordinates for a different company address"
+                    )
+                rows[index] = rows[index].model_copy(update={"geocoding": result})
+
+    rows = tuple(rows)
     delivered = to_deliverable_records(rows, include_unqualified=include_unqualified)
     excluded = sum(1 for row in rows if row.assessment.tier is QualificationTier.NOT_FIT)
+    geocoding_success = sum(
+        result.status is GeocodingStatus.SUCCESS for result in geocoding_results
+    )
+    geocoding_partial = sum(
+        result.status is GeocodingStatus.PARTIAL for result in geocoding_results
+    )
+    geocoding_failed = sum(
+        result.status is GeocodingStatus.FAILED for result in geocoding_results
+    )
+    first_coordinate = next(
+        (result.coordinate for result in geocoding_results if result.coordinate),
+        None,
+    )
 
     manifest = RunManifest(
         campaign_id=campaign.campaign_id,
@@ -191,6 +248,18 @@ def run_campaign(
         matched_rows=matched_rows,
         skipped_malformed_rows=skipped_malformed_rows,
         discovery_notes=tuple(notes),
+        geocoding_enabled=geocoding_service is not None,
+        geocoding_attempted=len(geocoding_results),
+        geocoding_success=geocoding_success,
+        geocoding_partial=geocoding_partial,
+        geocoding_failed=geocoding_failed,
+        geocoding_skipped=geocoding_skipped,
+        geocoding_provider=(
+            geocoding_results[0].provider if geocoding_results else None
+        ),
+        coordinate_reference_system=(
+            first_coordinate.crs if first_coordinate else None
+        ),
     )
     return CampaignRun(
         manifest=manifest,

@@ -140,6 +140,7 @@ class GeocodeBrGeocoder:
                             if row.get("desvio_metros") is not None
                             else None
                         ),
+                        crs="EPSG:4674",
                     ),
                     precision=precision,
                     provider=self.provider_name,

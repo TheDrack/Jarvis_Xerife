@@ -17,6 +17,7 @@ from typing import Iterable, Optional
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.domain.prospecting.contracts import ProspectRecord, RegistryPresence
+from app.domain.prospecting.geography import AddressGeocoding
 from app.domain.prospecting.qualification import QualificationAssessment, QualificationTier
 
 DELIVERABLE_CSV_HEADER: tuple[str, ...] = (
@@ -37,6 +38,14 @@ DELIVERABLE_CSV_HEADER: tuple[str, ...] = (
     "criterios_nao_atendidos",
     "criterios_sem_dado",
     "fontes",
+    "latitude",
+    "longitude",
+    "precisao_geocodificacao",
+    "desvio_estimado_m",
+    "crs_coordenadas",
+    "endereco_geocodificado",
+    "status_geocodificacao",
+    "fonte_geocodificacao",
 )
 
 _TIER_ORDER = {
@@ -62,6 +71,7 @@ class DeliverableRow(BaseModel):
 
     prospect: ProspectRecord
     assessment: QualificationAssessment
+    geocoding: Optional[AddressGeocoding] = None
 
     @model_validator(mode="after")
     def validate_same_prospect_and_tenant(self) -> "DeliverableRow":
@@ -122,6 +132,43 @@ def to_deliverable_records(
                 "setor": _escape(company.industry),
                 "segmento": _escape(company.segment),
                 "site": _escape(company.website),
+                "latitude": (
+                    str(row.geocoding.coordinate.latitude)
+                    if row.geocoding and row.geocoding.coordinate
+                    else ""
+                ),
+                "longitude": (
+                    str(row.geocoding.coordinate.longitude)
+                    if row.geocoding and row.geocoding.coordinate
+                    else ""
+                ),
+                "precisao_geocodificacao": (
+                    row.geocoding.precision.value
+                    if row.geocoding and row.geocoding.precision
+                    else ""
+                ),
+                "desvio_estimado_m": (
+                    str(row.geocoding.coordinate.accuracy_m)
+                    if row.geocoding and row.geocoding.coordinate
+                    and row.geocoding.coordinate.accuracy_m is not None
+                    else ""
+                ),
+                "crs_coordenadas": (
+                    row.geocoding.coordinate.crs
+                    if row.geocoding and row.geocoding.coordinate
+                    else ""
+                ),
+                "endereco_geocodificado": (
+                    _escape(row.geocoding.formatted_address)
+                    if row.geocoding
+                    else ""
+                ),
+                "status_geocodificacao": (
+                    row.geocoding.status.value if row.geocoding else ""
+                ),
+                "fonte_geocodificacao": (
+                    row.geocoding.provider if row.geocoding else ""
+                ),
                 "score_fit": str(assessment.fit.fit_score),
                 "intencao": assessment.intent.strength.value,
                 "confianca": str(assessment.confidence.score),

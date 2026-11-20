@@ -35,13 +35,14 @@ class GeocodingPrecision(str, Enum):
 
 
 class GeoCoordinate(BaseModel):
-    """WGS84 coordinate; accuracy is an estimated radius in meters."""
+    """Geographic coordinate with explicit CRS and estimated accuracy radius."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     accuracy_m: Optional[float] = Field(default=None, ge=0)
+    crs: str = Field(default="EPSG:4326", min_length=5, max_length=32)
 
 
 class AddressGeocoding(BaseModel):
@@ -94,7 +95,9 @@ def address_fingerprint(address: str) -> str:
 
 
 def distance_km(origin: GeoCoordinate, destination: GeoCoordinate) -> float:
-    """Great-circle distance between two WGS84 coordinates (Haversine)."""
+    """Great-circle distance between coordinates expressed in the same CRS."""
+    if origin.crs != destination.crs:
+        raise ValueError("coordinates must use the same coordinate reference system")
     earth_radius_km = 6371.0088
     lat1, lat2 = math.radians(origin.latitude), math.radians(destination.latitude)
     delta_lat = lat2 - lat1
