@@ -1,7 +1,7 @@
 # Estado do projeto — leitura do código versionado
 
 **Data da revisão documental:** 2026-11-20
-**Base de código auditada:** main @ 32cf7e94ed54d577c85cc503b1480ef1c765399d  
+**Base de código auditada:** main @ fdc51057c84cef8a0949ca59ccba6bcafe71da8a  
 **Escopo:** árvore de código e documentação versionada. Não foi realizada nesta página uma inspeção autenticada do deploy, banco, dispositivos ou serviços externos.
 
 ## Como interpretar este documento
@@ -137,3 +137,10 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 }
 ```
 <!-- JARVIS_COGNITIVE_EVIDENCE_END -->
+
+
+### Atualização Prospecto geoespacial — 2026-11-20
+- PR #867 mesclada: adapter opcional GeocodeBR/CNEFE e cache batch.
+- PR #869 mesclada em `fdc51057c84cef8a0949ca59ccba6bcafe71da8a`: campanhas e CLI aceitam geocodificação opt-in; CSV/manifesto recebem coordenadas e metadados.
+- O fluxo padrão continua offline sem `--geocode`. Não há comprovação de download real CNEFE ou benchmark de produção.
+- A interface de descoberta e o mapa de empresas ainda não consomem as coordenadas. O mapa geoespacial atual continua separado, voltado a dispositivos registrados.
