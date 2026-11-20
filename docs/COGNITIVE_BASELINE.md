@@ -1,4 +1,4 @@
-> **Baseline histórico com revalidação limitada.** A última revalidação funcional abrangente permanece em 2026-11-14. O adendo incremental de 2026-11-19 revalida o reporter C0, os gates de evolução, CI recente e as fronteiras de self-healing na main `2bf151052f1a25f088030bfafec5d31d58f18e11`; ele não substitui a auditoria comportamental completa exigida por C0. Use [docs/STATUS.md](STATUS.md) para o snapshot atual do código. Não copie snapshots de produção sem consulta ao ambiente.
+> **Baseline histórico com revalidação limitada.** A última revalidação funcional abrangente permanece em 2026-11-14. Os adendos incrementais de 2026-11-19 e 2026-11-20 revalidam reporter C0, gates de evolução, CI, consumidores do roteamento cognitivo e fronteiras de self-healing; eles não substituem a auditoria comportamental completa exigida por C0. Use [docs/STATUS.md](STATUS.md) para o snapshot atual do código. Não copie snapshots de produção sem consulta ao ambiente.
 
 # Cognitive Baseline — Fase C0
 
@@ -838,3 +838,32 @@ Esta seção atualiza evidências após o merge da PR #864. Não declara a Fase 
 - A PR [#862](https://github.com/TheDrack/Jarvis_Xerife/pull/862) é o veículo documental existente para atualizar a matriz após Prospecto. No início desta revalidação estava aberta, sem review formal; o head `493007a` tinha `JARVIS PR Validation` verde no run `44325535034`. O workflow Task Queue não foi disparado para aquele diff documental. Não foi feito merge.
 - Issues abertas consultadas: [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682) (proteção de main), [#723](https://github.com/TheDrack/Jarvis_Xerife/issues/723) (reconciliação provider-aware já merged, pendência histórica ligada ao Preview) e [#732](https://github.com/TheDrack/Jarvis_Xerife/issues/732) (reconciliação do ledger de migrations).
 - Próximo critério: concluir o mapa comportamental de C0, incluindo composição/consumidor real e teste integrado do roteamento cognitivo, além das lacunas de iniciativa, memória, planejamento e execução já registradas. Não iniciar C1 nem criar componentes duplicados.
+
+## 12. Revalidação incremental C0 — 2026-11-20 — main `32cf7e94ed54d577c85cc503b1480ef1c765399d`
+
+Esta verificação é source-level e baseada em CI identificado por SHA. Não é teste de runtime, deploy ou produção.
+
+### Composição e consumo do roteamento cognitivo
+- Graphify index: commit `32cf7e94ed54d577c85cc503b1480ef1c765399d`, indexado em 2026-11-20T21:24:44Z.
+- `CognitiveRouter.execute()` tem um único caller estrito: `tests/domain/test_cognitive_router.py::test_execute_initializes_missing_metadata`. Não foi localizado caller de aplicação.
+- `run_pipeline()` tem callers estritos no CLI de `app/runtime/pipeline_runner.py` e em testes; não há caller de serviço/aplicação no grafo. O CLI chama o runner sem `inputs`.
+- `AssistantService.process_command()` chama seus próprios helpers de decisão, interpretação, memória e despacho de providers; não há caminho estrito para `CognitiveRouter.execute()` nem para `run_pipeline()`.
+- `jarvis_chat` está presente no YAML, documentação e teste de declaração de configuração. Isso não comprova composição de runtime. Sem `inputs.metadata.user_input`, `CognitiveRouter.execute()` lê string vazia. Não há teste integrado que demonstre input real → router → LlmEngine.
+- A implementação de `CognitiveRouter` faz bypass por substrings para automação e, no restante, usa classificação opcional via LiteLLM com fallback para conversa. Não é um Reasoning Engine nem um ciclo cognitivo integrado.
+- **Decisão:** não conectar o router ao AssistantService nesta execução. O contrato de decisão, ownership do contexto, política de fallback e semântica de saída precisam ser definidos e testados antes de alterar o composition root.
+
+### Prospecto geoespacial — baseline da main
+- Commits funcionais em main: `b9754d387c8fe5bed9ee69cb1d4b611e7cb61868` (otimização de discovery/reconciliação) e `fc30d6ab215ea428e77e794bbd9f9c99fbdd53e7` (extração de endereço, contratos geográficos, cache DuckDB e distância Haversine).
+- O grafo encontra `GeocodingService` e `DuckDBGeocodingRepository` apenas em testes. A infraestrutura de cache e os contratos estão presentes, mas não há consumer de campanha, MCP ou mapa comprovado.
+- PR [#867](https://github.com/TheDrack/Jarvis_Xerife/pull/867) adiciona o adapter opcional Ipea `geocodebr`/CNEFE e lote/cache. Está aberta, não mesclada; seus dois workflows de suíte completa passaram no head `f52e68d`. Não houve execução real com download do CNEFE nem benchmark.
+- **Risco de contrato a revisar na PR #867:** o domínio descreve `GeoCoordinate` como WGS84; a documentação do `geocodebr` identifica seu GeoDataFrame espacial como SIRGAS 2000 / EPSG:4674. A PR passa `lat/lon` sem registrar CRS nem transformação explícita. A diferença pode ser pequena para visualização geral, mas o datum precisa ser declarado ou normalizado antes de prometer precisão métrica uniforme. Não foi demonstrado erro material de coordenada.
+- Nenhuma coordenada real, associação em campanha, filtro espacial de prospects ou interface de mapa foi verificada.
+
+### CI, gates e governança
+- Main head: `32cf7e94ed54d577c85cc503b1480ef1c765399d`; último commit funcional: `fc30d6a`. Task Queue run [44819128465](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44819128465): 3.672 passed, 21 skipped, 181 warnings. O commit `32cf7e9` é documental.
+- PR #867: PR Validation run [44822315142](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44822315142) — 3.661 passed, 38 skipped, 8 warnings; Task Queue run [44822314948](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44822314948) — 3.683 passed, 21 skipped, 181 warnings; 15 testes específicos de fila passaram. Sem review formal; não mesclada.
+- Integrated Evolution run [44753845068](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44753845068) passou somente pelo gate; `EVOLUTION_ENABLED` estava vazio e geração/publicação foram ignoradas. `data/roadmap_missions.json` continua vazio.
+- Self Healing V3 run [44753874490](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44753874490) foi ignorado. O workflow atual permanece restrito a falhas de workflows confiáveis em main; não cobre PR Validation/Task Queue.
+- `main.protected=false`, rulesets vazios e issue #682 aberta. A integração não consegue ler branch protection (403); nenhuma alteração foi tentada.
+
+**Conclusão:** C0 continua aberto. Os critérios `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` permanecem `pending`; C1 permanece bloqueado. A próxima capacidade pendente é resolver a composição real do roteamento conversacional e estabelecer um teste comportamental integrado antes de qualquer World Model.
