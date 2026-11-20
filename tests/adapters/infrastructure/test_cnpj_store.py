@@ -266,6 +266,18 @@ def test_store_pages_through_the_whole_slice_like_the_csv_adapter(tmp_path):
     assert third.truncated is False
 
 
+def test_bulk_registry_presence_lookup_matches_exact_cnpj_and_normalizes_input(tmp_path):
+    files = sample_files(tmp_path)
+    database = tmp_path / "bulk-lookup.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+
+    found = CnpjStoreProvider(database).lookup_company_presence(
+        ["123.456.780/0019-0", "44444444000190", "invalid"]
+    )
+
+    assert found == {"12345678000190", "44444444000190"}
+
+
 def test_lookup_finds_a_cnpj_outside_the_campaign_filter(tmp_path):
     files = sample_files(tmp_path)
     database = tmp_path / "store.duckdb"
