@@ -87,3 +87,12 @@ test('company markers cluster spatially while retaining their members', () => {
   assert.deepEqual(clusters.map(item => item.count).sort(), [1, 2]);
   assert.equal(clusters.find(item => item.count === 2).members.length, 2);
 });
+
+
+test('map rejects projected or unknown CRS instead of treating meters as degrees', () => {
+  const projected = company('Projected', -27.6, -48.6);
+  projected.geocoding.coordinate.crs = 'EPSG:31982';
+  const unknown = company('Unknown', -27.6, -48.6);
+  unknown.geocoding.coordinate.crs = 'LOCAL:GRID';
+  assert.deepEqual(buildCompanyMarkers([projected, unknown]), []);
+});
