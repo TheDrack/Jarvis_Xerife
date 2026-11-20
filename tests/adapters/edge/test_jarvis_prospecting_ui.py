@@ -55,3 +55,9 @@ def test_prospecting_hud_exposes_an_independent_company_map():
     assert "renderer.render" in JS
     assert "buildCompanyMarkers" in MAP_JS
     assert "geocodebr" not in MAP_JS.lower()
+
+
+def test_prospecting_cluster_members_can_be_selected_individually():
+    assert "cluster.members.forEach" in JS
+    assert "button.type='button'" in JS
+    assert "renderMapSelection({count:1,members:[marker]})" in JS
