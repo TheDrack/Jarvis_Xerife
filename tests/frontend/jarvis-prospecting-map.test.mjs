@@ -1,7 +1,8 @@
-'use strict';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const require = createRequire(import.meta.url);
 const {
   buildCompanyMarkers,
   calculateBounds,
