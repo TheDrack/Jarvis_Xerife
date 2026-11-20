@@ -22,6 +22,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.prospecting.contracts import ProspectCompany, ProspectRecord
+from app.application.services.prospecting.geocoding import GeocodingService
 from app.domain.prospecting.deliverable import (
     DeliverableRow,
     build_deliverable_csv,
@@ -112,7 +113,7 @@ def run_campaign(
     include_unqualified: bool = False,
     max_companies: Optional[int] = None,
     page_size: Optional[int] = None,
-    geocoding_service: Optional[object] = None,
+    geocoding_service: Optional[GeocodingService] = None,
 ) -> CampaignRun:
     """Discover, qualify and serialize one campaign.
 
@@ -197,10 +198,7 @@ def run_campaign(
         ]
         geocoding_skipped = len(selected_indexes) - len(geocodable)
         if geocodable:
-            batch_method = getattr(geocoding_service, "geocode_companies", None)
-            if not callable(batch_method):
-                raise TypeError("geocoding_service must expose geocode_companies(companies)")
-            geocoding_results = batch_method(
+            geocoding_results = geocoding_service.geocode_companies(
                 [company for _, company in geocodable]
             )
             if len(geocoding_results) != len(geocodable):
