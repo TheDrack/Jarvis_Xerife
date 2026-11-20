@@ -1,7 +1,10 @@
-> **Baseline histórico com revalidação limitada.** A última revalidação declarada neste documento é de 2026-11-14, anterior ao commit main 444b0b322f132802368cbbe0c9568d4409438e61 (2026-11-16). Mudanças posteriores podem alterar consumers, gates e estados. Use [docs/STATUS.md](STATUS.md) para a visão atual baseada no código e trate esta baseline como referência histórica até nova auditoria C0 completa. Não copie seus snapshots de produção sem consulta ao ambiente.\n\n# Cognitive Baseline — Fase C0
+> **Baseline histórico com revalidação limitada.** A última revalidação funcional abrangente permanece em 2026-11-14. O adendo incremental de 2026-11-19 revalida o reporter C0, os gates de evolução, CI recente e as fronteiras de self-healing na main `2bf151052f1a25f088030bfafec5d31d58f18e11`; ele não substitui a auditoria comportamental completa exigida por C0. Use [docs/STATUS.md](STATUS.md) para o snapshot atual do código. Não copie snapshots de produção sem consulta ao ambiente.
+
+# Cognitive Baseline — Fase C0
 
 **Snapshot original:** `main` em `82ca2ac70f67e8418f62079f7d94e3fc8b4d1230` (pós-PR #774; histórico)
-**Última revalidação:** `main` em `d83c0b81898ab45de75f7583b3a7bf830dfcb88c` (2026-11-14), após o merge documental da PR #821; a auditoria funcional foi revalidada nesse SHA.
+**Última revalidação funcional abrangente:** `main` em `d83c0b81898ab45de75f7583b3a7bf830dfcb88c` (2026-11-14), após o merge documental da PR #821.
+**Última verificação incremental:** `main` em `2bf151052f1a25f088030bfafec5d31d58f18e11` (2026-11-19), limitada a reporter C0, critérios do roadmap, CI e fronteiras de self-healing.
 **Auditoria original:** 2026-11-07
 **Estado atual:** parcial; C0 permanece aberto.
 **Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação, complementada por probes remotos somente leitura. Não é confirmação de deploy completo, execução ponta a ponta ou comportamento de todos os providers.
@@ -674,12 +677,16 @@ A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user
 - O parser não consulta GitHub para confirmar a conclusão real do run remoto; a aprovação/revisão humana continua obrigatória.
 - O roadmap contém IDs machine-readable para C0; os critérios C1 ainda não têm IDs `C1-*`. Não criar missão C1 nem iniciar o World Model antes do aceite formal de C0.
 
-### Integridade do Self Healing
+### Integridade do Self Healing — revalidação após PR #826 (2026-11-17)
 
-- `scripts/jarvis_healer.py` inclui arquivos de teste apontados por nodeids do pytest entre os alvos possíveis. Para esses arquivos, a instrução de produção que proíbe inserir código de teste não se aplica; o modelo pode devolver o arquivo completo e o healer pode escrevê-lo.
-- `homeostase.yml` inclui `tests` no staging e executa pytest após a cura, mas não foi localizado gate de diff que proíba apagar testes, remover assertions ou reduzir cobertura. Pytest verde, isoladamente, não prova preservação das assertions.
-- Isto é um risco de integridade confirmado no desenho, não evidência de que tenha ocorrido uma alteração maliciosa. O workflow foi preservado nesta auditoria. Próximo hardening: impedir mutação automática de arquivos de teste ou exigir validação independente do diff antes de publicação.
+A constatação anterior desta seção ficou obsoleta após a PR [#826](https://github.com/TheDrack/Jarvis_Xerife/pull/826), merged no commit `f7c7843e50699e046ef0ca2d53194f0f74551c97`. A leitura direta de `main @ 17c52c4a1b2ba1e730aba75f2fee0c067af79147` confirma:
 
+- `scripts/jarvis_healer.py::_resolve_production_target()` usa a política compartilhada `resolve_repository_path(..., reject_symlinks=True)` e rejeita caminhos externos, symlinks, arquivos fora de `.py`, diretórios `.frozen`, prefixes/arquivos protegidos, testes e infraestrutura pytest. `heal()` filtra os alvos por `is_production_file()` antes de ler ou enviar conteúdo ao LLM; `apply_fixes()` revalida o destino antes de escrever.
+- `homeostase.yml` stageia somente `app`, `scripts` e `docs`; um guard fail-closed rejeita no diff staged arquivos de teste, configuração pytest e qualquer segmento `.frozen`. O workflow não stageia `.github` e executa pytest antes e depois da auto-cura.
+- Regressões existentes: `tests/test_jarvis_healer_report.py`, `tests/application/test_local_repair_agent.py` e `tests/test_homeostase_workflow_security.py` cobrem proteção de testes/configuração, symlinks, caminhos externos, arquivos frozen e staging imutável.
+- Portanto, a afirmação histórica de que o fluxo atual poderia reescrever assertions de teste não descreve mais o código de `main`. A proteção é de integridade do fluxo; não significa que o código de produção gerado por LLM seja correto nem substitui revisão humana.
+
+**Lacuna remanescente, separada:** `homeostase.yml` continua restrito a falhas elegíveis de workflows confiáveis em `main`; não monitora `JARVIS PR Validation (unprivileged)` nem `Jarvis Task Queue Tests`. O endpoint protegido `/v1/github/ci-heal/{run_id}` continua log-only. Assim, autocorreção de PRs abertas não está comprovada. Qualquer extensão deve manter análise de PR como entrada não confiável, sem executar código de PR com credenciais privilegiadas, e usar publicação isolada sujeita aos checks e à revisão existentes.
 
 ### Revalidação estrita de consumidores — 2026-11-16
 
@@ -704,6 +711,9 @@ A captura MCP de curiosidade desta revalidação foi aceita com ID `ab56c1cc462e
 - `homeostase.yml` é o caminho Self Healing confirmado, mas somente para falhas de workflows confiáveis em `main`; não recebe PR Validation/Task Queue e cria uma PR nova por run elegível.
 - O caminho legado de `GitHubAdapter.dispatch_auto_fix()` aponta para workflow ausente (`jarvis_code_fixer.yml`) e não tem caller estrito localizado. `AIGateway._dispatch_auto_repair_if_enabled()` somente registra o payload; não despacha o evento. `report_for_auto_correction()` criaria outra PR em vez de atualizar uma existente e também não tem caller estrito localizado.
 - A automação de reparo de PR/CI precisa de um desenho separado, idempotente e seguro: análise em contexto sem escrita, sandbox não privilegiada para proposta de patch e publicador privilegiado isolado que atualize a PR correspondente após validar o diff. Não habilitar execução de código não confiável com token de escrita nem remover o Self Healing atual.
+- **Revalidação do AutoFixer legado (2026-11-18; inspeção de source, sem execução):** `C2OrchestratorService._trigger_auto_repair()` chama `AutoFixer.attempt_repair(...)`, mas `AutoFixer` não define esse método; a busca no código atual encontra `attempt_repair()` apenas como função de módulo em `scripts/pr_manager.py`. O handler C2 captura a exceção e registra debug, portanto esse caller não executa reparo. Não foi feita chamada operacional.
+- `scripts/pr_manager.py::attempt_repair()` grava o candidato em `_temp_test_<issue_id>.<suffix>` e, para Python, executa apenas `compile()` nesse arquivo temporário. Em seguida roda `pytest tests/` no checkout original, antes de `fix_applier.apply_fix()`; o candidato temporário não é importado nem executado por essa suíte. Depois da aplicação não há novo pytest antes do commit/PR. Logo, o resultado verde valida o código anterior, não o patch proposto. Este caminho não deve ser tratado como validação de correção.
+- **Decisão de segurança:** manter `homeostase.yml` ativo para falhas elegíveis de trusted-main, mas não conectar falhas de PR ao AutoFixer legado. Antes de reutilizá-lo, validar o candidato em worktree/container descartável, executar testes contra o candidato aplicado, preservar testes/assertions/cobertura, validar o diff e manter publisher separado sem executar código da PR com credenciais de escrita.
 
 
 - PR #825 foi merged em 2026-11-16 (merge commit `5d5ba13fba16054e4a84ff3e0c46ecd39e50de98`), mas seu gate apenas protege os critérios C0 contra conclusão baseada em nomes; não os conclui.
@@ -748,3 +758,83 @@ A captura MCP de curiosidade desta revalidação foi aceita com ID `ab56c1cc462e
 - Classificação: consumer e policy existem em source e testes; processo Termux ativo, sessão real, perfil OAuth/scopes e resposta de provider não foram verificados. O uso transmite o prompt ao provider e requer consentimento/classificação de dados.
 - Limite: este caminho não torna `TaskRunner.execute_plan()` operacional nem conecta genericamente ferramentas `active_bounded`/ `intervention`. O approval store e os resolvers de owner/executor/verifier continuam necessários para essas classes de execução.
 
+
+
+### Prospecto — discovery, outreach e demand matching (2026-11-17)
+
+**Base auditada:** `main @ d087d11aa6e01fe0ee226e51b478baf173841d39`. Esta revalidação é de source, contratos e CI; não é verificação de runtime.
+
+- **Domínio:** `app/domain/prospecting/` contém contratos e lifecycle de prospects, além de contratos de demanda. A busca de empresas usa dados abertos do CNPJ via `CnpjStoreProvider`/DuckDB; os resultados da busca são agrupados por raiz CNPJ de 8 dígitos e o lookup completo é por estabelecimento/CNPJ de 14 dígitos.
+- **Discovery / Toolbox:** `ProspectingAdapter` está registrado no Nexus e em `config/tool_registry.json` pelos manifests `prospecting.companies.search` e `prospecting.companies.lookup`. O teste `tests/runtime/test_toolbox_prospecting_integration.py` percorre dispatcher, manifest, adapter e provider fake. O HUD local e o Android MCP expõem consumidores autenticados.
+- **Outreach:** `app/application/prospecting/outreach.py` persiste planos/eventos em SQLite e oferece MCP tools de plan, approve, dispatch, history e block. Quatro canais são representados: WhatsApp, e-mail, telefone e formulário institucional. Planejar não envia; dispatch exige base/evidência de contato, aprovação explícita da sessão autenticada, idempotência e ausência de DO_NOT_CONTACT. Cada canal depende de relay HTTPS e credenciais externas que não estão incluídos nesta implementação. Não há evidência de mensagem externa enviada.
+- **Demand matching:** `app/application/prospecting/demand_discovery.py` implementa fan-out provider-neutral, validação de proveniência, deduplicação, ranking determinístico e resultado parcial. O Android MCP permite criar, recuperar, listar e retirar consentimento de demandas. O compartilhamento de perfil/CV é opt-in, request-scoped, com timestamp/escopo e retirada auditada. Ainda não há providers externos de vagas/carreiras ou catálogo de produtos/serviços; CNPJ não comprova vaga ou oferta comercial atual. O tenant atual é single-owner local, não multi-tenant hospedado.
+- **Testes:** os caminhos relevantes incluem `tests/domain/test_prospecting_domain.py`, `tests/adapters/infrastructure/test_prospecting_adapter.py`, `tests/runtime/test_toolbox_prospecting_integration.py`, `tests/adapters/edge/test_prospecting_mcp_tools.py`, `tests/application/test_prospecting_outreach.py`, `tests/adapters/edge/test_prospecting_demand_mcp_tools.py`, `tests/adapters/infrastructure/test_prospecting_demand_store.py`, `tests/application/test_prospecting_demand_discovery.py` e `tests/domain/test_prospecting_demand.py`.
+- **CI:** PR #859: PR Validation, Task Queue e message-claim-fencing passaram; PR #860: PR Validation e Task Queue passaram; PR #861: PR Validation passou com 3.590 testes, 38 skipped, 8 warnings e 69% de coverage; Task Queue passou com 3.612 testes, 21 skipped, 181 warnings e 70% de coverage. Os dois workflows do #861 executaram a suíte completa em runners diferentes. Esses resultados são de CI nos heads das PRs, não testes em Android, providers ou produção.
+- **Classificação:** código, consumidores e testes estão identificados; CI dos commits integrados está confirmado. Runtime Android, configuração real do DuckDB no host, relays de saída, providers externos, tenancy hospedada e efeitos externos permanecem não verificados ou não implementados.
+
+**Relação com C0:** esta atualização amplia o mapa de capacidades e corrige a defasagem documental após as PRs #858–#861. Não promove nenhum critério C0. O ledger em `docs/STATUS.md` mantém `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` como `pending`; C1 — World Model — continua bloqueado.
+
+
+### Revalidação C0 — adapters ACATE, análise técnica e self-healing de PRs (2026-11-17)
+
+**Base de código consultada:** `main @ 17c52c4a1b2ba1e730aba75f2fee0c067af79147`. O índice Graphify disponível estava em `ec2755a` (snapshot anterior à main atual); foi usado apenas para localizar símbolos. As conclusões abaixo foram cruzadas com GitHub code search e arquivos lidos diretamente em `main @ 17c52c4a1b2ba1e730aba75f2fee0c067af79147`.
+
+#### ACATE — adapters implementados, sem consumer operacional identificado
+
+- `AcateDirectoryAdapter` lê um CSV fornecido pelo operador e exige `reuse_permission_confirmed=True`; não faz scraping. A busca de código encontrou o módulo, a reexportação em `app/adapters/infrastructure/prospecting/__init__.py`, documentação e testes isolados, mas nenhuma instanciação em serviço, registro Nexus, manifest Tool Registry ou ferramenta MCP.
+- O adapter filtra `uf`, municípios e limite. O contrato `DiscoveryQuery` também exige `cnae_prefixes` e inclui `only_active`/`include_secondary_cnae`, mas esses campos não são aplicados pelo adapter. O teste `tests/adapters/infrastructure/test_acate_directory.py` passa um CNAE e valida a importação, porém não verifica que o CNAE seja filtrado. Como não há consumer de produção identificado, isso é um risco de integração latente, não uma falha operacional observada.
+- `AcateObservatoryAdapter` apenas carrega um snapshot JSON local em `MarketIndicatorDataset`. A busca encontrou o módulo, reexportação, documentação e teste isolado; não foi localizado collector recorrente, serviço consumidor ou integração de runtime. Indicadores agregados não geram prospects individuais.
+- **Classificação C0:** ambos são `IMPLEMENTED_UNVERIFIED` como adapters locais e `MISSING` quanto a consumer operacional. Não contar ACATE como fonte ativa do Prospecto até haver consumer, contrato de filtros/proveniência e validação no ambiente.
+
+#### TechnicalAnalysisService — stub e heurística sem integração
+
+- `app/application/services/technical_analysis_service.py` contém `TechnicalAnalysisService.execute()`, que retorna `{"success": False, "not_implemented": True}`. O método `analyze()` classifica mensagens por três substrings fixas; não implementa análise causal ou raciocínio com evidências.
+- `data/nexus_registry.json` não registra `technical_analysis`. A busca de código em main encontrou o módulo e referências documentais, sem consumer/instanciação de produção. O Graphify snapshot não encontrou caller resolvido nem teste vinculado; a busca textual também não encontrou teste específico.
+- **Classificação C0:** `IMPLEMENTED_UNVERIFIED` apenas como classe legada; a capacidade de análise técnica executável é `MISSING/BLOCKED`. Não criar outro serviço nem promover essa classe a Reasoning Engine sem consumer, contrato e baseline comportamental.
+
+#### Correção automática de CI/PR — fronteiras atuais
+
+- `.github/workflows/homeostase.yml` preserva o caminho trusted-main: no evento `workflow_run`, exige `head_branch == main`, repositório de origem igual ao repositório e evento original `push`, `schedule` ou `workflow_dispatch`; também exige falha, timeout ou cancelamento. A lista de workflows monitorados não inclui `JARVIS PR Validation (unprivileged)` nem `Jarvis Task Queue Tests`. Portanto, falhas de PR não acionam esse workflow.
+- O endpoint protegido `POST /v1/github/ci-heal/{run_id}` chama `GitHubWorker.auto_heal_ci_failure()`. O método baixa logs e registra tentativas em `ThoughtLogService`; não chama um analisador, não altera arquivos e não abre PR. Os testes em `tests/application/test_github_worker.py` verificam download de logs, falha de download e escalonamento após tentativas.
+- O fluxo de auto-cura efetivo em `homeostase.yml` usa `scripts/jarvis_healer.py` em checkout confiável de `main`, executa testes e só então cria branch/PR. Esse fluxo é distinto do endpoint log-only e não cobre branches de PR.
+- **Classificação transversal:** self-healing trusted-main presente; auto-correção automática de PRs abertas não comprovada. Preservar todos os mecanismos atuais. Qualquer extensão deve analisar logs como entrada não confiável, não fazer checkout/executar código de PR com credenciais privilegiadas e publicar somente patch isolado sujeito aos checks e revisão existentes.
+
+#### Gate de autoevolução observado
+
+- Run `44151942587` (`JARVIS Integrated Evolution`) concluiu o gate com sucesso, mas o log mostra `EVOLUTION_ENABLED` vazio e a evolução pausada. `data/roadmap_missions.json` contém `missions: []` e hold reason explícito porque C0 continua aberto e não há mapeamento revisado de target/teste.
+- Os jobs de geração e publicação foram `skipped`. Nenhum candidato foi gerado ou publicado nessa execução.
+
+**Conclusão C0:** estas evidências ampliam o mapa de lacunas; não completam critérios. `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` permanecem `pending`. C1 — World Model — permanece bloqueado.
+
+
+## 11. Revalidação incremental C0 — 2026-11-19 — main `2bf151052f1a25f088030bfafec5d31d58f18e11`
+
+Esta seção atualiza evidências após o merge da PR #864. Não declara a Fase 0 concluída.
+
+### CI e correção do reporter C0
+
+- A PR #864 foi merged em `main` no commit `2bf151052f1a25f088030bfafec5d31d58f18e11`. Corrigiu a regex de SHA do reporter horário: a quantificação `{40}` dentro da f-string raw precisava ser escapada como `{{40}}`. Antes da correção, dois testes de regressão falhavam porque evidências válidas eram classificadas como `invalid_evidence`; a causa era defeito de código, não ambiente.
+- No head corrigido da PR #864, `JARVIS PR Validation` run [44549728700](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44549728700) e `Jarvis Task Queue Tests` run [44549728767](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44549728767) concluíram com sucesso.
+- Na main atual, o workflow `JARVIS Hourly Curiosity Audit` run [44619680908](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44619680908) concluiu com sucesso: **3.626 passed, 39 skipped, 8 warnings, 69% coverage**. O relatório foi gerado e o artefato `14575443090` foi publicado.
+- Na mesma SHA, `Jarvis Task Queue Tests` run [44552097344](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44552097344) concluiu com sucesso: **3.649 passed, 21 skipped, 181 warnings, 70% coverage**. Esses resultados comprovam CI, não runtime ou produção.
+
+### Gate de evolução e ordem C0 → C1
+
+- `data/roadmap_missions.json` permanece com `missions: []` e `hold_reason` explícito porque C0 continua aberto e não há mapeamento revisado de target/teste elegível.
+- O workflow `auto_evolution_triggerV2.yml` usa `RoadmapMissionSelector`, que lê `docs/COGNITIVE_ROADMAP.md` e o ledger de `docs/STATUS.md`; o selector valida paths dentro do repositório, evidência de commit/Actions e testes existentes, e falha fechado em schema/evidência inválidos.
+- O run [44580778611](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44580778611) passou pelo gate, mas `EVOLUTION_ENABLED` estava vazio; geração/validação e publicação foram `skipped`. Nenhum candidato foi gerado ou publicado.
+- O ledger de STATUS continua com `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` em `pending`. C1 — World Model — permanece bloqueado até a aceitação formal de C0.
+
+### Correção automática de PR/CI e fronteiras de confiança
+
+- `homeostase.yml` continua limitado a workflows selecionados e confiáveis originados em `main`, no mesmo repositório, com conclusão `failure`, `timed_out` ou `cancelled`. A lista não inclui `JARVIS PR Validation (unprivileged)` nem `Jarvis Task Queue Tests`; portanto, falhas de CI de branches de PR não acionam o Self Healing V3 atual.
+- O endpoint protegido `/v1/github/ci-heal/{run_id}` permanece distinto: baixa logs e registra tentativas em `ThoughtLogService`, mas não altera arquivos nem publica PR.
+- O caminho legado `KeepAliveProvider._trigger_auto_repair()` chama `AutoFixer.attempt_repair()`, método que não existe em `AutoFixer`; a exceção é capturada e a tentativa não repara o Soldier. Separadamente, `scripts/pr_manager.py::attempt_repair()` executa pytest no checkout original antes de aplicar o candidato; portanto, a suíte executada não valida o código candidato. Não conectar esse caminho a PRs nem a publisher privilegiado antes de validação do candidato em worktree/container isolado.
+- A branch `main` foi observada com `protected=false`, checks obrigatórios desligados e rulesets vazios. A issue [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682) permanece aberta; o conector desta execução não possui acesso administrativo para configurar proteção.
+
+### Pendências C0 e revisão
+
+- O mapa atual continua identificando `CognitiveRouter.execute()` sem consumidor de aplicação estrito: Graphify encontrou somente o teste `test_execute_initializes_missing_metadata()` como caller. A referência no pipeline e a descoberta por filesystem do Nexus não comprovam consumo.
+- A PR [#862](https://github.com/TheDrack/Jarvis_Xerife/pull/862) é o veículo documental existente para atualizar a matriz após Prospecto. No início desta revalidação estava aberta, sem review formal; o head `493007a` tinha `JARVIS PR Validation` verde no run `44325535034`. O workflow Task Queue não foi disparado para aquele diff documental. Não foi feito merge.
+- Issues abertas consultadas: [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682) (proteção de main), [#723](https://github.com/TheDrack/Jarvis_Xerife/issues/723) (reconciliação provider-aware já merged, pendência histórica ligada ao Preview) e [#732](https://github.com/TheDrack/Jarvis_Xerife/issues/732) (reconciliação do ledger de migrations).
+- Próximo critério: concluir o mapa comportamental de C0, incluindo composição/consumidor real e teste integrado do roteamento cognitivo, além das lacunas de iniciativa, memória, planejamento e execução já registradas. Não iniciar C1 nem criar componentes duplicados.
