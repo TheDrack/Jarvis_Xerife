@@ -22,7 +22,7 @@ import csv
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from app.adapters.infrastructure.prospecting.cnpj_open_data import (
     DATASET_LICENSE,
@@ -345,6 +345,39 @@ class CnpjStoreProvider:
         rows = connection.execute("SELECT codigo, nome FROM municipalities").fetchall()
         codes = [row[0] for row in rows if normalize_text(row[1] or "") in wanted]
         return sorted(set(codes))
+
+    def lookup_company_presence(self, cnpjs: Sequence[str]) -> set[str]:
+        """Resolve registry presence for many CNPJs with one read-only connection."""
+        normalized = sorted(
+            {
+                "".join(character for character in value if character.isdigit())
+                for value in cnpjs
+                if isinstance(value, str)
+            }
+        )
+        normalized = [value for value in normalized if len(value) == 14]
+        if not normalized:
+            return set()
+
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                """
+                WITH requested AS (
+                    SELECT unnest(?) AS cnpj
+                )
+                SELECT DISTINCT requested.cnpj
+                FROM requested
+                INNER JOIN establishments AS e
+                    ON e.cnpj_basico = substr(requested.cnpj, 1, 8)
+                    AND e.cnpj_ordem = substr(requested.cnpj, 9, 4)
+                    AND e.cnpj_dv = substr(requested.cnpj, 13, 2)
+                """,
+                [normalized],
+            ).fetchall()
+        finally:
+            connection.close()
+        return {row[0] for row in rows}
 
     def lookup_company(self, cnpj: str) -> Optional[ProspectCompany]:
         """Look one CNPJ up in the whole store, outside the campaign filter.
