@@ -230,3 +230,68 @@ def test_our_own_campaign_file_loads_and_stays_consistent():
     assert campaign.max_companies is None, "the campaign must exhaust its filter by default"
     assert campaign.query.limit >= 100, "limit is the page size now, not the ceiling"
     assert campaign.notes, "assumptions must stay documented in the campaign file"
+
+
+
+def test_campaign_geocodes_only_delivered_companies_and_keeps_precision():
+    from app.domain.prospecting.geography import (
+        AddressGeocoding,
+        GeoCoordinate,
+        GeocodingPrecision,
+        GeocodingStatus,
+    )
+
+    class FakeGeocodingService:
+        def __init__(self):
+            self.companies = []
+
+        def geocode_companies(self, companies):
+            self.companies.extend(companies)
+            return [
+                AddressGeocoding(
+                    address=company.geocoding_address,
+                    status=GeocodingStatus.PARTIAL,
+                    coordinate=GeoCoordinate(
+                        latitude=-27.5969,
+                        longitude=-48.5495,
+                        accuracy_m=800,
+                        crs="EPSG:4674",
+                    ),
+                    precision=GeocodingPrecision.POSTAL_CODE,
+                    provider="fake:cnefe",
+                )
+                for company in companies
+            ]
+
+    qualified = company("Dentro do ICP").model_copy(
+        update={
+            "street_type": "RUA",
+            "street_name": "DAS FLORES",
+            "street_number": "100",
+            "postal_code": "88010000",
+        }
+    )
+    rejected = company("Fora do ICP", city="Joinville").model_copy(
+        update={
+            "street_type": "RUA",
+            "street_name": "DAS FLORES",
+            "street_number": "200",
+        }
+    )
+    geocoder = FakeGeocodingService()
+
+    run = run_campaign(
+        StubProvider((qualified, rejected)),
+        campaign_definition(),
+        now=NOW,
+        geocoding_service=geocoder,
+    )
+
+    assert [item.company_name for item in geocoder.companies] == ["Dentro do ICP"]
+    assert run.manifest.geocoding_enabled is True
+    assert run.manifest.geocoding_attempted == 1
+    assert run.manifest.geocoding_partial == 1
+    assert run.manifest.geocoding_failed == 0
+    assert run.rows[0].geocoding.coordinate.crs == "EPSG:4674"
+    assert "latitude" in run.csv_text
+    assert "-27.5969" in run.csv_text
