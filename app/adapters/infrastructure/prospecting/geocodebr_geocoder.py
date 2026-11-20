@@ -37,11 +37,14 @@ class GeocodeBrGeocoder:
         if not companies:
             return []
 
+        addresses = []
         for company in companies:
             if company.country != "BR":
                 raise ValueError("GeocodeBrGeocoder only supports Brazilian companies")
-            if not company.geocoding_address:
+            address = company.geocoding_address
+            if not address:
                 raise ValueError("company must have a postal address before geocoding")
+            addresses.append(address)
 
         try:
             import polars as pl
@@ -49,7 +52,7 @@ class GeocodeBrGeocoder:
         except ImportError as exc:
             raise RuntimeError(
                 "The optional geocodebr provider is not installed. "
-                "Install it with: python -m pip install 'jarvis-assistant[geocodebr]'"
+                'Install it with: python -m pip install -e ".[geocodebr]"'
             ) from exc
 
         rows = []
@@ -97,7 +100,7 @@ class GeocodeBrGeocoder:
             )
 
         results = []
-        for row_id, company in enumerate(companies):
+        for row_id, address in enumerate(addresses):
             row = by_id[row_id]
             latitude = row.get("lat")
             longitude = row.get("lon")
@@ -106,7 +109,7 @@ class GeocodeBrGeocoder:
             if latitude is None or longitude is None:
                 results.append(
                     AddressGeocoding(
-                        address=company.geocoding_address,
+                        address=address,
                         status=GeocodingStatus.FAILED,
                         provider=self.provider_name,
                     )
@@ -122,7 +125,7 @@ class GeocodeBrGeocoder:
             )
             results.append(
                 AddressGeocoding(
-                    address=company.geocoding_address,
+                    address=address,
                     formatted_address=row.get("endereco_encontrado") or None,
                     status=status,
                     coordinate=GeoCoordinate(
