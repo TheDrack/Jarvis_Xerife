@@ -2108,3 +2108,116 @@ def test_prospecting_exact_lookup_requires_local_authentication():
     )
 
     assert response.status_code == 401
+
+
+def test_prospecting_search_can_attach_cached_geocoding_without_running_provider(monkeypatch):
+    from app.core.nexus import nexus
+    from app.domain.prospecting.contracts import (
+        ProspectCompany,
+        ProspectEvidence,
+        ProspectEvidenceType,
+    )
+    from app.domain.prospecting.geography import (
+        AddressGeocoding,
+        GeoCoordinate,
+        GeocodingPrecision,
+        GeocodingStatus,
+        address_fingerprint,
+    )
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    evidence = ProspectEvidence(
+        source_id="fixture",
+        source_name="Fixture",
+        source_type=ProspectEvidenceType.USER_PROVIDED,
+        url="https://example.com",
+        license_or_terms="fixture",
+        supports_fields=("postal_address",),
+    )
+    company = ProspectCompany(
+        company_name="Alfa Serralheria",
+        cnpj="12345678000190",
+        street_type="RUA",
+        street_name="DAS FLORES",
+        street_number="10",
+        neighborhood="CENTRO",
+        city="SAO JOSE",
+        state="SC",
+        evidence=(evidence,),
+    )
+    address = company.geocoding_address
+    observation = AddressGeocoding(
+        address=address,
+        formatted_address="Rua das Flores, 10, São José, SC",
+        status=GeocodingStatus.PARTIAL,
+        coordinate=GeoCoordinate(
+            latitude=-27.6136,
+            longitude=-48.6366,
+            accuracy_m=120,
+            crs="EPSG:4674",
+        ),
+        precision=GeocodingPrecision.STREET,
+        provider="geocodebr:cnefe",
+    )
+
+    class FakeProspectingAdapter:
+        def can_execute(self, context=None):
+            return True
+
+        def search_companies(self, **kwargs):
+            return {
+                "success": True,
+                "companies": [company.model_dump(mode="json")],
+                "truncated": False,
+                "next_cursor": None,
+            }
+
+    class FakeGeocodingRepository:
+        def get_many(self, addresses):
+            assert addresses == [address]
+            return {address_fingerprint(address): observation}
+
+    monkeypatch.setattr(
+        nexus, "resolve", lambda component_id: FakeProspectingAdapter()
+    )
+    repository_calls = []
+    monkeypatch.setattr(
+        desktop_local,
+        "_prospecting_geocoding_repository",
+        lambda: repository_calls.append(True) or FakeGeocodingRepository(),
+    )
+    runtime = LocalRuntime()
+    headers = {"Authorization": f"Bearer {runtime.token}"}
+
+    plain = _client(runtime).get(
+        "/api/prospecting/search",
+        params={"uf": "SC", "cnae_prefixes": "4120"},
+        headers=headers,
+    )
+    assert plain.status_code == 200
+    assert repository_calls == []
+    assert "geocoding" not in plain.json()["companies"][0]
+
+    mapped = _client(runtime).get(
+        "/api/prospecting/search",
+        params={
+            "uf": "SC",
+            "cnae_prefixes": "4120",
+            "include_geocoding": "true",
+        },
+        headers=headers,
+    )
+
+    assert mapped.status_code == 200
+    company_result = mapped.json()["companies"][0]
+    assert company_result["geocoding"]["status"] == "partial"
+    assert company_result["geocoding"]["coordinate"]["crs"] == "EPSG:4674"
+    assert mapped.json()["geocoding_summary"] == {
+        "available": True,
+        "total": 1,
+        "geocoded": 1,
+        "success": 0,
+        "partial": 1,
+        "unmapped": 0,
+    }
+    assert repository_calls == [True]
