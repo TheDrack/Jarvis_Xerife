@@ -42,7 +42,7 @@
           provider: String(geocoding.provider || 'unknown'),
           formattedAddress: String(geocoding.formatted_address || ''),
           approximate: geocoding.status === 'partial' ||
-            ['interpolated', 'postal_code', 'locality', 'region', 'unknown'].includes(precision),
+            !['rooftop', 'premise'].includes(precision),
           coordinate: {
             latitude: Number(coordinate.latitude),
             longitude: Number(coordinate.longitude),
