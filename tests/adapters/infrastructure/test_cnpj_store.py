@@ -204,7 +204,17 @@ def test_truncation_is_reported_with_the_ordering_caveat(tmp_path):
 
 
 def test_discovery_count_and_page_ignore_duplicate_lookup_keys(tmp_path):
-    files = sample_files(tmp_path)
+    files = build_files(
+        tmp_path / "data",
+        [
+            establishment(),
+            establishment(basico="87654321", fantasia="Beta Obras"),
+        ],
+        [
+            company_row(),
+            company_row("87654321", "BETA OBRAS LTDA"),
+        ],
+    )
     write_csv(
         files.municipalities,
         [["8000", "SAO JOSE"], ["8000", "SAO JOSE"]],
@@ -222,10 +232,9 @@ def test_discovery_count_and_page_ignore_duplicate_lookup_keys(tmp_path):
         "Alfa Serralheria",
         "Beta Obras",
     ]
-    assert result.matched_rows == 3
-    assert result.truncated is True
-    assert result.next_cursor == "87654321"
-
+    assert result.matched_rows == 2
+    assert result.truncated is False
+    assert result.next_cursor is None
 
 def test_unknown_municipality_returns_an_explanation(tmp_path):
     files = sample_files(tmp_path)
