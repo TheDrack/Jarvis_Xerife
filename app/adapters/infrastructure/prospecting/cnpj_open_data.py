@@ -45,13 +45,19 @@ _NOME_FANTASIA = 4
 _SITUACAO_CADASTRAL = 5
 _CNAE_PRINCIPAL = 11
 _CNAE_SECUNDARIA = 12
+_STREET_TYPE = 13
+_STREET_NAME = 14
+_STREET_NUMBER = 15
+_ADDRESS_COMPLEMENT = 16
+_NEIGHBORHOOD = 17
+_POSTAL_CODE = 18
 _UF = 19
 _MUNICIPIO = 20
 _MIN_ESTABLISHMENT_COLUMNS = 21
 _MIN_COMPANY_COLUMNS = 6
 _ACTIVE = "02"
 
-_SUPPORTED_FIELDS = ("company_name", "legal_name", "cnpj", "industry", "city", "state")
+_SUPPORTED_FIELDS = ("company_name", "legal_name", "cnpj", "industry", "city", "state", "postal_address")
 
 
 @dataclass(frozen=True)
@@ -99,6 +105,7 @@ class CnpjOpenDataAdapter:
         self._dataset_url = dataset_url
         self._encoding = encoding
         self._delimiter = delimiter
+        self._municipality_names_cache: Optional[dict[str, str]] = None
 
     def _rows(self, path: Path):
         with path.open("r", encoding=self._encoding, newline="") as handle:
@@ -108,12 +115,11 @@ class CnpjOpenDataAdapter:
         if not names:
             return None
         wanted = {normalize_text(name) for name in names}
-        codes = {
-            row[0].strip()
-            for row in self._rows(self._files.municipalities)
-            if len(row) >= 2 and normalize_text(row[1]) in wanted
+        return {
+            code
+            for code, name in self._municipality_names().items()
+            if normalize_text(name) in wanted
         }
-        return codes
 
     def _cnae_descriptions(self) -> dict[str, str]:
         return {
@@ -123,11 +129,13 @@ class CnpjOpenDataAdapter:
         }
 
     def _municipality_names(self) -> dict[str, str]:
-        return {
-            row[0].strip(): row[1].strip()
-            for row in self._rows(self._files.municipalities)
-            if len(row) >= 2
-        }
+        if self._municipality_names_cache is None:
+            self._municipality_names_cache = {
+                row[0].strip(): row[1].strip()
+                for row in self._rows(self._files.municipalities)
+                if len(row) >= 2
+            }
+        return self._municipality_names_cache
 
     def _legal_names(self, wanted: set[str]) -> dict[str, str]:
         names: dict[str, str] = {}
@@ -203,12 +211,21 @@ class CnpjOpenDataAdapter:
             return None
         reference = datetime.now(timezone.utc)
         cnae = _digits(row[_CNAE_PRINCIPAL])
+        municipality_name = None
+        if self._files.municipalities.is_file():
+            municipality_name = self._municipality_names().get(row[_MUNICIPIO].strip())
         return ProspectCompany(
             company_name=name,
             legal_name=legal_name,
             cnpj=digits,
             industry=f"CNAE {cnae}",
-            city=None,
+            street_type=row[_STREET_TYPE].strip() or None,
+            street_name=row[_STREET_NAME].strip() or None,
+            street_number=row[_STREET_NUMBER].strip() or None,
+            address_complement=row[_ADDRESS_COMPLEMENT].strip() or None,
+            neighborhood=row[_NEIGHBORHOOD].strip() or None,
+            postal_code=_digits(row[_POSTAL_CODE]) or None,
+            city=municipality_name,
             state=row[_UF].strip().upper(),
             country="BR",
             registry_presence=RegistryPresence.FOUND,
@@ -331,6 +348,12 @@ class CnpjOpenDataAdapter:
                     legal_name=legal_name,
                     cnpj=cnpj,
                     industry=cnae_descriptions.get(cnae) or f"CNAE {cnae}",
+                    street_type=row[_STREET_TYPE].strip() or None,
+                    street_name=row[_STREET_NAME].strip() or None,
+                    street_number=row[_STREET_NUMBER].strip() or None,
+                    address_complement=row[_ADDRESS_COMPLEMENT].strip() or None,
+                    neighborhood=row[_NEIGHBORHOOD].strip() or None,
+                    postal_code=_digits(row[_POSTAL_CODE]) or None,
                     city=municipality_names.get(row[_MUNICIPIO].strip()),
                     state=query.uf,
                     country="BR",

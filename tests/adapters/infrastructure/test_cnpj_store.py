@@ -35,6 +35,7 @@ def establishment(
     row[0], row[1], row[2], row[3] = basico, ordem, dv, tipo
     row[4], row[5], row[11], row[12] = fantasia, situacao, cnae, secundario
     row[10] = abertura
+    row[13], row[14], row[15], row[16] = "RUA", "DAS FLORES", "100", "SALA 2"
     row[17], row[18] = bairro, cep
     row[19], row[20] = uf, municipio
     return row
@@ -128,6 +129,16 @@ def test_store_provider_matches_the_csv_adapter(tmp_path):
     assert store_companies == csv_companies == ["12345678000190", "87654321000190"]
     assert store_result.matched_rows == csv_result.matched_rows
     assert store_result.truncated is False
+    company = store_result.companies[0]
+    assert company.street_type == "RUA"
+    assert company.street_name == "DAS FLORES"
+    assert company.street_number == "100"
+    assert company.address_complement == "SALA 2"
+    assert company.geocoding_address == "RUA DAS FLORES 100, SALA 2, Centro, SAO JOSE, SC, 88010000, Brasil"
+    assert csv_result.companies[0].geocoding_address == company.geocoding_address
+    assert csv_result.companies[0].geocoding_address is not None
+    assert "postal_address" in company.evidence[0].supports_fields
+    assert len(company.evidence[0].supports_fields) <= 20
 
 
 def test_masked_names_and_inactive_rows_are_excluded(tmp_path):
@@ -185,7 +196,6 @@ def test_discovery_uses_one_filtered_scan_for_count_and_page(tmp_path):
         "SELECT count(*) FROM establishments" in statement
         for statement in statements
     )
-
 
 def test_truncation_is_reported_with_the_ordering_caveat(tmp_path):
     files = sample_files(tmp_path)
@@ -310,7 +320,6 @@ def test_bulk_registry_presence_lookup_matches_exact_cnpj_and_normalizes_input(t
 
     assert found == {"12345678000190", "44444444000190"}
 
-
 def test_lookup_finds_a_cnpj_outside_the_campaign_filter(tmp_path):
     files = sample_files(tmp_path)
     database = tmp_path / "store.duckdb"
@@ -326,6 +335,8 @@ def test_lookup_finds_a_cnpj_outside_the_campaign_filter(tmp_path):
     assert found.company_size == "03"
     assert found.legal_nature == "2062"
     assert found.capital_social == "100000,00"
+    assert found.geocoding_address is not None
+    assert "RUA DAS FLORES 100" in found.geocoding_address
     assert provider.lookup_company("99999999000199") is None
     assert provider.lookup_company("123") is None
 

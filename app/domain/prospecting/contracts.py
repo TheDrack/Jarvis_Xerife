@@ -92,6 +92,10 @@ class ProspectCompany(BaseModel):
     capital_social: Optional[str] = Field(default=None, max_length=40)
     opening_date: Optional[str] = Field(default=None, min_length=8, max_length=8)
     establishment_type: Optional[str] = Field(default=None, max_length=2)
+    street_type: Optional[str] = Field(default=None, max_length=40)
+    street_name: Optional[str] = Field(default=None, max_length=200)
+    street_number: Optional[str] = Field(default=None, max_length=30)
+    address_complement: Optional[str] = Field(default=None, max_length=120)
     neighborhood: Optional[str] = Field(default=None, max_length=120)
     postal_code: Optional[str] = Field(default=None, max_length=8)
     primary_cnae: Optional[str] = Field(default=None, max_length=7)
@@ -103,6 +107,27 @@ class ProspectCompany(BaseModel):
     country: str = Field(default="BR", min_length=2, max_length=2)
     registry_presence: Optional[RegistryPresence] = None
     evidence: tuple[ProspectEvidence, ...] = Field(min_length=1, max_length=20)
+
+    @property
+    def geocoding_address(self) -> Optional[str]:
+        """Best available postal address; None when no street/locality data exists."""
+        street = self.street_name
+        if street and self.street_type:
+            street = f"{self.street_type} {street}"
+        street_line = " ".join(part for part in (street, self.street_number) if part)
+        address_parts = (
+            street_line or None,
+            self.address_complement,
+            self.neighborhood,
+            self.city,
+            self.state,
+            self.postal_code,
+        )
+        if not any(part and part.strip() for part in address_parts):
+            return None
+        country = "Brasil" if self.country == "BR" else self.country
+        parts = (*address_parts, country)
+        return ", ".join(part.strip() for part in parts if part and part.strip())
 
     @field_validator("cnpj")
     @classmethod

@@ -3,6 +3,7 @@
 
 from .action_provider import ActionProvider
 from .history_provider import HistoryProvider
+from .geocoding import Geocoder, GeocodingRepository
 from .memory_provider import MemoryProvider
 from .model_runtime import (
     ModelInvocationRequest,
@@ -20,6 +21,8 @@ from .web_provider import WebProvider
 
 __all__ = [
     "VoiceProvider",
+    "Geocoder",
+    "GeocodingRepository",
     "ActionProvider",
     "WebProvider",
     "SystemController",
