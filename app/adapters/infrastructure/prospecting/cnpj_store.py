@@ -73,7 +73,7 @@ ESTABELECIMENTO_COLUMNS: tuple[str, ...] = (
 )
 MINIMUM_ESTABLISHMENT_COLUMNS = 21
 _ACTIVE = "02"
-_SUPPORTED_FIELDS = ("company_name", "legal_name", "cnpj", "industry", "city", "state", "company_size", "legal_nature", "capital_social", "opening_date", "establishment_type", "neighborhood", "postal_code", "primary_cnae", "has_phone", "has_email", "has_fax")
+_SUPPORTED_FIELDS = ("company_name", "legal_name", "cnpj", "industry", "city", "state", "company_size", "legal_nature", "capital_social", "opening_date", "establishment_type", "postal_address", "primary_cnae", "has_phone", "has_email", "has_fax")
 
 
 @dataclass(frozen=True)
@@ -180,7 +180,9 @@ class CnpjStoreBuilder:
             "data_opcao_simples VARCHAR, data_exclusao_simples VARCHAR, opcao_mei VARCHAR, "
             "data_opcao_mei VARCHAR, data_exclusao_mei VARCHAR)"
         )
-        # Backward-compatible migration for stores created by the earlier 3-column schema.
+        # Backward-compatible additions for existing materialized stores.
+        for name in ("tipo_logradouro", "logradouro", "numero", "complemento", "bairro", "cep"):
+            connection.execute(f"ALTER TABLE establishments ADD COLUMN IF NOT EXISTS {name} VARCHAR")
         for name in ("natureza", "qualificacao", "capital", "ente"):
             connection.execute(f"ALTER TABLE companies ADD COLUMN IF NOT EXISTS {name} VARCHAR")
 
@@ -393,7 +395,8 @@ class CnpjStoreProvider:
             row = connection.execute(
                 "SELECT e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv, e.nome_fantasia, "
                 "e.cnae_principal, c.razao_social, m.nome, n.descricao, c.natureza, c.capital, "
-                "c.porte, e.data_inicio_atividade, e.matriz_filial, e.bairro, e.cep, "
+                "c.porte, e.data_inicio_atividade, e.matriz_filial, e.tipo_logradouro, e.logradouro, "
+                "e.numero, e.complemento, e.bairro, e.cep, "
                 "(nullif(trim(e.telefone1), '') IS NOT NULL OR nullif(trim(e.telefone2), '') IS NOT NULL), "
                 "(nullif(trim(e.correio_eletronico), '') IS NOT NULL), "
                 "(nullif(trim(e.telefone3), '') IS NOT NULL) "
@@ -409,7 +412,7 @@ class CnpjStoreProvider:
         if row is None:
             return None
 
-        (basename, ordem, dv, trade_name, cnae, legal_name, municipality_name, description, legal_nature, capital_social, company_size, opening_date, establishment_type, neighborhood, postal_code, has_phone, has_email, has_fax) = row
+        (basename, ordem, dv, trade_name, cnae, legal_name, municipality_name, description, legal_nature, capital_social, company_size, opening_date, establishment_type, street_type, street_name, street_number, address_complement, neighborhood, postal_code, has_phone, has_email, has_fax) = row
         name = (trade_name or "").strip() or (legal_name or "").strip()
         if not name or not any(ch.isalpha() for ch in name):
             return None
@@ -425,6 +428,10 @@ class CnpjStoreProvider:
             company_size=(company_size or "").strip() or None,
             opening_date=(opening_date or "").strip() or None,
             establishment_type=(establishment_type or "").strip() or None,
+            street_type=(street_type or "").strip() or None,
+            street_name=(street_name or "").strip() or None,
+            street_number=(street_number or "").strip() or None,
+            address_complement=(address_complement or "").strip() or None,
             neighborhood=(neighborhood or "").strip() or None,
             postal_code=(postal_code or "").strip() or None,
             has_phone=bool(has_phone),
@@ -569,7 +576,8 @@ class CnpjStoreProvider:
                 "SELECT f.cnpj_basico, f.cnpj_ordem, f.cnpj_dv, f.nome_fantasia, "
                 "f.cnae_principal, f.municipio, f.razao_social, m.nome, n.descricao, "
                 "f.natureza, f.capital, f.porte, f.data_inicio_atividade, f.matriz_filial, "
-                "f.bairro, f.cep, f.has_phone, f.has_email, f.has_fax, f.matched_rows "
+                "f.tipo_logradouro, f.logradouro, f.numero, f.complemento, f.bairro, f.cep, "
+                "f.has_phone, f.has_email, f.has_fax, f.matched_rows "
                 "FROM filtered f "
                 "LEFT JOIN (SELECT codigo, min(nome) AS nome FROM municipalities GROUP BY codigo) m "
                 "ON m.codigo = f.municipio "
@@ -601,6 +609,10 @@ class CnpjStoreProvider:
             company_size,
             opening_date,
             establishment_type,
+            street_type,
+            street_name,
+            street_number,
+            address_complement,
             neighborhood,
             postal_code,
             has_phone,
@@ -632,6 +644,10 @@ class CnpjStoreProvider:
                     company_size=(company_size or "").strip() or None,
                     opening_date=(opening_date or "").strip() or None,
                     establishment_type=(establishment_type or "").strip() or None,
+                    street_type=(street_type or "").strip() or None,
+                    street_name=(street_name or "").strip() or None,
+                    street_number=(street_number or "").strip() or None,
+                    address_complement=(address_complement or "").strip() or None,
                     neighborhood=(neighborhood or "").strip() or None,
                     postal_code=(postal_code or "").strip() or None,
                     has_phone=bool(has_phone),

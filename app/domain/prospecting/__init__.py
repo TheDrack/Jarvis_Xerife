@@ -33,6 +33,15 @@ from app.domain.prospecting.discovery import (
     DiscoveryQuery,
     DiscoveryResult,
 )
+from app.domain.prospecting.geography import (
+    AddressGeocoding,
+    GeoCoordinate,
+    GeoRadiusQuery,
+    GeocodingPrecision,
+    GeocodingStatus,
+    address_fingerprint,
+    distance_km,
+)
 from app.domain.prospecting.icp import (
     CriterionEvaluation,
     CriterionOutcome,
@@ -62,6 +71,13 @@ from app.domain.prospecting.qualification import (
 
 __all__ = [
     "DELIVERABLE_CSV_HEADER",
+    "AddressGeocoding",
+    "GeoCoordinate",
+    "GeoRadiusQuery",
+    "GeocodingPrecision",
+    "GeocodingStatus",
+    "address_fingerprint",
+    "distance_km",
     "CandidateType",
     "DemandCandidate",
     "DemandEvidence",

@@ -67,6 +67,10 @@ O domínio de prospecção não deve depender do Android nem do PC da MultMetal.
 
 A primeira versão não armazena contatos pessoais. A inclusão futura de nome, telefone, e-mail pessoal ou perfil profissional exigirá finalidade específica, base legal documentada, minimização, retenção, controle de acesso e mecanismo de oposição/opt-out.
 
+### Localização geográfica
+
+Os estabelecimentos mantêm os componentes do endereço cadastral e a geocodificação em um registro separado, com coordenadas WGS84, precisão, confiança, provedor e data. A geocodificação é cacheada por fingerprint do endereço e pode ser reutilizada entre estabelecimentos no mesmo local. Ver [camada geoespacial](JARVIS_PROSPECTO_GEOSPATIAL.md) para contratos, persistência, limites dos provedores e etapas de mapa.
+
 ### Pipeline interno legado
 
 O pipeline abaixo permanece para acompanhar a operação manual da própria equipe. Não deve receber recursos de marketplace, catálogo, relacionamento comprador-fornecedor ou pedidos; esses domínios pertencem ao produto comercial independente.

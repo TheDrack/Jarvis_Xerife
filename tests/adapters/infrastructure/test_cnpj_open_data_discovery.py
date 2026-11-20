@@ -35,6 +35,8 @@ def establishment(
     row[5] = situacao
     row[11] = cnae
     row[12] = secundario
+    row[13], row[14], row[15], row[16] = "RUA", "DAS FLORES", "100", "SALA 2"
+    row[17], row[18] = "CENTRO", "88010000"
     row[19] = uf
     row[20] = municipio
     return row
@@ -98,7 +100,6 @@ def test_lookup_company_presence_scans_csv_once_and_matches_full_cnpj(tmp_path):
     assert found == {"12345678000190", "12345678000207"}
     assert reads == [files.establishments]
 
-
 def test_finds_active_company_in_the_requested_slice(tmp_path):
     files = build_files(
         tmp_path,
@@ -115,10 +116,17 @@ def test_finds_active_company_in_the_requested_slice(tmp_path):
     assert found.industry == "CONSTRUCAO DE EDIFICIOS"
     assert found.city == "SAO JOSE"
     assert found.state == "SC"
+    assert found.street_type == "RUA"
+    assert found.street_name == "DAS FLORES"
+    assert found.street_number == "100"
+    assert found.address_complement == "SALA 2"
+    assert found.geocoding_address == "RUA DAS FLORES 100, SALA 2, CENTRO, SAO JOSE, SC, 88010000, Brasil"
     evidence = found.evidence[0]
     assert evidence.source_type == "public_registry"
     assert evidence.license_or_terms == DATASET_LICENSE
     assert "cnpj" in evidence.supports_fields
+    assert "postal_address" in evidence.supports_fields
+    assert len(evidence.supports_fields) <= 20
     assert result.matched_rows == 1
     assert any("CC-BY" in note for note in result.notes)
 
@@ -266,3 +274,19 @@ def test_csv_adapter_rejects_advanced_filters_it_cannot_apply(tmp_path):
 
     with pytest.raises(NotImplementedError, match="DuckDB"):
         adapter.discover(query(company_sizes=("03",)))
+
+
+def test_lookup_company_returns_address_and_municipality_for_geocoding(tmp_path):
+    files = build_files(
+        tmp_path,
+        establishments=[establishment()],
+        companies=[company_row()],
+    )
+
+    found = CnpjOpenDataAdapter(files).lookup_company("12345678000190")
+
+    assert found is not None
+    assert found.city == "SAO JOSE"
+    assert found.geocoding_address == "RUA DAS FLORES 100, SALA 2, CENTRO, SAO JOSE, SC, 88010000, Brasil"
+
+
