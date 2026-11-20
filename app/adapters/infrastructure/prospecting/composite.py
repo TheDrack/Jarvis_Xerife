@@ -70,17 +70,16 @@ class CompositeDiscoveryProvider:
         duplicates = 0
         candidates = []
         for company in external_result.companies:
+            normalized_name = normalize_text(company.company_name)
             if company.cnpj:
                 if company.cnpj in seen_cnpj:
                     duplicates += 1
                     continue
                 seen_cnpj.add(company.cnpj)
-            else:
-                normalized_name = normalize_text(company.company_name)
-                if normalized_name in seen_names:
-                    duplicates += 1
-                    continue
-                seen_names.add(normalized_name)
+            elif normalized_name in seen_names:
+                duplicates += 1
+                continue
+            seen_names.add(normalized_name)
             candidates.append(company)
 
         bulk_lookup = getattr(self._registry, "lookup_company_presence", None)
