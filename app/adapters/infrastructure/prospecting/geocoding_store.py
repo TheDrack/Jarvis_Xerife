@@ -61,73 +61,86 @@ class DuckDBGeocodingRepository:
 
     def get(self, address: str) -> Optional[AddressGeocoding]:
         key = address_fingerprint(address)
+        return self.get_many([address]).get(key)
+
+    def get_many(
+        self, addresses: list[str] | tuple[str, ...]
+    ) -> dict[str, AddressGeocoding]:
+        """Read many cached addresses through one DuckDB connection.
+
+        Results are keyed by the normalized address fingerprint so callers can
+        restore input order and deduplicate aliases without another query.
+        """
+        keys = tuple(dict.fromkeys(address_fingerprint(item) for item in addresses))
+        if not keys:
+            return {}
+
+        placeholders = ", ".join("?" for _ in keys)
         connection = self._connect()
         try:
-            row = connection.execute(
-                """
-                SELECT address, formatted_address, status, latitude, longitude, accuracy_m,
-                       coordinate_crs, geocoding_precision, provider, confidence, geocoded_at
+            rows = connection.execute(
+                f"""
+                SELECT address_hash, address, formatted_address, status, latitude,
+                       longitude, accuracy_m, coordinate_crs, geocoding_precision,
+                       provider, confidence, geocoded_at
                 FROM prospect_geocoding
-                WHERE address_hash = ?
+                WHERE address_hash IN ({placeholders})
                 """,
-                [key],
-            ).fetchone()
+                list(keys),
+            ).fetchall()
         finally:
             connection.close()
 
-        if row is None:
-            return None
-        (
-            stored_address,
-            formatted_address,
-            status,
-            latitude,
-            longitude,
-            accuracy_m,
-            coordinate_crs,
-            precision,
-            provider,
-            confidence,
-            geocoded_at,
-        ) = row
-        coordinate = None
-        if latitude is not None and longitude is not None:
-            coordinate = GeoCoordinate(
-                latitude=latitude,
-                longitude=longitude,
-                accuracy_m=accuracy_m,
-                crs=coordinate_crs or "EPSG:4326",
+        results = {}
+        for row in rows:
+            (
+                key,
+                stored_address,
+                formatted_address,
+                status,
+                latitude,
+                longitude,
+                accuracy_m,
+                coordinate_crs,
+                precision,
+                provider,
+                confidence,
+                geocoded_at,
+            ) = row
+            coordinate = None
+            if latitude is not None and longitude is not None:
+                coordinate = GeoCoordinate(
+                    latitude=latitude,
+                    longitude=longitude,
+                    accuracy_m=accuracy_m,
+                    crs=coordinate_crs or "EPSG:4326",
+                )
+            results[key] = AddressGeocoding(
+                address=stored_address,
+                formatted_address=formatted_address,
+                status=GeocodingStatus(status),
+                coordinate=coordinate,
+                precision=GeocodingPrecision(precision) if precision else None,
+                provider=provider,
+                confidence=confidence,
+                geocoded_at=datetime.fromisoformat(geocoded_at),
             )
-        return AddressGeocoding(
-            address=stored_address,
-            formatted_address=formatted_address,
-            status=GeocodingStatus(status),
-            coordinate=coordinate,
-            precision=GeocodingPrecision(precision) if precision else None,
-            provider=provider,
-            confidence=confidence,
-            geocoded_at=datetime.fromisoformat(geocoded_at),
-        )
+        return results
 
     def save(self, result: AddressGeocoding) -> None:
-        key = address_fingerprint(result.address)
-        coordinate = result.coordinate
-        connection = self._connect()
-        try:
-            connection.execute("BEGIN TRANSACTION")
-            connection.execute(
-                "DELETE FROM prospect_geocoding WHERE address_hash = ?",
-                [key],
-            )
-            connection.execute(
-                """
-                INSERT INTO prospect_geocoding (
-                    address_hash, address, formatted_address, status, latitude, longitude,
-                    accuracy_m, coordinate_crs, geocoding_precision, provider, confidence, geocoded_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    key,
+        self.save_many([result])
+
+    def save_many(self, results: list[AddressGeocoding] | tuple[AddressGeocoding, ...]) -> None:
+        """Persist a batch of observations in one transaction and connection."""
+        if not results:
+            return
+
+        rows = []
+        for result in results:
+            coordinate = result.coordinate
+            rows.append(
+                (
+                    address_fingerprint(result.address),
                     result.address,
                     result.formatted_address,
                     result.status.value,
@@ -139,7 +152,24 @@ class DuckDBGeocodingRepository:
                     result.provider,
                     result.confidence,
                     result.geocoded_at.isoformat(),
-                ],
+                )
+            )
+
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN TRANSACTION")
+            connection.executemany(
+                "DELETE FROM prospect_geocoding WHERE address_hash = ?",
+                [(row[0],) for row in rows],
+            )
+            connection.executemany(
+                """
+                INSERT INTO prospect_geocoding (
+                    address_hash, address, formatted_address, status, latitude, longitude,
+                    accuracy_m, coordinate_crs, geocoding_precision, provider, confidence, geocoded_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                rows,
             )
             connection.execute("COMMIT")
         except Exception:
@@ -147,6 +177,7 @@ class DuckDBGeocodingRepository:
             raise
         finally:
             connection.close()
+
 
 
 __all__ = ["DuckDBGeocodingRepository"]
