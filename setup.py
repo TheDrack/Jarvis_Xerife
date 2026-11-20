@@ -40,5 +40,8 @@ setup(
             "mcp>=1.30.0,<2",
             "uvicorn>=0.24.0,<1",
         ],
+        "geocodebr": [
+            "geocodebr>=0.2.0,<0.3.0; python_version >= '3.10'",
+        ],
     },
 )
