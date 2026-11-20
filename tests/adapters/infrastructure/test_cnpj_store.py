@@ -156,6 +156,37 @@ def test_rebuild_skips_files_already_ingested(tmp_path):
     assert second.establishment_rows == 5
 
 
+def test_discovery_uses_one_filtered_scan_for_count_and_page(tmp_path):
+    files = sample_files(tmp_path)
+    database = tmp_path / "single-pass.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+    provider = CnpjStoreProvider(database)
+    connection = provider._connect()
+    statements = []
+
+    class RecordingConnection:
+        def execute(self, statement, parameters=None):
+            statements.append(statement)
+            if parameters is None:
+                return connection.execute(statement)
+            return connection.execute(statement, parameters)
+
+        def close(self):
+            connection.close()
+
+    provider._connect = lambda: RecordingConnection()
+
+    result = provider.discover(query(limit=1))
+
+    assert len(result.companies) == 1
+    assert result.matched_rows == 3
+    assert result.truncated is True
+    assert not any(
+        "SELECT count(*) FROM establishments" in statement
+        for statement in statements
+    )
+
+
 def test_truncation_is_reported_with_the_ordering_caveat(tmp_path):
     files = sample_files(tmp_path)
     database = tmp_path / "store.duckdb"
