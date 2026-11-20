@@ -44,6 +44,10 @@ class GeocodeBrGeocoder:
             address = company.geocoding_address
             if not address:
                 raise ValueError("company must have a postal address before geocoding")
+            if not company.city or not company.state:
+                raise ValueError(
+                    "geocodebr requires both municipality and state for every company"
+                )
             addresses.append(address)
 
         try:
