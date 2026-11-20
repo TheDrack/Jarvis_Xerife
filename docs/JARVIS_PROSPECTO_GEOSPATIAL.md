@@ -2,14 +2,14 @@
 
 ## Objetivo
 
-Associar endereços de estabelecimentos a coordenadas WGS84 para consultas de proximidade e futura visualização em mapa. A geocodificação é uma observação separada do cadastro empresarial: não altera o dado original da Receita Federal e mantém sua própria precisão, confiança, provedor e data.
+Associar endereços de estabelecimentos a coordenadas geográficas com CRS explícito para consultas de proximidade e futura visualização em mapa. A geocodificação é uma observação separada do cadastro empresarial: não altera o dado original da Receita Federal e mantém sua própria precisão, confiança, provedor e data.
 
 ## O que está implementado nesta etapa
 
 - ProspectCompany passa a carregar tipo de logradouro, logradouro, número, complemento, bairro, CEP, município, UF e país.
 - geocoding_address monta o melhor endereço disponível e retorna None quando não existe dado de localização suficiente.
 - Os adaptadores CSV e DuckDB da Receita Federal extraem os componentes de endereço das colunas oficiais do estabelecimento.
-- GeoCoordinate valida latitude/longitude WGS84.
+- GeoCoordinate valida latitude/longitude e registra o CRS de cada observação (EPSG:4326 por padrão; GeocodeBR retorna SIRGAS 2000 / EPSG:4674).
 - AddressGeocoding exige coordenadas e precisão para resultados success/partial, e não permite que failed ou pending afirmem coordenadas. Guarda também o endereço formatado retornado pelo provedor.
 - Precisões distinguem rooftop, premise, street, interpolated, postal_code, locality, region e unknown.
 - GeoRadiusQuery e distance_km fornecem a base para consultas por raio usando Haversine.
@@ -41,11 +41,31 @@ Instalação opcional em Python 3.10 ou superior:
 python -m pip install -e ".[geocodebr]"
 ```
 
-O extra não é instalado por padrão. O import do provedor é tardio, portanto o runtime principal não instala o pacote nem baixa a base CNEFE ao iniciar. O adapter recebe registros `ProspectCompany` estruturados, exige município e UF (campos obrigatórios do geocodebr), envia um lote e preserva a associação por identificador de linha. Guarda precisão, desvio estimado, endereço encontrado e origem `geocodebr:cnefe`.
+O extra não é instalado por padrão. O import do provedor é tardio, portanto o runtime principal não instala o pacote nem baixa a base CNEFE ao iniciar. O adapter recebe registros `ProspectCompany` estruturados, exige município e UF (campos obrigatórios do geocodebr), envia um lote e preserva a associação por identificador de linha. Guarda precisão, desvio estimado, endereço encontrado, origem `geocodebr:cnefe` e CRS `EPSG:4674`. O resultado Python é um `pyarrow.Table`; a integração consome `to_pylist()` e não depende de `pandas`.
 
 Mapeamento de precisão: `numero` → `premise`; `numero_aproximado` → `interpolated`; `logradouro` → `street`; `cep` → `postal_code`; `localidade` → `locality`; `municipio` → `region`. Só `numero` é classificado como sucesso; os demais níveis são parciais. A estimativa `desvio_metros` é mantida como `accuracy_m`, sem ser tratada como score probabilístico.
 
-**Limite desta entrega:** o adapter e o serviço de lote/cache estão implementados, mas ainda não estão ligados ao comando de campanha, ao MCP de busca nem à interface de mapa. O processamento de campanha e a seleção de quais empresas geocodificar permanecem uma etapa de integração posterior. Não afirmar que coordenadas reais já foram geradas no Prospecto.
+## Execução integrada à campanha
+
+A campanha CLI agora aceita geocodificação opcional:
+
+```bash
+python scripts/prospecto_run.py \
+  --campaign config/prospecting/campaigns/jarvis-prospecto-grande-florianopolis.json \
+  --store /caminho/cnpj.duckdb \
+  --out artifacts/prospecto \
+  --geocode
+```
+
+- Sem `--geocode`, o comportamento permanece offline e não importa/inicializa o provedor.
+- Com `--geocode`, apenas empresas que serão entregues no CSV são enviadas ao serviço; empresas fora do ICP ficam de fora, salvo quando `--include-unqualified` é usado.
+- Registros sem endereço, município ou UF não são enviados ao provedor e entram no contador de ignorados.
+- O cache DuckDB fica por padrão em `~/.local/share/jarvis/prospecto/geocoding.duckdb`. Use `--geocoding-db` para alterar o caminho.
+- A primeira execução pode baixar tabelas CNEFE necessárias para o tipo de endereço consultado. O cache de dados do pacote é separado do cache de resultados do Jarvis.
+- O CSV contém latitude, longitude, precisão, desvio estimado, CRS, endereço encontrado, status e provedor. O manifesto registra totais de tentativas, resultados precisos/parciais/falhos e empresas ignoradas.
+- Coordenadas de precisão `postal_code`, `locality` ou `region` continuam identificadas como parciais; não devem ser exibidas como pontos exatos de estabelecimento.
+
+A integração cobre o CLI e o arquivo CSV/manifesto. O MCP de busca e a interface de mapa ainda não estão conectados. A geração real de coordenadas depende da instalação do extra e da disponibilidade dos dados CNEFE locais.
 
 O Nominatim público do OpenStreetMap não deve ser usado como serviço de geocodificação em massa do Prospecto: sua política limita a no máximo uma requisição por segundo e restringe tarefas em lote/recorrentes. Consulte a política oficial: https://operations.osmfoundation.org/policies/nominatim/.
 
@@ -60,4 +80,4 @@ O Nominatim público do OpenStreetMap não deve ser usado como serviço de geoco
 
 ## Estado
 
-Esta etapa implementa contratos, cache persistente, distância geográfica e extração de endereço. Ela ainda não produz coordenadas reais sem um Geocoder conectado, nem oferece endpoint ou interface de mapa.
+Esta etapa implementa contratos, cache persistente, integração opcional ao CLI de campanha e exportação das coordenadas no CSV. Ainda não oferece endpoint MCP nem interface de mapa.
