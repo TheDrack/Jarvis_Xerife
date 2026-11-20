@@ -1,7 +1,7 @@
 # Estado do projeto — leitura do código versionado
 
-**Data da revisão documental:** 2026-11-19
-**Base de código auditada:** main @ 2bf151052f1a25f088030bfafec5d31d58f18e11  
+**Data da revisão documental:** 2026-11-20
+**Base de código auditada:** main @ 32cf7e94ed54d577c85cc503b1480ef1c765399d  
 **Escopo:** árvore de código e documentação versionada. Não foi realizada nesta página uma inspeção autenticada do deploy, banco, dispositivos ou serviços externos.
 
 ## Como interpretar este documento
@@ -33,7 +33,7 @@ A presença de arquivo, migration, manifest, skill ou variável de ambiente não
 | Android | Cliente nativo e integração com serviços Jarvis estão versionados. | VPN, acessibilidade, shell, captura e inspeção dependem de permissões, consentimento, pareamento e testes no dispositivo. |
 | Desktop | Cliente Windows/WebView2, API local e scripts de build/start estão presentes. | Listener, firewall, pairing e sessão interativa dependem do host real. |
 | MCP e acesso remoto | Servidores/adaptadores e runbooks de transporte estão presentes. | STDIO, HTTP local, Secure MCP Tunnel e gateways privados são rotas diferentes; não inferir conectividade atual. |
-| Prospecto | Discovery por CNPJ, outreach multicanal e demand matching B2B/B2C/C2B presentes no código; adapters ACATE para diretório CSV e indicadores agregados existem e têm testes isolados. | Runtime Android, store no host, relays HTTPS, envio externo, providers de vagas/catálogos e isolamento multi-tenant não foram verificados; adapters ACATE não têm consumer de produção/registro no Tool Registry ou Nexus identificado. `AcateDirectoryAdapter` não aplica CNAE nem situação ativa do `DiscoveryQuery`; não conectá-lo a campanhas genéricas sem contrato explícito. |
+| Prospecto | Discovery por CNPJ, outreach multicanal e demand matching B2B/B2C/C2B estão no código; a base geoespacial também inclui extração de endereço dos datasets CNPJ, contratos de coordenadas/precisão, distância Haversine e cache DuckDB. | O `GeocodingService` e `DuckDBGeocodingRepository` têm apenas callers de teste no grafo atual; não há consumer de campanha/MCP/mapa identificado. A geração de coordenadas reais não foi verificada. O adapter opcional `geocodebr` está somente na PR #867, ainda não integrada. Runtime Android, relays externos, providers de vagas/catálogos e isolamento multi-tenant seguem não verificados; ACATE continua sem consumer operacional e com filtros de CNAE/situação incompletos. |
 | Auto-evolução e reparo | Serviços, gatekeeper, sandbox, scripts e workflows estão presentes; `homeostase.yml` usa código confiável de `main` e `scripts/jarvis_healer.py` para falhas elegíveis. | `homeostase.yml` não dispara para PR Validation/Task Queue; o endpoint protegido `/v1/github/ci-heal/{run_id}` baixa logs e registra pensamento, mas não produz patch/PR. Não declarar autocorreção automática de PRs ponta a ponta. |
 | Deploy e persistência | Manifestos, migrations e adapters estão presentes. | Só inspeção no ambiente confirma deploy, schema aplicado, RLS/grants, feature flags e saúde. |
 
@@ -70,6 +70,25 @@ Esta página substitui snapshots antigos como descrição geral de estado. Resul
 - `main` @ `2bf151052f1a25f088030bfafec5d31d58f18e11`: `JARVIS Hourly Curiosity Audit` run [44619680908](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44619680908) — success; pytest **3.626 passed, 39 skipped, 8 warnings**, coverage **69%**.
 - Mesma SHA: `Jarvis Task Queue Tests` run [44552097344](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44552097344) — success; pytest **3.649 passed, 21 skipped, 181 warnings**, coverage **70%**.
 - CI verde não altera o estado dos critérios cognitivos. O ledger abaixo mantém os três critérios C0 como `pending`; C1 continua bloqueado.
+
+
+## Revalidação técnica — 2026-11-20
+
+### Base, CI e PRs
+- `main` está em `32cf7e94ed54d577c85cc503b1480ef1c765399d`. O último commit funcional da linha principal é `fc30d6ab215ea428e77e794bbd9f9c99fbdd53e7`; os commits posteriores `290010f` e `32cf7e9` atualizam documentação gerada e baseline.
+- `Jarvis Task Queue Tests`, run [44819128465](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44819128465), executou no commit funcional `fc30d6a`: **3.672 passed, 21 skipped, 181 warnings**; job concluído com sucesso em Windows/Python 3.12.10. `Auto-Documentation JARVIS`, run [44819127851](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44819127851), também concluiu com sucesso.
+- A PR [#867](https://github.com/TheDrack/Jarvis_Xerife/pull/867) permanece aberta, head `f52e68d7352809e372f235b18710254ffafea8d5`, base `32cf7e9`, **12 commits ahead / 0 behind**. No head exato: PR Validation run [44822315142](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44822315142) passou com **3.661 passed, 38 skipped, 8 warnings** (Linux/Python 3.11.18); Task Queue run [44822314948](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44822314948) passou com **3.683 passed, 21 skipped, 181 warnings** e teste específico da fila **15/15** (Windows/Python 3.12.10). Supabase Preview foi `skipped`, sem branch de preview. Não há review formal; a PR não foi mesclada.
+- Esses resultados comprovam CI dos respectivos SHAs, não download/execução real do CNEFE, geração de coordenadas em lote, runtime Android ou mapa. O código da PR #867 não faz parte de `main`.
+
+### C0 e ordem do roadmap
+- Graphify está indexado exatamente em `main @ 32cf7e94ed54d577c85cc503b1480ef1c765399d`. `CognitiveRouter.execute()` tem como único caller estrito o teste `test_execute_initializes_missing_metadata()`. `run_pipeline()` tem callers estritos no CLI do próprio módulo e em testes; não foi localizado consumer de aplicação. `AssistantService.process_command()` não alcança o router nem o runner no grafo de chamadas.
+- `config/pipelines/jarvis_chat.yml` aparece em configuração/documentação/teste, mas não foi comprovado um caminho de aplicação nem um teste integrado input → CognitiveRouter → LlmEngine. O runner CLI não recebe `inputs`; sem `inputs.metadata.user_input`, o router observa texto vazio. O roteador atual é uma heurística de marcha com fallback, não um Reasoning Engine.
+- `data/roadmap_missions.json` continua com `missions: []`. O run [44753845068](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44753845068) concluiu o gate, mas `EVOLUTION_ENABLED` estava vazio e os jobs de geração/validação e publicação foram `skipped`. Não houve candidato nem publicação.
+- O ledger permanece com `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` em `pending`; **C1 — World Model — continua bloqueado**. Esta atualização não altera esses estados.
+
+### Governança e self-healing
+- A API da branch reporta `main.protected=false`; a consulta de rulesets retorna `[]`. A leitura do endpoint de branch protection retorna 403 para a integração; nenhuma configuração foi alterada. Issue [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682) continua aberta.
+- Self Healing V3 run [44753874490](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44753874490) foi `skipped`; não houve reparo nessa execução. `homeostase.yml` continua limitado a workflows confiáveis originados em `main` e não observa PR Validation/Task Queue. O fluxo trusted-main permanece preservado; autocorreção automática de PRs continua não comprovada.
 
 ## Ledger verificável dos critérios cognitivos
 
