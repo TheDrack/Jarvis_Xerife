@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-const state={query:null,cursor:null,items:[],busy:false};
+const state={query:null,cursor:null,items:[],busy:false,view:'list',mapRenderId:0};
 const token=()=>sessionStorage.getItem('jarvis_local_access')||'';
 async function request(path){
  const headers={'Accept':'application/json'};
@@ -21,7 +21,13 @@ function setStatus(message,error=false){
 }
 function render(data){
  const results=$('prospectingResults');
+ const mapPanel=$('prospectingMapPanel');
+ const mapToggle=$('prospectingMapToggle');
  const items=state.items;
+ results.hidden=state.view==='map';
+ mapPanel.hidden=state.view!=='map';
+ mapToggle.disabled=!state.query||state.busy;
+ mapToggle.textContent=state.view==='map'?'LISTA':'MAPA';
  if(!items.length){
   results.innerHTML='<div class="prospecting-empty">Nenhuma empresa encontrada para este recorte.</div>';
  }else{
@@ -36,12 +42,13 @@ function render(data){
  }
  $('prospectingNext').hidden=!(data.truncated&&data.next_cursor);
  $('prospectingNext').disabled=false;
+ if(state.view==='map')void renderMap(data);
  const count=items.length;
  $('prospectingSummary').textContent=count+' empresas · '+(data.identity_granularity||'identidade não informada');
  $('prospectingIdentityNote').textContent=data.identity_note||'A granularidade da identidade não foi informada pela fonte.';
  $('prospectingSourceNote').textContent='FONTE '+(data.source_id||'--')+' · COLETA '+(data.collected_at?new Date(data.collected_at).toLocaleString('pt-BR'):'--')+' · '+(data.scanned_rows??0)+' LINHAS EXAMINADAS';
 }
-function buildQuery(query,cursor){
+function buildQuery(query,cursor,includeGeocoding=false){
  const params=new URLSearchParams();
  params.set('uf',query.uf);
  query.cnaePrefixes.forEach(value=>params.append('cnae_prefixes',value));
@@ -49,8 +56,60 @@ function buildQuery(query,cursor){
  params.set('only_active',String(query.onlyActive));
  params.set('include_secondary_cnae',String(query.includeSecondaryCnae));
  params.set('limit',String(query.limit));
+ if(includeGeocoding)params.set('include_geocoding','true');
  if(cursor)params.set('after_cnpj_basico',cursor);
  return '/api/prospecting/search?'+params.toString();
+}
+function renderMapSelection(cluster){
+ const node=$('prospectingMapSelection');
+ if(!node)return;
+ if(cluster.count>1){
+  const names=cluster.members.slice(0,5).map(item=>item.name);
+  node.textContent=cluster.count+' empresas agrupadas\\n'+names.join(' · ')+(cluster.count>5?' · e outras '+(cluster.count-5):'');
+  return;
+ }
+ const marker=cluster.members[0];
+ const coordinate=marker.coordinate;
+ const accuracy=coordinate.accuracy_m==null?'não informada':coordinate.accuracy_m+' m';
+ node.textContent=[
+  marker.name,
+  marker.cnpj?'CNPJ '+marker.cnpj:'',
+  [marker.city,marker.state].filter(Boolean).join(' / '),
+  'PRECISÃO '+marker.precision+' · '+marker.status,
+  'DESVIO ESTIMADO '+accuracy+' · '+coordinate.crs,
+  marker.provider,
+  marker.formattedAddress,
+ ].filter(Boolean).join('\\n');
+}
+async function renderMap(data){
+ const sequence=++state.mapRenderId;
+ const summary=data.geocoding_summary||{};
+ const mapped=state.items.filter(company=>{
+  const item=company.geocoding;
+  return item&&(item.status==='success'||item.status==='partial')&&item.coordinate;
+ });
+ const success=mapped.filter(company=>company.geocoding.status==='success').length;
+ const partial=mapped.length-success;
+ $('prospectingMapSummary').textContent=mapped.length+' / '+state.items.length+' COM COORDENADAS · '+success+' PRECISAS · '+partial+' PARCIAIS';
+ $('prospectingMapNote').textContent=!summary.available
+  ?'CACHE GEOGRÁFICO NÃO ENCONTRADO. Configure JARVIS_PROSPECTO_GEOCODING_DB ou execute uma campanha com --geocode no caminho padrão.'
+  :mapped.length
+   ?'PONTOS DO CACHE LOCAL · RESULTADOS PARCIAIS SÃO APROXIMADOS · CRS PRESERVADO POR REGISTRO · SEM GEOCODIFICAÇÃO SOB DEMANDA'
+   :'Nenhuma coordenada em cache para esta página. Execute uma campanha com --geocode para preencher o cache; o mapa não chama provedores.';
+ try{
+  const renderer=window.JarvisProspectingMap;
+  if(!renderer||typeof renderer.render!=='function')throw new Error('Módulo de mapa do Prospecto indisponível.');
+  await renderer.render($('prospectingMapCanvas'),state.items,renderMapSelection);
+  if(sequence!==state.mapRenderId)return;
+ }catch(error){
+  if(sequence!==state.mapRenderId)return;
+  const canvas=$('prospectingMapCanvas');
+  canvas.replaceChildren();
+  const message=document.createElement('div');
+  message.className='prospecting-map-empty';
+  message.textContent=error.message;
+  canvas.appendChild(message);
+ }
 }
 async function search(next=false){
  if(state.busy)return;
@@ -70,7 +129,7 @@ async function search(next=false){
  $('prospectingNext').disabled=true;
  setStatus(next?'Carregando próxima página…':'Consultando a base oficial…');
  try{
-  const data=await request(buildQuery(state.query,next?state.cursor:null));
+  const data=await request(buildQuery(state.query,next?state.cursor:null,state.view==='map'));
   state.items=next?state.items.concat(data.companies||[]):(data.companies||[]);
   state.cursor=data.next_cursor||null;
   render(data);
@@ -82,6 +141,7 @@ async function search(next=false){
   state.busy=false;
   $('prospectingSearch').disabled=false;
   $('prospectingNext').disabled=false;
+  $('prospectingMapToggle').disabled=!state.query;
  }
 }
 function wire(){
@@ -96,6 +156,15 @@ function wire(){
  windowNode.addEventListener('click',event=>{if(event.target===windowNode)windowNode.classList.remove('show');});
  $('prospectingForm').addEventListener('submit',event=>{event.preventDefault();search(false);});
  $('prospectingNext').addEventListener('click',()=>search(true));
+ $('prospectingMapToggle').addEventListener('click',()=>{
+  if(state.busy||!state.query)return;
+  state.view=state.view==='map'?'list':'map';
+  state.cursor=null;
+  state.items=[];
+  state.mapRenderId+=1;
+  $('prospectingMapSelection').textContent='Selecione um ponto para consultar a empresa e a precisão da coordenada.';
+  search(false);
+ });
  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&windowNode.classList.contains('show'))windowNode.classList.remove('show');});
  $('prospectingResults').addEventListener('click',async event=>{
   const button=event.target.closest('[data-copy-cnpj]');
