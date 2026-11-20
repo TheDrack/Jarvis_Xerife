@@ -31,11 +31,23 @@ A chave identifica o endereço pesquisado, não a empresa. Estabelecimentos dife
 
 Não converter CEP ou município diretamente em coordenada e rotular como endereço exato. Confiança é opcional: se o provedor não oferecer um score calibrado, o campo permanece nulo em vez de inventarmos um valor. A interface futura deverá distinguir visualmente precisão e confiança e permitir filtrar/excluir resultados aproximados.
 
-## Provedor externo
+## Provedor local selecionado: Ipea geocodebr / CNEFE
 
-Nenhum provedor externo está selecionado ou conectado nesta PR. A porta Geocoder permite integrar provedores comerciais ou instâncias próprias sem acoplar o domínio.
+O adapter `GeocodeBrGeocoder` integra a versão Python opcional do projeto Ipea `geocodebr`, baseada no CNEFE publicado pelo IBGE. O pacote usa DuckDB no processamento, aceita tabelas Polars e retorna `pyarrow.Table`; não faz uma chamada HTTP por endereço. A primeira execução baixa os arquivos de referência necessários para o cache local. Documentação: https://pypi.org/project/geocodebr/.
 
-O Nominatim público do OpenStreetMap não deve ser usado como serviço de geocodificação em massa do Prospecto: sua política limita a no máximo uma requisição por segundo, restringe tarefas em lote/recorrentes e orienta serviços comerciais cuja função principal é geocodificação a operar sua própria instância. Consulte a política oficial: https://operations.osmfoundation.org/policies/nominatim/. A escolha do provedor precisa considerar volume, licença, cache, SLA, custo e possibilidade de troca.
+Instalação opcional em Python 3.10 ou superior:
+
+```bash
+python -m pip install -e ".[geocodebr]"
+```
+
+O extra não é instalado por padrão. O import do provedor é tardio, portanto o runtime principal não instala o pacote nem baixa a base CNEFE ao iniciar. O adapter recebe registros `ProspectCompany` estruturados, exige município e UF (campos obrigatórios do geocodebr), envia um lote e preserva a associação por identificador de linha. Guarda precisão, desvio estimado, endereço encontrado e origem `geocodebr:cnefe`.
+
+Mapeamento de precisão: `numero` → `premise`; `numero_aproximado` → `interpolated`; `logradouro` → `street`; `cep` → `postal_code`; `localidade` → `locality`; `municipio` → `region`. Só `numero` é classificado como sucesso; os demais níveis são parciais. A estimativa `desvio_metros` é mantida como `accuracy_m`, sem ser tratada como score probabilístico.
+
+**Limite desta entrega:** o adapter e o serviço de lote/cache estão implementados, mas ainda não estão ligados ao comando de campanha, ao MCP de busca nem à interface de mapa. O processamento de campanha e a seleção de quais empresas geocodificar permanecem uma etapa de integração posterior. Não afirmar que coordenadas reais já foram geradas no Prospecto.
+
+O Nominatim público do OpenStreetMap não deve ser usado como serviço de geocodificação em massa do Prospecto: sua política limita a no máximo uma requisição por segundo e restringe tarefas em lote/recorrentes. Consulte a política oficial: https://operations.osmfoundation.org/policies/nominatim/.
 
 ## Próximas etapas
 

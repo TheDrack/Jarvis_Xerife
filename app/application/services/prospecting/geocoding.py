@@ -1,7 +1,14 @@
 """Application service coordinating geocoding providers and persistent cache."""
 from __future__ import annotations
 
-from app.application.ports.geocoding import Geocoder, GeocodingRepository
+from typing import Sequence, Union
+
+from app.application.ports.geocoding import (
+    CompanyGeocoder,
+    Geocoder,
+    GeocodingRepository,
+)
+from app.domain.prospecting.contracts import ProspectCompany
 from app.domain.prospecting.geography import (
     AddressGeocoding,
     GeocodingStatus,
@@ -10,14 +17,18 @@ from app.domain.prospecting.geography import (
 
 
 class GeocodingService:
-    """Geocode an address once and reuse successful or approximate observations.
+    """Geocode addresses and reuse successful or approximate observations.
 
     Failed lookups are deliberately not cached: temporary provider/network
     failures must not permanently poison an address. A caller can force a fresh
     lookup by passing force=True.
     """
 
-    def __init__(self, geocoder: Geocoder, repository: GeocodingRepository) -> None:
+    def __init__(
+        self,
+        geocoder: Union[Geocoder, CompanyGeocoder],
+        repository: GeocodingRepository,
+    ) -> None:
         self._geocoder = geocoder
         self._repository = repository
 
@@ -34,12 +45,85 @@ class GeocodingService:
         }:
             return cached
 
-        result = self._geocoder.geocode(address.strip())
+        single_method = getattr(self._geocoder, "geocode", None)
+        if not callable(single_method):
+            raise TypeError("configured geocoder only supports structured company batches")
+        result = single_method(address.strip())
+        self._validate_and_cache(address, result)
+        return result
+
+    def geocode_company(
+        self, company: ProspectCompany, *, force: bool = False
+    ) -> AddressGeocoding:
+        return self.geocode_companies([company], force=force)[0]
+
+    def geocode_companies(
+        self,
+        companies: Sequence[ProspectCompany],
+        *,
+        force: bool = False,
+    ) -> list[AddressGeocoding]:
+        """Geocode structured company addresses in one provider batch when supported."""
+        if not companies:
+            return []
+
+        requested = []
+        unique_companies = {}
+        results_by_fingerprint = {}
+        for company in companies:
+            address = company.geocoding_address
+            if not address:
+                raise ValueError(
+                    f"company {company.company_name!r} has no postal address to geocode"
+                )
+            fingerprint = address_fingerprint(address)
+            requested.append(fingerprint)
+            if fingerprint in unique_companies:
+                continue
+            unique_companies[fingerprint] = (company, address)
+            if not force:
+                cached = self._repository.get(address)
+                if cached is not None and cached.status in {
+                    GeocodingStatus.SUCCESS,
+                    GeocodingStatus.PARTIAL,
+                }:
+                    results_by_fingerprint[fingerprint] = cached
+
+        pending = [
+            (fingerprint, company, address)
+            for fingerprint, (company, address) in unique_companies.items()
+            if fingerprint not in results_by_fingerprint
+        ]
+        if pending:
+            batch_method = getattr(self._geocoder, "geocode_companies", None)
+            if callable(batch_method):
+                provider_results = batch_method(
+                    [company for _, company, _ in pending]
+                )
+            else:
+                single_method = getattr(self._geocoder, "geocode", None)
+                if not callable(single_method):
+                    raise TypeError("configured geocoder has no supported geocoding method")
+                provider_results = [
+                    single_method(address) for _, _, address in pending
+                ]
+            if len(provider_results) != len(pending):
+                raise ValueError("geocoder returned an unexpected number of batch results")
+
+            for index, (fingerprint, _, address) in enumerate(pending):
+                result = provider_results[index]
+                self._validate_and_cache(address, result)
+                results_by_fingerprint[fingerprint] = result
+
+        return [results_by_fingerprint[fingerprint] for fingerprint in requested]
+
+    def _validate_and_cache(
+        self, address: str, result: AddressGeocoding
+    ) -> None:
         if address_fingerprint(result.address) != address_fingerprint(address):
             raise ValueError("geocoder returned a result for a different address")
         if result.status in {GeocodingStatus.SUCCESS, GeocodingStatus.PARTIAL}:
             self._repository.save(result)
-        return result
 
 
 __all__ = ["GeocodingService"]
