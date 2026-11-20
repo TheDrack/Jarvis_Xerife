@@ -212,7 +212,9 @@
         class: 'prospecting-map-marker' + (cluster.approximate ? ' is-approximate' : ''),
         role: 'button',
         tabindex: 0,
-        'aria-label': cluster.count + ' empresa(s) nesta localização',
+        'aria-label': cluster.count === 1
+          ? cluster.members[0].name + ' · ' + cluster.members[0].precision
+          : cluster.count + ' empresas agrupadas nesta localização',
         transform: 'translate(' + cluster.x.toFixed(1) + ' ' + cluster.y.toFixed(1) + ')',
       });
       group.appendChild(svgElement('circle', {
