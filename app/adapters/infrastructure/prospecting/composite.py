@@ -115,7 +115,7 @@ class CompositeDiscoveryProvider:
         notes = list(registry_result.notes) + list(external_result.notes)
         notes.append(
             f"external leads: {len(external_result.companies)} in scope, {added} added, "
-            f"{duplicates} already present in the registry result"
+            f"{duplicates} duplicates skipped (registry or external source)"
         )
         return DiscoveryResult(
             source_id=self.source_id,
