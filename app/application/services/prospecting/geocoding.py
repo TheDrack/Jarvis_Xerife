@@ -45,7 +45,10 @@ class GeocodingService:
         }:
             return cached
 
-        result = self._geocoder.geocode(address.strip())
+        single_method = getattr(self._geocoder, "geocode", None)
+        if not callable(single_method):
+            raise TypeError("configured geocoder only supports structured company batches")
+        result = single_method(address.strip())
         self._validate_and_cache(address, result)
         return result
 
@@ -98,9 +101,11 @@ class GeocodingService:
                     [company for _, company, _ in pending]
                 )
             else:
+                single_method = getattr(self._geocoder, "geocode", None)
+                if not callable(single_method):
+                    raise TypeError("configured geocoder has no supported geocoding method")
                 provider_results = [
-                    self._geocoder.geocode(address)
-                    for _, _, address in pending
+                    single_method(address) for _, _, address in pending
                 ]
             if len(provider_results) != len(pending):
                 raise ValueError("geocoder returned an unexpected number of batch results")
