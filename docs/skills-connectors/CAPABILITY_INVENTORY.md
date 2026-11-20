@@ -1,7 +1,7 @@
 # Inventário de capacidades — Jarvis Xerife
 
-**Revisão de código:** 2026-11-19  
-**Base de código auditada:** main @ 2bf151052f1a25f088030bfafec5d31d58f18e11  
+**Revisão de código:** 2026-11-20  
+**Base de código auditada:** main @ fdc51057c84cef8a0949ca59ccba6bcafe71da8a  
 **Escopo:** inventário do código e contratos versionados. Não é um health check de deploy nem de conectores do host.
 
 ## Semântica dos estados
@@ -32,7 +32,7 @@ Esses estados são independentes. Manifest, skill, migration ou adapter não pro
 | Desktop | desktop/, app/adapters/edge/ | Requer host Windows, sessão interativa e configuração local. |
 | Android | mobile/android/, app/adapters/edge/ | Requer pareamento, permissões Android, consentimentos e validação no dispositivo. |
 | MCP | app/adapters/edge/ e app/adapters/infrastructure/ | STDIO, HTTP e túneis são transportes diferentes; conexão não concede autorização. |
-| Prospecto | `app/domain/prospecting/`, `app/application/prospecting/`, `app/adapters/infrastructure/prospecting/`, `app/adapters/edge/prospecting_mcp_tools.py`, `app/adapters/edge/prospecting_demand_mcp_tools.py` | Discovery B2B por CNPJ, outreach multicanal e demandas B2B/B2C/C2B estão no código e cobertos por CI; relays externos, provedores de vagas/catálogos, runtime Android e isolamento multi-tenant hospedado não estão comprovados. |
+| Prospecto | `app/domain/prospecting/`, `app/application/prospecting/`, `app/adapters/infrastructure/prospecting/` e MCPs de Prospecto. Discovery B2B por CNPJ, outreach, demandas B2B/B2C/C2B, contratos geoespaciais e integração opcional GeocodeBR/CNEFE ao runner de campanhas e CLI. | O adapter e a integração estão em main, com geocodificação opt-in e cache DuckDB; não há comprovação de execução CNEFE real, benchmark, endpoint para leitura de campanhas geocodificadas ou mapa de empresas. O mapa atual é de dispositivos e permanece isolado. Relays, providers de vagas/catálogos, runtime Android e multi-tenant hospedado permanecem não comprovados. |
 | Auto-evolução | app/application/services/ e scripts de evolução | Gatekeeper, sandbox, revisão e publicação são etapas distintas; não assumir autonomia irrestrita. |
 | Segurança | app/application/security/, app/runtime/toolbox/ e testes de segurança | A política efetiva depende do composition root e da identidade runtime. |
 
@@ -124,3 +124,15 @@ Ao adicionar/remover manifests, skills, adapters, consumers ou grants:
 3. atualize os estados somente com evidência;
 4. registre o commit e a data;
 5. nunca copie snapshots de produção sem revalidá-los.
+
+### Geoespacial — código presente, integração não verificada (2026-11-20)
+
+- **Extração:** os adapters CSV e DuckDB do CNPJ agora leem tipo/logradouro/número/complemento/bairro/CEP/município/UF.
+- **Domínio:** `ProspectCompany.geocoding_address`, `GeoCoordinate`, `AddressGeocoding`, precisão/proveniência e consultas por raio/Haversine estão versionados.
+- **Persistência:** `DuckDBGeocodingRepository` mantém cache separado, indexado por SHA-256 do endereço normalizado; testes cobrem round-trip, precisão desconhecida e atualização do mesmo endereço.
+- **Serviço:** `GeocodingService` implementa cache, force refresh e validação de identidade do endereço; `run_campaign` o consome quando recebe serviço opcional.
+- **Provider:** PR #867 adicionou `geocodebr` como extra opcional e adapter batch; está em main. Não há evidência de download CNEFE ou benchmark real.
+- **Datum:** `GeoCoordinate` está documentado como WGS84, enquanto a documentação do provider identifica o GeoDataFrame espacial como SIRGAS 2000 / EPSG:4674. Registrar CRS ou transformação explicitamente antes de usar tolerâncias métricas como garantia.
+- **Campanha:** PR #869 integrou geocodificação opcional ao CLI `--geocode` e exportação CSV/manifesto. Sem a flag, a execução padrão permanece offline.
+- **Mapa:** interface de empresas e endpoint de leitura geográfica ainda não implementados; não reutilizar a watchlist de dispositivos.
+- **Estado:** contratos, provider opcional e integração ao runner estão em main; execução real CNEFE e visualização empresarial não verificadas.
