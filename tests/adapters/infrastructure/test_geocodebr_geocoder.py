@@ -164,3 +164,17 @@ def test_geocodebr_rejects_non_brazilian_company_before_loading_provider(monkeyp
 
 def test_geocodebr_empty_batch_does_not_import_optional_dependencies():
     assert GeocodeBrGeocoder().geocode_companies([]) == []
+
+
+def test_geocodebr_rejects_missing_required_municipality_before_loading_provider():
+    import pytest
+
+    with pytest.raises(ValueError, match="municipality and state"):
+        GeocodeBrGeocoder().geocode_companies([company(city=None)])
+
+
+def test_geocodebr_rejects_missing_required_state_before_loading_provider():
+    import pytest
+
+    with pytest.raises(ValueError, match="municipality and state"):
+        GeocodeBrGeocoder().geocode_companies([company(state=None)])
