@@ -203,6 +203,30 @@ def test_truncation_is_reported_with_the_ordering_caveat(tmp_path):
     assert any("CNPJ base order" in note for note in result.notes)
 
 
+def test_discovery_count_and_page_ignore_duplicate_lookup_keys(tmp_path):
+    files = sample_files(tmp_path)
+    write_csv(
+        files.municipalities,
+        [["8000", "SAO JOSE"], ["8000", "SAO JOSE"]],
+    )
+    write_csv(
+        files.cnaes,
+        [["4120400", "CONSTRUCAO DE EDIFICIOS"], ["4120400", "CONSTRUCAO DE EDIFICIOS"]],
+    )
+    database = tmp_path / "duplicate-lookups.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+
+    result = CnpjStoreProvider(database).discover(query(limit=2))
+
+    assert [company.company_name for company in result.companies] == [
+        "Alfa Serralheria",
+        "Beta Obras",
+    ]
+    assert result.matched_rows == 3
+    assert result.truncated is True
+    assert result.next_cursor == "87654321"
+
+
 def test_unknown_municipality_returns_an_explanation(tmp_path):
     files = sample_files(tmp_path)
     database = tmp_path / "store.duckdb"
