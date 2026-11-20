@@ -135,3 +135,37 @@ def test_service_rejects_company_without_geocodable_address():
     import pytest
     with pytest.raises(ValueError, match="no postal address"):
         service.geocode_company(company)
+
+
+def test_service_uses_bulk_cache_reads_and_writes_for_batch_geocoding():
+    class BulkMemoryRepository(MemoryGeocodingRepository):
+        def __init__(self):
+            super().__init__()
+            self.bulk_reads = 0
+            self.bulk_writes = 0
+
+        def get_many(self, addresses):
+            self.bulk_reads += 1
+            return {
+                address_fingerprint(address): self.items[address_fingerprint(address)]
+                for address in addresses
+                if address_fingerprint(address) in self.items
+            }
+
+        def save_many(self, results):
+            self.bulk_writes += 1
+            for item in results:
+                self.save(item)
+
+    first = make_company("Empresa A", "10")
+    second = make_company("Empresa B", "20")
+    repository = BulkMemoryRepository()
+    provider = FakeCompanyBatchGeocoder()
+    service = GeocodingService(provider, repository)
+
+    service.geocode_companies([first, second])
+    service.geocode_companies([first, second])
+
+    assert repository.bulk_reads == 2
+    assert repository.bulk_writes == 1
+    assert len(provider.calls) == 1
