@@ -64,8 +64,21 @@ function renderMapSelection(cluster){
  const node=$('prospectingMapSelection');
  if(!node)return;
  if(cluster.count>1){
-  const names=cluster.members.slice(0,5).map(item=>item.name);
-  node.textContent=cluster.count+' empresas agrupadas\\n'+names.join(' · ')+(cluster.count>5?' · e outras '+(cluster.count-5):'');
+  node.replaceChildren();
+  const heading=document.createElement('p');
+  heading.textContent=cluster.count+' empresas agrupadas nesta localização. Selecione uma para consultar os dados:';
+  node.appendChild(heading);
+  const members=document.createElement('div');
+  members.className='prospecting-map-members';
+  cluster.members.forEach(marker=>{
+   const button=document.createElement('button');
+   button.type='button';
+   button.className='prospecting-map-member';
+   button.textContent=marker.name+(marker.cnpj?' · '+marker.cnpj:'');
+   button.addEventListener('click',()=>renderMapSelection({count:1,members:[marker]}));
+   members.appendChild(button);
+  });
+  node.appendChild(members);
   return;
  }
  const marker=cluster.members[0];
