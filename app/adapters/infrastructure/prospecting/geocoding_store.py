@@ -75,19 +75,24 @@ class DuckDBGeocodingRepository:
         if not keys:
             return {}
 
-        placeholders = ", ".join("?" for _ in keys)
         connection = self._connect()
         try:
-            rows = connection.execute(
-                f"""
-                SELECT address_hash, address, formatted_address, status, latitude,
-                       longitude, accuracy_m, coordinate_crs, geocoding_precision,
-                       provider, confidence, geocoded_at
-                FROM prospect_geocoding
-                WHERE address_hash IN ({placeholders})
-                """,
-                list(keys),
-            ).fetchall()
+            rows = []
+            for offset in range(0, len(keys), 1000):
+                chunk = keys[offset : offset + 1000]
+                placeholders = ", ".join("?" for _ in chunk)
+                rows.extend(
+                    connection.execute(
+                        f"""
+                        SELECT address_hash, address, formatted_address, status, latitude,
+                               longitude, accuracy_m, coordinate_crs, geocoding_precision,
+                               provider, confidence, geocoded_at
+                        FROM prospect_geocoding
+                        WHERE address_hash IN ({placeholders})
+                        """,
+                        list(chunk),
+                    ).fetchall()
+                )
         finally:
             connection.close()
 
@@ -135,25 +140,25 @@ class DuckDBGeocodingRepository:
         if not results:
             return
 
-        rows = []
+        rows_by_key = {}
         for result in results:
             coordinate = result.coordinate
-            rows.append(
-                (
-                    address_fingerprint(result.address),
-                    result.address,
-                    result.formatted_address,
-                    result.status.value,
-                    coordinate.latitude if coordinate else None,
-                    coordinate.longitude if coordinate else None,
-                    coordinate.accuracy_m if coordinate else None,
-                    coordinate.crs if coordinate else "EPSG:4326",
-                    result.precision.value if result.precision else None,
-                    result.provider,
-                    result.confidence,
-                    result.geocoded_at.isoformat(),
-                )
+            key = address_fingerprint(result.address)
+            rows_by_key[key] = (
+                key,
+                result.address,
+                result.formatted_address,
+                result.status.value,
+                coordinate.latitude if coordinate else None,
+                coordinate.longitude if coordinate else None,
+                coordinate.accuracy_m if coordinate else None,
+                coordinate.crs if coordinate else "EPSG:4326",
+                result.precision.value if result.precision else None,
+                result.provider,
+                result.confidence,
+                result.geocoded_at.isoformat(),
             )
+        rows = list(rows_by_key.values())
 
         connection = self._connect()
         try:
