@@ -50,6 +50,14 @@ class DuckDBGeocodingRepository:
             connection.execute(
                 "ALTER TABLE prospect_geocoding ADD COLUMN IF NOT EXISTS coordinate_crs VARCHAR DEFAULT 'EPSG:4326'"
             )
+            connection.execute(
+                """
+                UPDATE prospect_geocoding
+                SET coordinate_crs = 'EPSG:4674'
+                WHERE provider = 'geocodebr:cnefe'
+                  AND coordinate_crs = 'EPSG:4326'
+                """
+            )
         finally:
             connection.close()
 
