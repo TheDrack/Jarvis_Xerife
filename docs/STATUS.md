@@ -33,7 +33,7 @@ A presença de arquivo, migration, manifest, skill ou variável de ambiente não
 | Android | Cliente nativo e integração com serviços Jarvis estão versionados. | VPN, acessibilidade, shell, captura e inspeção dependem de permissões, consentimento, pareamento e testes no dispositivo. |
 | Desktop | Cliente Windows/WebView2, API local e scripts de build/start estão presentes. | Listener, firewall, pairing e sessão interativa dependem do host real. |
 | MCP e acesso remoto | Servidores/adaptadores e runbooks de transporte estão presentes. | STDIO, HTTP local, Secure MCP Tunnel e gateways privados são rotas diferentes; não inferir conectividade atual. |
-| Prospecto | Discovery por CNPJ, outreach multicanal, demand matching B2B/B2C/C2B, extração de endereço, contratos geoespaciais, cache DuckDB e integração opcional GeocodeBR ao runner de campanhas/CLI estão no código. | A geocodificação é opt-in; execução real CNEFE e benchmark de volume não foram comprovados. A UI de descoberta ainda não consome o cache geográfico nem apresenta mapa de empresas. O mapa geoespacial existente é voltado a dispositivos. Runtime Android, relays externos, providers de vagas/catálogos e isolamento multi-tenant hospedado seguem não verificados; ACATE continua sem consumer operacional e com filtros incompletos. |
+| Prospecto | Discovery por CNPJ, outreach multicanal, demand matching B2B/B2C/C2B, extração de endereço, contratos geoespaciais, cache DuckDB, integração opcional GeocodeBR/CNEFE ao CLI e mapa empresarial Desktop estão no código. | A geocodificação é opt-in; execução real CNEFE e benchmark de volume não foram comprovados. O mapa empresarial lê apenas o cache existente, sem geocodificar durante a consulta; smoke test Desktop Windows/Android ainda pendente. Runtime Android, relays externos, providers de vagas/catálogos e isolamento multi-tenant hospedado seguem não verificados; ACATE continua sem consumer operacional e com filtros incompletos. |
 | Auto-evolução e reparo | Serviços, gatekeeper, sandbox, scripts e workflows estão presentes; `homeostase.yml` usa código confiável de `main` e `scripts/jarvis_healer.py` para falhas elegíveis. | `homeostase.yml` não dispara para PR Validation/Task Queue; o endpoint protegido `/v1/github/ci-heal/{run_id}` baixa logs e registra pensamento, mas não produz patch/PR. Não declarar autocorreção automática de PRs ponta a ponta. |
 | Deploy e persistência | Manifestos, migrations e adapters estão presentes. | Só inspeção no ambiente confirma deploy, schema aplicado, RLS/grants, feature flags e saúde. |
 
@@ -141,6 +141,8 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 
 ### Atualização Prospecto geoespacial — 2026-11-20
 - PR #867 mesclada: adapter opcional GeocodeBR/CNEFE e cache batch.
-- PR #869 mesclada em `fdc51057c84cef8a0949ca59ccba6bcafe71da8a`: campanhas e CLI aceitam geocodificação opt-in; CSV/manifesto recebem coordenadas e metadados.
-- O fluxo padrão continua offline sem `--geocode`. Não há comprovação de download real CNEFE ou benchmark de produção.
+- PR #869 mesclada: campanhas e CLI aceitam geocodificação opt-in; CSV/manifesto recebem coordenadas e metadados.
+- PR #871 mesclada em `a9a80816aa1155af8f8ef4153c7efb985d25a104`: mapa empresarial no Desktop, enriquecimento autenticado a partir do cache existente, rota local do asset, clusters selecionáveis e leitura DuckDB estritamente read-only.
+- CI da PR #871: suíte Python completa, testes frontend geoespaciais e testes da fila de tarefas passaram. Revisão Codex concluída sem findings no SHA `e973016f5e83ec4606b7cac0cd8fa7b2d229347a`.
+- O fluxo padrão continua offline sem `--geocode`. Não há comprovação de download real CNEFE, benchmark de produção ou smoke test Desktop/Android.
 - A interface de descoberta e o mapa de empresas ainda não consomem as coordenadas. O mapa geoespacial atual continua separado, voltado a dispositivos registrados.
