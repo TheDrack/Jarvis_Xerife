@@ -2221,3 +2221,11 @@ def test_prospecting_search_can_attach_cached_geocoding_without_running_provider
         "unmapped": 0,
     }
     assert repository_calls == [True]
+
+
+def test_prospecting_company_map_script_is_served_by_local_core():
+    response = _client(LocalRuntime()).get("/static/jarvis-prospecting-map.js")
+
+    assert response.status_code == 200
+    assert "application/javascript" in response.headers["content-type"]
+    assert "JarvisProspectingMap" in response.text
