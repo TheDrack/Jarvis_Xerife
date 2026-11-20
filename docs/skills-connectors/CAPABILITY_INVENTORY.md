@@ -1,7 +1,7 @@
 # Inventário de capacidades — Jarvis Xerife
 
-**Revisão de código:** 2026-11-19  
-**Base de código auditada:** main @ 2bf151052f1a25f088030bfafec5d31d58f18e11  
+**Revisão de código:** 2026-11-20  
+**Base de código auditada:** main @ 32cf7e94ed54d577c85cc503b1480ef1c765399d  
 **Escopo:** inventário do código e contratos versionados. Não é um health check de deploy nem de conectores do host.
 
 ## Semântica dos estados
@@ -32,7 +32,7 @@ Esses estados são independentes. Manifest, skill, migration ou adapter não pro
 | Desktop | desktop/, app/adapters/edge/ | Requer host Windows, sessão interativa e configuração local. |
 | Android | mobile/android/, app/adapters/edge/ | Requer pareamento, permissões Android, consentimentos e validação no dispositivo. |
 | MCP | app/adapters/edge/ e app/adapters/infrastructure/ | STDIO, HTTP e túneis são transportes diferentes; conexão não concede autorização. |
-| Prospecto | `app/domain/prospecting/`, `app/application/prospecting/`, `app/adapters/infrastructure/prospecting/`, `app/adapters/edge/prospecting_mcp_tools.py`, `app/adapters/edge/prospecting_demand_mcp_tools.py` | Discovery B2B por CNPJ, outreach multicanal e demandas B2B/B2C/C2B estão no código e cobertos por CI; relays externos, provedores de vagas/catálogos, runtime Android e isolamento multi-tenant hospedado não estão comprovados. |
+| Prospecto | `app/domain/prospecting/`, `app/application/prospecting/`, `app/adapters/infrastructure/prospecting/` e MCPs de Prospecto. Discovery B2B por CNPJ, outreach e demandas B2B/B2C/C2B; contratos geoespaciais, extração de endereço, cache DuckDB e distância Haversine. | A base geoespacial está no código e tem testes, mas `GeocodingService`/`DuckDBGeocodingRepository` não têm consumer de aplicação estrito localizado. O adapter `geocodebr` está somente na PR #867, ainda não mesclada. Não há coordenadas reais, integração com campanhas, filtros espaciais ou mapa verificados. Relays, providers de vagas/catálogos, runtime Android e multi-tenant hospedado permanecem não comprovados. |
 | Auto-evolução | app/application/services/ e scripts de evolução | Gatekeeper, sandbox, revisão e publicação são etapas distintas; não assumir autonomia irrestrita. |
 | Segurança | app/application/security/, app/runtime/toolbox/ e testes de segurança | A política efetiva depende do composition root e da identidade runtime. |
 
@@ -124,3 +124,13 @@ Ao adicionar/remover manifests, skills, adapters, consumers ou grants:
 3. atualize os estados somente com evidência;
 4. registre o commit e a data;
 5. nunca copie snapshots de produção sem revalidá-los.
+
+### Geoespacial — código presente, integração não verificada (2026-11-20)
+
+- **Extração:** os adapters CSV e DuckDB do CNPJ agora leem tipo/logradouro/número/complemento/bairro/CEP/município/UF.
+- **Domínio:** `ProspectCompany.geocoding_address`, `GeoCoordinate`, `AddressGeocoding`, precisão/proveniência e consultas por raio/Haversine estão versionados.
+- **Persistência:** `DuckDBGeocodingRepository` mantém cache separado, indexado por SHA-256 do endereço normalizado; testes cobrem round-trip, precisão desconhecida e atualização do mesmo endereço.
+- **Serviço:** `GeocodingService` implementa cache, force refresh e validação de identidade do endereço. O grafo atual encontra apenas callers de teste; não foi localizado consumidor de campanha, MCP ou interface.
+- **Provider:** PR #867 adiciona `geocodebr` como extra opcional e adapter batch. Não está em main e ainda não houve download CNEFE ou benchmark real. CI verde da PR não comprova runtime.
+- **Datum:** `GeoCoordinate` está documentado como WGS84, enquanto a documentação do provider identifica o GeoDataFrame espacial como SIRGAS 2000 / EPSG:4674. Registrar CRS ou transformação explicitamente antes de usar tolerâncias métricas como garantia.
+- **Estado:** base implementada/testada; provider batch em PR; integração operacional e visualização em mapa não verificadas.
