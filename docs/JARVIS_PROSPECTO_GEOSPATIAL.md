@@ -60,24 +60,32 @@ python scripts/prospecto_run.py \
 - Sem `--geocode`, o comportamento permanece offline e não importa/inicializa o provedor.
 - Com `--geocode`, apenas empresas que serão entregues no CSV são enviadas ao serviço; empresas fora do ICP ficam de fora, salvo quando `--include-unqualified` é usado.
 - Registros sem endereço, município ou UF não são enviados ao provedor e entram no contador de ignorados.
-- O cache DuckDB fica por padrão em `~/.local/share/jarvis/prospecto/geocoding.duckdb`. Use `--geocoding-db` para alterar o caminho.
+- O cache DuckDB fica por padrão em `~/.local/share/jarvis/prospecto/geocoding.duckdb`. Use `--geocoding-db` para alterar o caminho em uma execução ou defina `JARVIS_PROSPECTO_GEOCODING_DB` para compartilhar o mesmo arquivo entre o CLI e a API Desktop.
 - A primeira execução pode baixar tabelas CNEFE necessárias para o tipo de endereço consultado. O cache de dados do pacote é separado do cache de resultados do Jarvis.
 - O CSV contém latitude, longitude, precisão, desvio estimado, CRS, endereço encontrado, status e provedor. O manifesto registra totais de tentativas, resultados precisos/parciais/falhos e empresas ignoradas.
 - Coordenadas de precisão `postal_code`, `locality` ou `region` continuam identificadas como parciais; não devem ser exibidas como pontos exatos de estabelecimento.
 
-A integração cobre o CLI e o arquivo CSV/manifesto. O MCP de busca e a interface de mapa ainda não estão conectados. A geração real de coordenadas depende da instalação do extra e da disponibilidade dos dados CNEFE locais.
+A integração cobre o CLI e o arquivo CSV/manifesto. O MCP de busca não executa geocodificação. A interface Desktop de Prospecto pode anexar observações existentes do cache à busca autenticada com `include_geocoding=true`; essa leitura não chama o provedor nem cria um cache ausente. A geração real de coordenadas depende da instalação do extra e da disponibilidade dos dados CNEFE locais.
 
 O Nominatim público do OpenStreetMap não deve ser usado como serviço de geocodificação em massa do Prospecto: sua política limita a no máximo uma requisição por segundo e restringe tarefas em lote/recorrentes. Consulte a política oficial: https://operations.osmfoundation.org/policies/nominatim/.
 
+## Mapa empresarial no Desktop
+
+- O painel de Prospecto tem alternância LISTA/MAPA. A busca usa a mesma UF, CNAE e municípios; a paginação acrescenta resultados ao mapa.
+- A API local autenticada GET /api/prospecting/search?...&include_geocoding=true consulta apenas o cache DuckDB já existente e acrescenta geocoding por empresa, mais um resumo de coordenadas precisas/parciais/ausentes.
+- O mapa usa a camada vetorial local world-land.json (Natural Earth, domínio público). Não usa tiles remotos, não faz chamadas a geocodificadores e não altera o mapa de dispositivos.
+- Só plota coordenadas geográficas EPSG:4326 e EPSG:4674. CRS projetados ou desconhecidos são omitidos em vez de serem interpretados como graus.
+- Precisões rooftop/premise aparecem como pontos precisos; resultados parciais ou com precisão inferior aparecem como aproximados. Clusters preservam a lista de empresas e permitem inspecionar precisão, desvio estimado, CRS e provedor.
+- A base cartográfica é territorial e generalizada (escala Natural Earth 1:110m): não contém ruas, números prediais nem roteamento. A localização do ponto vem do CNEFE/cache, não da malha visual.
+
 ## Próximas etapas
 
-1. Selecionar provedor compatível com o volume e o modelo comercial (API contratada ou instância própria).
-2. Implementar adapter com timeout, rate limit, retries controlados, normalização e mapeamento explícito de precisão.
-3. Criar job de geocodificação em lote, com checkpoints, limites por provedor, idempotência e reprocessamento de falhas.
-4. Associar resultados aos prospects e expor filtros espaciais (raio, área, distância a centros logísticos).
-5. Criar endpoint de mapa com clusters/camadas e atribuição/licença cartográfica visível.
-6. Adicionar mapa de calor e seleção de área após validar volume e performance com dados reais.
+1. Executar uma campanha de teste com o extra geocodebr e dados CNEFE reais; medir download inicial, throughput, cache hit rate e distribuição de precisão.
+2. Fazer smoke test do painel no Desktop Windows e no cliente Android/LAN, incluindo paginação, clusters e cache ausente.
+3. Adicionar filtros no mapa por precisão, status, CNAE, município e distância, sem misturar a watchlist de dispositivos.
+4. Implementar filtros espaciais (raio, área, distância a centros logísticos) depois de definir transformação de CRS métrico.
+5. Adicionar mapa de calor e seleção de área após validar volume e performance com dados reais.
 
 ## Estado
 
-Esta etapa implementa contratos, cache persistente, integração opcional ao CLI de campanha e exportação das coordenadas no CSV. Ainda não oferece endpoint MCP nem interface de mapa.
+Contratos, adapter opcional CNEFE, cache DuckDB, integração CLI e exportação CSV/manifesto estão em main. A PR do mapa empresarial adiciona leitura autenticada do cache e visualização vetorial local independente da camada de dispositivos. A execução real CNEFE e o smoke test da interface ainda não foram realizados.
