@@ -222,10 +222,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         provider = CompositeDiscoveryProvider(registry, external)
 
-    geocoding_service = (
-        _build_geocoding_service(args.geocoding_db) if args.geocode else None
-    )
     try:
+        geocoding_service = (
+            _build_geocoding_service(args.geocoding_db) if args.geocode else None
+        )
         run = run_campaign(
             provider,
             campaign,
@@ -234,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
             max_companies=args.max_companies,
             geocoding_service=geocoding_service,
         )
-    except (FileNotFoundError, RuntimeError, ValueError, TypeError) as error:
+    except (FileNotFoundError, RuntimeError, ValueError, TypeError, ImportError) as error:
         print(f"erro: {error}", file=sys.stderr)
         return 2
 
