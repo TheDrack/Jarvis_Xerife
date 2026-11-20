@@ -124,6 +124,75 @@ _LOCAL_INTELLIGENCE_KEYS = {
 }
 
 
+
+def _prospecting_geocoding_database_path() -> Path:
+    configured = os.getenv("JARVIS_PROSPECTO_GEOCODING_DB", "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    return Path.home() / ".local" / "share" / "jarvis" / "prospecto" / "geocoding.duckdb"
+
+
+def _prospecting_geocoding_repository():
+    """Open the existing geocoding cache only; never create it during map reads."""
+    database = _prospecting_geocoding_database_path()
+    if not database.is_file():
+        return None
+    from app.adapters.infrastructure.prospecting.geocoding_store import (
+        DuckDBGeocodingRepository,
+    )
+
+    return DuckDBGeocodingRepository(database)
+
+
+def _attach_cached_geocoding(payload: dict[str, Any]) -> dict[str, Any]:
+    """Attach prior geocoding observations without triggering provider work."""
+    from app.domain.prospecting.contracts import ProspectCompany
+    from app.domain.prospecting.geography import (
+        GeocodingStatus,
+        address_fingerprint,
+    )
+
+    companies = payload.get("companies")
+    if not isinstance(companies, list):
+        return payload
+
+    repository = _prospecting_geocoding_repository()
+    parsed = [ProspectCompany.model_validate(item) for item in companies]
+    addresses = [company.geocoding_address for company in parsed]
+    valid_addresses = [address for address in addresses if address]
+    cached = repository.get_many(valid_addresses) if repository and valid_addresses else {}
+
+    geocoded = success = partial = 0
+    for item, address in zip(companies, addresses):
+        observation = (
+            cached.get(address_fingerprint(address))
+            if address
+            else None
+        )
+        item["geocoding"] = (
+            observation.model_dump(mode="json") if observation is not None else None
+        )
+        if observation is None or observation.coordinate is None:
+            continue
+        if observation.status not in {GeocodingStatus.SUCCESS, GeocodingStatus.PARTIAL}:
+            continue
+        geocoded += 1
+        if observation.status is GeocodingStatus.SUCCESS:
+            success += 1
+        else:
+            partial += 1
+
+    payload["geocoding_summary"] = {
+        "available": repository is not None,
+        "total": len(companies),
+        "geocoded": geocoded,
+        "success": success,
+        "partial": partial,
+        "unmapped": len(companies) - geocoded,
+    }
+    return payload
+
+
 EARTHQUAKE_GEOCODE_LIMIT = 6
 
 
@@ -1776,6 +1845,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         ),
         only_active: bool = True,
         include_secondary_cnae: bool = True,
+        include_geocoding: bool = False,
         limit: int = Query(default=50, ge=1, le=100),
         after_cnpj_basico: str | None = Query(
             default=None,
@@ -1801,7 +1871,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                     status_code=503,
                     detail="Base CNPJ não configurada neste host.",
                 )
-            return await _run_sync_io_off_loop(
+            payload = await _run_sync_io_off_loop(
                 adapter.search_companies,
                 uf=uf.upper(),
                 cnae_prefixes=cnae_prefixes,
@@ -1811,6 +1881,11 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 limit=limit,
                 after_cnpj_basico=after_cnpj_basico,
             )
+            if include_geocoding:
+                payload = await _run_sync_io_off_loop(
+                    _attach_cached_geocoding, payload
+                )
+            return payload
         except HTTPException:
             raise
         except ValueError as exc:
