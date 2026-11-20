@@ -44,20 +44,27 @@ class DuckDBGeocodingRepository:
                 )
                 """
             )
-            connection.execute(
-                "ALTER TABLE prospect_geocoding ADD COLUMN IF NOT EXISTS formatted_address VARCHAR"
-            )
-            connection.execute(
-                "ALTER TABLE prospect_geocoding ADD COLUMN IF NOT EXISTS coordinate_crs VARCHAR DEFAULT 'EPSG:4326'"
-            )
-            connection.execute(
-                """
-                UPDATE prospect_geocoding
-                SET coordinate_crs = 'EPSG:4674'
-                WHERE provider = 'geocodebr:cnefe'
-                  AND coordinate_crs = 'EPSG:4326'
-                """
-            )
+            columns = {
+                row[1]
+                for row in connection.execute(
+                    "PRAGMA table_info('prospect_geocoding')"
+                ).fetchall()
+            }
+            if "formatted_address" not in columns:
+                connection.execute(
+                    "ALTER TABLE prospect_geocoding ADD COLUMN formatted_address VARCHAR"
+                )
+            if "coordinate_crs" not in columns:
+                connection.execute(
+                    "ALTER TABLE prospect_geocoding ADD COLUMN coordinate_crs VARCHAR DEFAULT 'EPSG:4326'"
+                )
+                connection.execute(
+                    """
+                    UPDATE prospect_geocoding
+                    SET coordinate_crs = 'EPSG:4674'
+                    WHERE provider = 'geocodebr:cnefe'
+                    """
+                )
         finally:
             connection.close()
 
