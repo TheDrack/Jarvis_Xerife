@@ -29,7 +29,7 @@ from app.domain.prospecting.deliverable import (
 )
 from app.domain.prospecting.discovery import DiscoveryProvider, DiscoveryQuery
 from app.domain.prospecting.icp import IcpProfile
-from app.domain.prospecting.geography import GeocodingStatus
+from app.domain.prospecting.geography import GeocodingStatus, address_fingerprint
 from app.domain.prospecting.qualification import QualificationTier, qualify_prospect
 
 
@@ -205,7 +205,13 @@ def run_campaign(
             )
             if len(geocoding_results) != len(geocodable):
                 raise ValueError("geocoding service returned an unexpected number of results")
-            for (index, _), result in zip(geocodable, geocoding_results):
+            for (index, company), result in zip(geocodable, geocoding_results):
+                if address_fingerprint(result.address) != address_fingerprint(
+                    company.geocoding_address
+                ):
+                    raise ValueError(
+                        "geocoding service returned coordinates for a different company address"
+                    )
                 rows[index] = rows[index].model_copy(update={"geocoding": result})
 
     rows = tuple(rows)
