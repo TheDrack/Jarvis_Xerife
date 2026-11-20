@@ -51,6 +51,7 @@ def test_prospecting_hud_exposes_an_independent_company_map():
     assert 'id="prospectingMapCanvas"' in HTML
     assert 'src="/static/jarvis-prospecting-map.js"' in HTML
     assert "include_geocoding" in JS
-    assert "JarvisProspectingMap.render" in JS
+    assert "window.JarvisProspectingMap" in JS
+    assert "renderer.render" in JS
     assert "buildCompanyMarkers" in MAP_JS
     assert "geocodebr" not in MAP_JS.lower()
