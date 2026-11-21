@@ -112,74 +112,13 @@ class CapabilityManager(NexusComponent):
             return blueprint
     
     def _generate_blueprint(self, capability: JarvisCapability) -> Dict[str, Any]:
-        """
-        Generate a technical blueprint for implementing a capability.
-        
-        This is where AI could be used to analyze the capability name/description
-        and generate technical requirements. For now, we use rule-based logic.
-        """
-        blueprint = {
-            "capability_id": capability.id,
-            "capability_name": capability.capability_name,
-            "chapter": capability.chapter,
-            "status": capability.status,
-            "requirements": [],
-            "libraries": [],
-            "apis": [],
-            "env_vars": [],
-            "permissions": [],
-            "blueprint": ""
-        }
-        
-        # Rule-based blueprint generation based on capability patterns
-        name_lower = capability.capability_name.lower()
-        
-        # Memory-related capabilities
-        if "memory" in name_lower:
-            blueprint["libraries"].extend(["redis", "sqlalchemy"])
-            blueprint["requirements"].append("Persistent storage system")
-            blueprint["blueprint"] = "Implement using Redis for short-term cache and PostgreSQL for long-term storage"
-        
-        # Learning-related capabilities
-        if "learn" in name_lower:
-            blueprint["libraries"].extend(["scikit-learn", "numpy"])
-            blueprint["requirements"].append("Machine learning framework")
-            blueprint["blueprint"] = "Implement feedback loop with ML model training"
-        
-        # Economic/cost capabilities
-        if "cost" in name_lower or "economic" in name_lower or "revenue" in name_lower:
-            blueprint["libraries"].append("stripe")
-            blueprint["apis"].append("Stripe API")
-            blueprint["env_vars"].append("STRIPE_API_KEY")
-            blueprint["requirements"].append("Payment processing system")
-            blueprint["blueprint"] = "Integrate with Stripe for payment tracking and processing"
-        
-        # Monitoring/detection capabilities
-        if "detect" in name_lower or "monitor" in name_lower:
-            blueprint["libraries"].extend(["prometheus-client", "sentry-sdk"])
-            blueprint["requirements"].append("Monitoring and alerting system")
-            blueprint["blueprint"] = "Implement with Prometheus metrics and Sentry error tracking"
-        
-        # Testing capabilities
-        if "test" in name_lower or "validate" in name_lower:
-            blueprint["libraries"].extend(["pytest", "hypothesis"])
-            blueprint["requirements"].append("Automated testing framework")
-            blueprint["blueprint"] = "Extend pytest suite with property-based testing"
-        
-        # Strategic/planning capabilities
-        if "plan" in name_lower or "strateg" in name_lower:
-            blueprint["requirements"].append("Advanced LLM integration")
-            blueprint["env_vars"].extend(["OPENAI_API_KEY", "ANTHROPIC_API_KEY"])
-            blueprint["blueprint"] = "Use LLM chain-of-thought for multi-step planning"
-        
-        # Orchestration capabilities
-        if "orchestrat" in name_lower or "parallel" in name_lower or "distribut" in name_lower:
-            blueprint["libraries"].extend(["celery", "redis"])
-            blueprint["requirements"].append("Distributed task queue")
-            blueprint["blueprint"] = "Implement with Celery for distributed task execution"
-        
-        return blueprint
-    
+        """Delegate to the single blueprint generator (ADR-006 R3)."""
+        from app.application.services.capability_blueprint_service import (
+            generate_capability_blueprint,
+        )
+
+        return generate_capability_blueprint(capability)
+
     def status_scan(self) -> Dict[str, Any]:
         """
         Scan the repository to identify which capabilities are already implemented.
@@ -480,10 +419,12 @@ class CapabilityManager(NexusComponent):
         return graph
 
     def get_executable_capabilities(self) -> List[Dict[str, Any]]:
-        """Retorna capabilities cujas dependências estão com status ``complete``.
+        """Retorna objectives cujas dependências estão com status ``complete``.
 
-        Apenas essas capabilities podem ser trabalhadas no próximo ciclo
-        de evolução.
+        Apenas esses objectives podem ser trabalhados no próximo ciclo de
+        evolução. ``complete`` só é aceito com evidência de execução
+        (ADR-006 R1); um objective ``unverified`` segue executável até que
+        essa evidência exista.
 
         Returns:
             Lista de dicionários de capabilities prontas para execução.

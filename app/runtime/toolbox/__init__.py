@@ -5,6 +5,7 @@ from app.runtime.toolbox.audit import JsonlToolAuditSink
 from app.runtime.toolbox.authorization import ToolAuthorizationPolicy
 from app.runtime.toolbox.contracts import (
     EvidenceRecord,
+    HostImplementation,
     ToolAuthorizationDecision,
     ToolExecutionEvent,
     ToolManifest,
@@ -34,6 +35,7 @@ __all__ = [
     "tool_request_digest",
     "JsonlToolAuditSink",
     "EvidenceRecord",
+    "HostImplementation",
     "ToolAuthorizationDecision",
     "ToolAuthorizationPolicy",
     "RateLimitPolicy",

@@ -32,7 +32,7 @@ def test_mission_metadata_is_not_interpolated_into_shell_source():
 def test_workflow_rejects_malformed_mission_ids_before_candidate_generation():
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
-    assert 're.fullmatch(r"CAP-[0-9]+", cap_id)' in workflow
+    assert 're.fullmatch(r"objective:CAP-[0-9]{3}", cap_id)' in workflow
     assert 'output.write("action=blocked\\n")' in workflow
 
 

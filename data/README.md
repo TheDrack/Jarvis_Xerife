@@ -8,7 +8,7 @@ Contém os arquivos de dados estáticos e de runtime utilizados pelo JARVIS.
 |---------|---------|-----------|
 | `nexus_registry.json` | JSON | Mapeamento de IDs de componentes para módulos Python |
 | `nexus_registry.jrvs` | JRVS | Espelho binário do `nexus_registry.json` (leitura rápida) |
-| `capabilities.json` | JSON | Inventário de capacidades (CAP-001 a CAP-102+) |
+| `capabilities.json` | JSON | Objetivos de roadmap (`objective:CAP-001` a `objective:CAP-102`); `complete` exige evidência de execução |
 | `capabilities.jrvs` | JRVS | Espelho binário do `capabilities.json` |
 | `master_crystal.json` | JSON | Metadados do sistema e registro de cristalização |
 | `master_crystal.jrvs` | JRVS | Espelho binário do `master_crystal.json` |

@@ -91,7 +91,7 @@ class AutoEvolutionServiceV2(NexusComponent):
         ``data/evolution_proposals/`` e abre o PR pelo GitHubWorker.
 
         Args:
-            cap_id: identificador da capability-alvo (ex.: ``CAP-042``).
+            cap_id: identificador do objective-alvo (ex.: ``objective:CAP-042``).
             mission: metadados da capability (título/notas) ou ``None``.
             roadmap_context: contexto textual já montado para o LLM.
             max_attempts: número máximo de ciclos de evolução tentados.
