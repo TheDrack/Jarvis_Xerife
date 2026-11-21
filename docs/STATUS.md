@@ -145,4 +145,4 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 - PR #871 mesclada em `a9a80816aa1155af8f8ef4153c7efb985d25a104`: mapa empresarial no Desktop, enriquecimento autenticado a partir do cache existente, rota local do asset, clusters selecionáveis e leitura DuckDB estritamente read-only.
 - CI da PR #871: suíte Python completa, testes frontend geoespaciais e testes da fila de tarefas passaram. Revisão Codex concluída sem findings no SHA `e973016f5e83ec4606b7cac0cd8fa7b2d229347a`.
 - O fluxo padrão continua offline sem `--geocode`. Não há comprovação de download real CNEFE, benchmark de produção ou smoke test Desktop/Android.
-- A interface de descoberta/campanhas ainda não incorpora o mapa ao fluxo de prospecção; o mapa empresarial Desktop consome somente o cache geográfico existente. O mapa de dispositivos continua separado.
+- A tela Desktop de descoberta empresarial já oferece alternância LISTA/MAPA e anexa coordenadas existentes do cache à busca autenticada; não geocodifica sob demanda. A geração de coordenadas em campanhas continua opt-in via CLI `--geocode`; o mapa de dispositivos permanece separado.
