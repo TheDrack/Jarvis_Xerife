@@ -1,6 +1,6 @@
 # ADR-006 — Fronteiras entre capacidade, implementação, host e política
 
-- **Status:** Proposto; decisão arquitetural, sem código de implementação
+- **Status:** Aceito; C1 e C2 implementados e testados localmente (ver [Estado de implementação](#estado-de-implementação-2026-11-21)). R1 parcial, R2/R4/R5 e C3–C5 pendentes.
 - **Data:** 2026-11-21
 - **Depende de:** [ADR-001](ADR-001-universal-tool-registry.md) (Universal Tool Registry, dispatcher fail-closed)
 - **Insumo:** [Jarvis OS — auditoria de capacidades](JARVIS_OS_CAPABILITY_AUDIT.md) §4, §8 e §9
@@ -117,11 +117,44 @@ Não faz parte desta decisão:
 - O schema definitivo de `CapabilityBinding`, a estratégia de ordenação de candidatos, a durabilidade do journal e o desenho da porta privilegiada ficam para C1–C4.
 - Nenhuma execução foi validada por este documento: ele é decisão arquitetural baseada em auditoria source-only.
 
+## Estado de implementação (2026-11-21)
+
+Os incrementos abaixo foram implementados **depois** desta decisão, na ordem obrigatória. Cada linha declara apenas o que foi realmente testado; nada aqui é inferido de leitura de código.
+
+### Entregue e testado
+
+| ID | Entrega | Evidência de teste | Não verificado |
+|---|---|---|---|
+| **C1** | `app/application/services/capability_binding_registry.py`: `CapabilityBinding`, `HostRecord`, `CapabilityResolution`, `CapabilityResolutionGap` e `CapabilityBindingRegistry` como **extensão** de `AdapterRegistry` (não um sexto registro). Namespace `capability:` canônico; `objective:` recusado com `NamespaceViolation`. | `tests/application/test_capability_binding_registry.py` (20 testes): dois hosts fictícios, um sem `screen.capture` → gap `capability_not_declared`; host desconhecido, host offline, implementação indisponível com a limitação preservada; ordenação determinística entre consultas; `find_gap` herdado continua funcionando. | Nenhum adapter real foi executado e nenhum host real foi sondado. |
+| **C1 (catálogo Ubuntu)** | `app/application/services/reference_host_catalog.py`: `host:ubuntu-server` e `host:ubuntu-desktop` com telemetria (`psutil_host_adapter`), descoberta de rede, mensageria e `screen.capture`. | `screen.capture` resolve de forma diferente nos dois hosts Ubuntu: disponível no desktop com limitação `captures-only-the-current-x11-session`; no server, `implementation_unavailable` com `requires-graphical-display-session`. | `host:android-*` e `host:windows-*` não foram declarados porque não foram verificados nesta sessão; não há alegação de paridade. |
+| **C2** | `ToolManifest.host_implementations` + `HostImplementation`; `ToolRequest.host_ref` como preferência não confiável; `ToolDispatcher._select_implementation` escolhe **depois** da autorização e falha com `capability_unavailable` em vez de fallback; `ToolResult`/`ToolExecutionEvent` registram `capability`, `adapter_id` e `host_ref`. | `tests/runtime/test_toolbox_host_implementations.py` (8 testes): dois adapters coexistem; host indisponível é rejeitado sem resolver adapter; host que não declara a tool é rejeitado; política negada continua negando antes da seleção; manifesto rejeita host duplicado, host inválido e capability `objective:`. | Nenhuma tool de `config/tool_registry.json` declara `host_implementations` ainda, e nenhum adapter real foi executado por host. |
+| **C1+C2 (vocabulário único)** | `app/domain/tools/host_selection.py` passa a ser a única definição de `Availability`, `GapReason` e da ordenação (`implementation_order_key`). O catálogo de vínculos e o dispatcher importam o mesmo vocabulário; `HostImplementation.availability` deixa de ser um `Literal` paralelo e passa a usar o enum compartilhado. | `tests/domain/test_host_catalog_manifest_consistency.py` (6 testes): o manifesto derivado do catálogo preserva a mesma disponibilidade e a mesma ordem, o dispatcher escolhe o mesmo `adapter_id`/`host_ref`/limitações que `resolve_capability` em cada host Ubuntu, e o `config/tool_registry.json` real não contradiz o catálogo (host declarado inexistente ou disponibilidade divergente falham). | As duas camadas continuam sendo avaliadas com hosts e adapters de teste; nenhum host real foi sondado. |
+| **R3** | Um único gerador: `generate_capability_blueprint()`; `CapabilityManager`, `CapabilityGapReporter` e `CapabilityBlueprintService` delegam a ele. | `tests/test_capability_manager.py` mantido e verde. | Os `execute()` de componente Nexus continuam stub; não foram alterados. |
+| **R6** | `capabilities/classification.py` removido. | Nenhuma importação restante; o pacote não tem mais efeito colateral em import. | — |
+| **R7** | `docs/skills-connectors/CATALOG.md`: "dez" → "doze" (10 `read_only`, 2 `active_bounded`), apontando o registry versionado e a auditoria como insumo datado. | Contagem verificada em `config/tool_registry.json` (12 manifests, 10 `read_only` / 2 `active_bounded`). | — |
+
+### Pendente, declarado
+
+- **R1 parcial.** O namespace é imposto no código (`normalize_capability_id` e `ToolManifest.capabilities` recusam `objective:`), mas `data/capabilities.json` continua com IDs `CAP-###` e os 68 `complete` heurísticos **não** foram migrados para exigir evidência de execução.
+- **R2.** `app/domain/models/adapter_registry.py` segue registrado em `data/nexus_registry.json` e coberto por `tests/test_nexus_registry_sync.py`; aposentá-lo exige migrar o componente Nexus, não apagar o arquivo.
+- **R4.** O alias registry continua sem consumidor de produção.
+- **R5.** `coverage_report()` cobre o registry de vínculos, **não** as ~115 tools MCP.
+- **C3, C4, C5.** Porta privilegiada tipada, journal durável e camada de SO não foram iniciados; `linux/` continua apenas provisionamento de runtime.
+
+### Verificação executada
+
+```
+python -m pytest tests/runtime tests/application tests/domain \
+  tests/test_capability_manager.py tests/test_nexus_registry_sync.py \
+  tests/test_regression_guards.py tests/test_docs_references.py
+→ 1168 passed, 1 skipped
+```
+
+Ambiente local com as dependências de `requirements/core.txt` em `venv`, Python 3.12.3. Os testes usam adapters e hosts de teste; nenhum adapter real foi invocado. CI da PR, build Android/Desktop, execução em dispositivo e boot de VM **não** foram executados nesta sessão e permanecem não verificados, como declarado em [JARVIS_OS_CAPABILITY_AUDIT.md](JARVIS_OS_CAPABILITY_AUDIT.md) §11.
+
 ## Verificação
 
-Este ADR é documental. Não altera código, configuração, política de produção, credenciais, banco ou deploy. Não executou a suíte de testes, CI, build Android/Desktop nem verificação em dispositivo; essas evidências continuam pendentes e são declaradas como não verificadas em [JARVIS_OS_CAPABILITY_AUDIT.md](JARVIS_OS_CAPABILITY_AUDIT.md) §11.
-
-Critério para considerar esta decisão implementada (e não apenas aceita): R1–R7 concluídos com seus aceites, C1 entregue com teste de gap explícito, e o teste decisivo de `screen.capture` em dois hosts demonstrando candidatos, limitação, política e resultado distintos — com evidência de execução registrada, não inferida.
+O critério de implementação do ADR continua sendo o teste decisivo: **`screen.capture` resolve para implementações diferentes em hosts diferentes, com disponibilidade, limitação, política e resultado observáveis separadamente.** C1 cobre descoberta e catálogo; C2 cobre seleção e resultado no caminho de execução. Ambos têm teste automatizado; falta a execução real por host e a CI da mudança.
 
 ## Referências
 

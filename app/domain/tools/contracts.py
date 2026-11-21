@@ -19,6 +19,8 @@ from pydantic import (
     model_validator,
 )
 
+from app.domain.tools.host_selection import Availability
+
 _TOOL_ID_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
 _SEMVER_PATTERN = re.compile(
     r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
@@ -62,6 +64,49 @@ class RateLimitPolicy(BaseModel):
     burst: int | None = Field(default=None, gt=0)
 
 
+class HostImplementation(BaseModel):
+    """One declared host alternative for a tool implementation (ADR-006 C2).
+
+    Declaring a host alternative does not authorize it: the policy decision is
+    made for the tool, capability and scope before a host is selected, and host
+    selection never widens that decision.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    host_ref: str = Field(
+        pattern=r"^host:[a-z][a-z0-9]*(?:-[a-z0-9]+)*$", max_length=128
+    )
+    adapter_id: str = Field(min_length=3, max_length=128)
+    #: Shared vocabulary with the capability catalog; see
+    #: ``app.domain.tools.host_selection`` for usability and ordering.
+    availability: Availability = Availability.AVAILABLE
+    limitations: tuple[str, ...] = ()
+
+    @field_validator("availability", mode="before")
+    @classmethod
+    def validate_availability(cls, value: Any) -> Availability:
+        return Availability.coerce(value)
+
+    @field_validator("adapter_id")
+    @classmethod
+    def validate_adapter_identifier(cls, value: str) -> str:
+        if not _TOOL_ID_PATTERN.fullmatch(value):
+            raise ValueError(
+                "adapter_id must use lowercase dot/underscore/hyphen segments"
+            )
+        return value
+
+    @field_validator("limitations")
+    @classmethod
+    def validate_limitations(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        if any(not value.strip() for value in values):
+            raise ValueError("limitations entries must not be empty")
+        if len(set(values)) != len(values):
+            raise ValueError("limitations must not contain duplicates")
+        return values
+
+
 class ToolManifest(BaseModel):
     """Versioned metadata describing one atomic tool implementation.
 
@@ -86,6 +131,9 @@ class ToolManifest(BaseModel):
     )
 
     capabilities: tuple[str, ...] = Field(min_length=1)
+    #: Optional per-host alternatives. Empty means the single ``adapter_id`` above
+    #: is the only declared implementation, preserving pre-C2 behaviour.
+    host_implementations: tuple[HostImplementation, ...] = ()
     input_schema: dict[str, Any] = Field(
         default_factory=lambda: {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -252,8 +300,28 @@ class ToolManifest(BaseModel):
             raise ValueError(
                 "capabilities must be lowercase capability identifiers"
             )
+        if any(value.startswith("objective:") for value in values):
+            raise ValueError(
+                "objectives (objective:*) are roadmap entries, not executable "
+                "capabilities"
+            )
         if len(set(values)) != len(values):
             raise ValueError("capabilities must not contain duplicates")
+        return values
+
+    @field_validator("host_implementations")
+    @classmethod
+    def validate_host_implementations(
+        cls, values: tuple[HostImplementation, ...]
+    ) -> tuple[HostImplementation, ...]:
+        seen: set[tuple[str, str]] = set()
+        for item in values:
+            key = (item.host_ref, item.adapter_id)
+            if key in seen:
+                raise ValueError(
+                    "host_implementations must not repeat (host_ref, adapter_id)"
+                )
+            seen.add(key)
         return values
 
     @field_validator("dependencies")

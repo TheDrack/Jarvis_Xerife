@@ -153,8 +153,6 @@ graph LR
     app_utils["<b>utils</b><br/><hr/>📄 document_store.py: DocumentStore, read, write<br/>📄 helpers.py: setup_logging, ensure_directory, sanitize_filename<br/>📄 jrvs_codec.py: JrvsDecodeError, encode, decode"]
     class app_utils support
     app --> app_utils
-    capabilities["<b>capabilities</b><br/><hr/>📄 classification.py: from, CapabilityStatus, class"]
-    class capabilities support
     config["<b>config</b>"]
     class config support
     config_pipelines["<b>pipelines</b>"]
