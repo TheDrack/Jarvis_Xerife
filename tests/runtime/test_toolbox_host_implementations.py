@@ -199,3 +199,37 @@ class TestManifestHostDeclarations:
 
         with pytest.raises(ValidationError):
             ToolManifest.model_validate(data)
+
+def test_process_idempotency_is_scoped_to_requested_host():
+    data = _manifest(
+        host_implementations=[
+            {"host_ref": SERVER, "adapter_id": "headless_screen"},
+            {"host_ref": DESKTOP, "adapter_id": "x11_screen"},
+        ],
+        idempotency="supported",
+    )
+    calls = []
+    dispatcher = ToolDispatcher(
+        ToolRegistry([data]),
+        resolver=lambda adapter_id: calls.append(adapter_id) or _Adapter(adapter_id),
+        authorizer=_Authorizer(),
+    )
+
+    desktop_result = asyncio.run(
+        dispatcher.dispatch_async(
+            _request(host_ref=DESKTOP, idempotency_key="same-key")
+        )
+    )
+    server_result = asyncio.run(
+        dispatcher.dispatch_async(
+            _request(host_ref=SERVER, idempotency_key="same-key")
+        )
+    )
+
+    assert desktop_result.success is True
+    assert desktop_result.adapter_id == "x11_screen"
+    assert server_result.success is True
+    assert server_result.status == "succeeded"
+    assert server_result.adapter_id == "headless_screen"
+    assert server_result.host_ref == SERVER
+    assert calls == ["x11_screen", "headless_screen"]
