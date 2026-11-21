@@ -134,6 +134,6 @@ Ao adicionar/remover manifests, skills, adapters, consumers ou grants:
 - **Provider:** PR #867 adicionou `geocodebr` como extra opcional e adapter batch; está em main. Não há evidência de download CNEFE ou benchmark real.
 - **Datum:** `GeoCoordinate` está documentado como WGS84, enquanto a documentação do provider identifica o GeoDataFrame espacial como SIRGAS 2000 / EPSG:4674. Registrar CRS ou transformação explicitamente antes de usar tolerâncias métricas como garantia.
 - **Campanha:** PR #869 integrou geocodificação opcional ao CLI `--geocode` e exportação CSV/manifesto. Sem a flag, a execução padrão permanece offline.
-- **Mapa:** interface de empresas e endpoint de leitura geográfica ainda não implementados; não reutilizar a watchlist de dispositivos.
+- **Mapa:** interface empresarial Desktop e endpoint autenticado de leitura geográfica implementados pela PR #871; a consulta usa somente o cache existente e não geocodifica sob demanda. Não reutilizar a watchlist de dispositivos.
 - **Mapa Desktop:** PR #871 em main. A API autenticada enriquece resultados apenas com cache existente; DuckDB é aberto em modo read-only e não migra schema durante GET. O mapa local distingue precisão, CRS e clusters, permitindo selecionar empresas individualmente.
 - **Estado:** contratos, provider opcional, integração ao runner e mapa empresarial estão em main; execução real CNEFE, benchmark e smoke test Desktop/Android não verificados.
