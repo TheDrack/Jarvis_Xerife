@@ -115,7 +115,7 @@ class ToolDispatcher:
         self._event_sink = event_sink
         self._max_idempotency_entries = max(1, int(max_idempotency_entries))
         self._lock = threading.RLock()
-        self._inflight: dict[tuple[str, str, str, str, str, str], str] = {}
+        self._inflight: dict[tuple[str, str, str, str, str, str, str], str] = {}
         self._completed: dict[
             tuple[str, str, str, str, str, str], tuple[str, ToolResult]
         ] = {}
@@ -304,6 +304,7 @@ class ToolDispatcher:
                     manifest.version,
                     requested_capability,
                     envelope.task_id or "",
+                    envelope.host_ref or "",
                     envelope.idempotency_key,
                 )
                 idempotency_digest = self._arguments_digest(
@@ -311,6 +312,7 @@ class ToolDispatcher:
                     authorization_decision.principal_id,
                     envelope.scope,
                     envelope.task_id,
+                    envelope.host_ref,
                 )
                 with self._lock:
                     completed = self._completed.get(idempotency_ref)
@@ -739,6 +741,7 @@ class ToolDispatcher:
         caller: str,
         scope: str,
         task_id: Optional[str] = None,
+        host_ref: Optional[str] = None,
     ) -> str:
         canonical = json.dumps(
             {
@@ -746,6 +749,7 @@ class ToolDispatcher:
                 "caller": caller,
                 "scope": scope,
                 "task_id": task_id,
+                "host_ref": host_ref,
             },
             sort_keys=True,
             separators=(",", ":"),
