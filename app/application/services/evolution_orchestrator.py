@@ -71,7 +71,7 @@ class EvolutionOrchestrator(NexusComponent):
         Aceita campos opcionais em *context*:
             error_snippet (str)   — erro ou gap a corrigir.
             mission_id (str)      — ID da missão atual.
-            cap_id (str)          — capability-alvo explícita (ex.: "CAP-042").
+            cap_id (str)          — objective-alvo explícito (ex.: "objective:CAP-042").
                 Quando informada, esta capability é usada em vez da seleção
                 automática via CapabilityManager.
             cap_title (str)       — título da capability-alvo explícita.

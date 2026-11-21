@@ -147,7 +147,13 @@ def _fix_file(file_path: Path, caps_index: Dict[str, Dict]) -> bool:
     num = file_path.stem.replace("cap_", "")
     sector = f"app/domain/capabilities/cap_{num}.py"
 
-    cap_data = caps_index.get(cap_id, {})
+    # O catálogo usa o namespace `objective:` (ADR-006 R1); o formulário
+    # legado `CAP-###` continua aceito para não quebrar o uso manual.
+    cap_data = (
+        caps_index.get(cap_id)
+        or caps_index.get(f"objective:{cap_id}")
+        or {}
+    )
     title = cap_data.get("title", f"Capability {cap_id}")
     description = cap_data.get("description", "Sem descrição disponível.")
 

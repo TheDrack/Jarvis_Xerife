@@ -167,6 +167,7 @@ O que existe, portanto, cobre **execução** em quase todos os domínios e **adm
 - Contagem de arquivos, extensões e testes: `git ls-files`, `find tests -name "test_*.py"`.
 - `config/tool_registry.json`: 12 manifests, 10 `read_only` / 2 `active_bounded`; adapters `public_intelligence_adapter` (4), `telegram_adapter` (2), `network_discovery_adapter` (2), `prospecting_adapter` (2), `drive_uploader` (1), `openai.chatgpt_plan` (1).
 - `data/capabilities.json`: 102 objetivos, 68 `complete` / 21 `pending` / 13 `partial`, campos `id,title,description,status,auto,priority,depends_on,notes`.
+  - **Atualização (2026-11-21, ADR-006 R1):** o inventário foi migrado para `objective:CAP-###`, e os 68 `complete` heurísticos passaram a `unverified` com `claimed_status: "complete"` (histórico preservado). A contagem acima é a leitura anterior à migração e permanece como registro datado; `complete` agora exige evidência de execução.
 - `app/domain/capabilities/cap_*.py`: 102 arquivos, 11–24 linhas, `NexusComponent` sem operação.
 - `@mcp.tool`: 102 em `app/adapters/edge`, 13 em `app/adapters/infrastructure`.
 - `ToolDispatcher(`: 3 instanciações (`prospecting_mcp_tools.py:45`, `communication/dispatcher.py:52`, `runtime/pipeline_runner.py:142`).

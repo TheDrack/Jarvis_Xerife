@@ -419,10 +419,12 @@ class CapabilityManager(NexusComponent):
         return graph
 
     def get_executable_capabilities(self) -> List[Dict[str, Any]]:
-        """Retorna capabilities cujas dependências estão com status ``complete``.
+        """Retorna objectives cujas dependências estão com status ``complete``.
 
-        Apenas essas capabilities podem ser trabalhadas no próximo ciclo
-        de evolução.
+        Apenas esses objectives podem ser trabalhados no próximo ciclo de
+        evolução. ``complete`` só é aceito com evidência de execução
+        (ADR-006 R1); um objective ``unverified`` segue executável até que
+        essa evidência exista.
 
         Returns:
             Lista de dicionários de capabilities prontas para execução.

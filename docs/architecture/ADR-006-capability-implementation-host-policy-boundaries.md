@@ -1,6 +1,6 @@
 # ADR-006 — Fronteiras entre capacidade, implementação, host e política
 
-- **Status:** Aceito; C1 e C2 implementados e testados localmente (ver [Estado de implementação](#estado-de-implementação-2026-11-21)). R1 parcial, R2/R4/R5 e C3–C5 pendentes.
+- **Status:** Aceito; R1, R3, R6, R7, C1 e C2 implementados e testados localmente (ver [Estado de implementação](#estado-de-implementação-2026-11-21)). R2, R4, R5 e C3–C5 pendentes.
 - **Data:** 2026-11-21
 - **Depende de:** [ADR-001](ADR-001-universal-tool-registry.md) (Universal Tool Registry, dispatcher fail-closed)
 - **Insumo:** [Jarvis OS — auditoria de capacidades](JARVIS_OS_CAPABILITY_AUDIT.md) §4, §8 e §9
@@ -129,13 +129,13 @@ Os incrementos abaixo foram implementados **depois** desta decisão, na ordem ob
 | **C1 (catálogo Ubuntu)** | `app/application/services/reference_host_catalog.py`: `host:ubuntu-server` e `host:ubuntu-desktop` com telemetria (`psutil_host_adapter`), descoberta de rede passiva (`network.discovery.passive`, o mesmo ID que o catálogo de execução usa para esse adapter), mensageria e `screen.capture`. | `screen.capture` resolve de forma diferente nos dois hosts Ubuntu: disponível no desktop com limitação `captures-only-the-current-x11-session`; no server, `implementation_unavailable` com `requires-graphical-display-session`. | `host:android-*` e `host:windows-*` não foram declarados porque não foram verificados nesta sessão; não há alegação de paridade. |
 | **C2** | `ToolManifest.host_implementations` + `HostImplementation`; `ToolRequest.host_ref` como preferência não confiável; `ToolDispatcher._select_implementation` escolhe **depois** da autorização e falha com `capability_unavailable` em vez de fallback; `ToolResult`/`ToolExecutionEvent` registram `capability`, `adapter_id` e `host_ref`. | `tests/runtime/test_toolbox_host_implementations.py` (8 testes): dois adapters coexistem; host indisponível é rejeitado sem resolver adapter; host que não declara a tool é rejeitado; política negada continua negando antes da seleção; manifesto rejeita host duplicado, host inválido e capability `objective:`. | Nenhuma tool de `config/tool_registry.json` declara `host_implementations` ainda, e nenhum adapter real foi executado por host. |
 | **C1+C2 (vocabulário único)** | `app/domain/tools/host_selection.py` passa a ser a única definição de `Availability`, `GapReason` e da ordenação (`implementation_order_key`). O catálogo de vínculos e o dispatcher importam o mesmo vocabulário; `HostImplementation.availability` deixa de ser um `Literal` paralelo e passa a usar o enum compartilhado. | `tests/domain/test_host_catalog_manifest_consistency.py` (9 testes): o manifesto derivado do catálogo preserva a mesma disponibilidade e a mesma ordem; o dispatcher escolhe o mesmo `adapter_id`/`host_ref`/limitações que `resolve_capability` em cada host Ubuntu; e o `config/tool_registry.json` real é conferido vínculo a vínculo — cada `(capability, host, adapter)` declarado precisa existir no catálogo com a mesma `availability`, e um manifesto sem `host_implementations` precisa ter seu `adapter_id` declarado e utilizável em algum host. Dois testes negativos provam que a verificação compara disponibilidade, não apenas identidade: catálogo com o adapter real indisponível em todos os hosts falha, e alternativa de host inexistente ou com `availability` divergente falha. | As duas camadas continuam sendo avaliadas com hosts e adapters de teste; nenhum host real foi sondado. |
+| **R1** | `data/capabilities.json` migrado para o namespace `objective:CAP-###` (IDs e `depends_on`); os 68 `complete` heurísticos passaram a `unverified` com `claimed_status: "complete"`, preservando a alegação histórica sem afirmá-la. `app/domain/capabilities/objectives.py` define o namespace e os estados, e exige `evidence` (`command`, `result: passed`, `recorded_at`) para `complete`. `RoadmapMissionSelector` e o workflow passaram a exigir `objective:CAP-###` na referência de compatibilidade. | `tests/domain/test_objective_catalog.py` (16 testes): o catálogo real é validado inteiro (namespace, dependências resolvíveis, 0 `complete` / 68 `unverified` sem `evidence`); `complete` sem evidência ou com `result != passed` é recusado; o catálogo de objetivos e o de execução não compartilham identificadores; `RoadmapMissionSelector` carrega os 102 IDs prefixados. `tests/application/test_roadmap_mission_selector.py` mantido e verde com o novo namespace. | Nenhuma evidência de execução foi coletada para os 68 objetivos: eles seguem sem execução verificada. |
 | **R3** | Um único gerador: `generate_capability_blueprint()`; `CapabilityManager`, `CapabilityGapReporter` e `CapabilityBlueprintService` delegam a ele. | `tests/test_capability_manager.py` mantido e verde. | Os `execute()` de componente Nexus continuam stub; não foram alterados. |
 | **R6** | `capabilities/classification.py` removido. | Nenhuma importação restante; o pacote não tem mais efeito colateral em import. | — |
 | **R7** | `docs/skills-connectors/CATALOG.md`: "dez" → "doze" (10 `read_only`, 2 `active_bounded`), apontando o registry versionado e a auditoria como insumo datado. | Contagem verificada em `config/tool_registry.json` (12 manifests, 10 `read_only` / 2 `active_bounded`). | — |
 
 ### Pendente, declarado
 
-- **R1 parcial.** O namespace é imposto no código (`normalize_capability_id` e `ToolManifest.capabilities` recusam `objective:`), mas `data/capabilities.json` continua com IDs `CAP-###` e os 68 `complete` heurísticos **não** foram migrados para exigir evidência de execução.
 - **R2.** `app/domain/models/adapter_registry.py` segue registrado em `data/nexus_registry.json` e coberto por `tests/test_nexus_registry_sync.py`; aposentá-lo exige migrar o componente Nexus, não apagar o arquivo.
 - **R4.** O alias registry continua sem consumidor de produção.
 - **R5.** `coverage_report()` cobre o registry de vínculos, **não** as ~115 tools MCP.
@@ -146,8 +146,10 @@ Os incrementos abaixo foram implementados **depois** desta decisão, na ordem ob
 ```
 python -m pytest tests/runtime tests/application tests/domain \
   tests/test_capability_manager.py tests/test_nexus_registry_sync.py \
-  tests/test_regression_guards.py tests/test_docs_references.py
-→ 1171 passed, 1 skipped
+  tests/test_regression_guards.py tests/test_docs_references.py \
+  tests/test_evolution_pause_guard.py tests/test_auto_evolution_workflow_contract.py \
+  tests/test_workflow_fixes.py
+→ 1204 passed, 1 skipped
 ```
 
 Ambiente local com as dependências de `requirements/core.txt` em `venv`, Python 3.12.3. Os testes usam adapters e hosts de teste; nenhum adapter real foi invocado. CI da PR, build Android/Desktop, execução em dispositivo e boot de VM **não** foram executados nesta sessão e permanecem não verificados, como declarado em [JARVIS_OS_CAPABILITY_AUDIT.md](JARVIS_OS_CAPABILITY_AUDIT.md) §11.
@@ -155,6 +157,8 @@ Ambiente local com as dependências de `requirements/core.txt` em `venv`, Python
 ## Verificação
 
 O critério de implementação do ADR continua sendo o teste decisivo: **`screen.capture` resolve para implementações diferentes em hosts diferentes, com disponibilidade, limitação, política e resultado observáveis separadamente.** C1 cobre descoberta e catálogo; C2 cobre seleção e resultado no caminho de execução. Ambos têm teste automatizado; falta a execução real por host e a CI da mudança.
+
+R1 tem teste sobre o catálogo real: o namespace `objective:` é validado em todos os 102 registros e nenhum deles afirma `complete` sem evidência de execução. A migração não coletou essa evidência para nenhum objetivo.
 
 ## Referências
 

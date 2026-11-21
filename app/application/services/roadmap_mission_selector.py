@@ -2,9 +2,10 @@
 
 The Markdown roadmap remains the source of truth. This module only accepts
 explicit, reviewed mappings from a roadmap heading to an existing repository
-target and its regression tests. The legacy capability catalog is consulted
-only to resolve the compatibility CAP identifier required by the existing
-EvolutionOrchestrator pipeline; it never selects or prioritizes a mission.
+target and its regression tests. The objective catalog (`data/capabilities.json`,
+namespace `objective:CAP-###`) is consulted only to resolve the compatibility
+objective identifier required by the existing EvolutionOrchestrator pipeline; it
+never selects or prioritizes a mission.
 """
 from __future__ import annotations
 
@@ -19,9 +20,9 @@ from app.application.security.repository_path_policy import (
     protected_prefix_for,
     resolve_repository_path,
 )
+from app.domain.capabilities.objectives import is_objective_id
 
 _CRITERION_RE = re.compile(r"^C[0-8]-[A-Z0-9]+(?:-[A-Z0-9]+)*$")
-_CAPABILITY_RE = re.compile(r"^CAP-[0-9]+$")
 _PHASE_RE = re.compile(r"^C[0-8]$")
 _ALLOWED_STATUSES = {"ready", "blocked", "complete"}
 _ALLOWED_RISKS = {"low", "medium", "high"}
@@ -299,7 +300,7 @@ class RoadmapMissionSelector:
             raise RoadmapManifestError("mission_criterion_id_invalid")
         if not _PHASE_RE.fullmatch(phase) or not criterion_id.startswith(phase + "-"):
             raise RoadmapManifestError("mission_phase_mismatch")
-        if not _CAPABILITY_RE.fullmatch(capability_id):
+        if not is_objective_id(capability_id):
             raise RoadmapManifestError("mission_legacy_capability_id_invalid")
         if capability_id not in capability_ids:
             raise RoadmapManifestError("mission_legacy_capability_id_unknown")
