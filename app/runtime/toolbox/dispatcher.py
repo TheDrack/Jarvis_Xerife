@@ -76,7 +76,12 @@ class _SelectedImplementation:
 
 
 def _implementation_order_key(item: Any) -> tuple[int, int, str, str]:
-    """Order manifest host alternatives with the shared ADR-006 ordering."""
+    """Order manifest host alternatives with the shared ADR-006 ordering.
+
+    ``ToolManifest`` host alternatives do not declare a priority yet, so the
+    shared ordering falls back to ``DEFAULT_PRIORITY`` and breaks ties by
+    adapter and host.
+    """
     return implementation_order_key(
         availability=item.availability,
         adapter_id=item.adapter_id,
@@ -629,15 +634,25 @@ class ToolDispatcher:
                     f"'{requested_host}'.",
                     requested_host,
                 )
-            chosen = min(matches, key=_implementation_order_key)
-            if not chosen.availability.usable:
-                detail = ", ".join(chosen.limitations) or "sem motivo declarado"
+            usable = tuple(
+                item for item in matches if item.availability.usable
+            )
+            if not usable:
+                # Report every declared alternative for the host, not only the
+                # first one the ordering happens to pick: the catalog's gap does
+                # the same, and a single limitation can hide the real blocker.
+                detail = "; ".join(
+                    f"{item.adapter_id}: "
+                    f"{', '.join(item.limitations) or 'sem motivo declarado'}"
+                    for item in matches
+                )
                 raise _CapabilityUnavailableError(
                     GapReason.IMPLEMENTATION_UNAVAILABLE.value,
                     "Implementação declarada indisponível no host "
                     f"'{requested_host}': {detail}.",
                     requested_host,
                 )
+            chosen = min(usable, key=_implementation_order_key)
             return _SelectedImplementation(
                 chosen.adapter_id, chosen.host_ref, chosen.limitations
             )

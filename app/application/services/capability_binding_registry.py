@@ -88,7 +88,12 @@ def _clean_limitations(values: Iterable[str]) -> tuple[str, ...]:
     limitations = tuple(values)
     if any(not isinstance(item, str) or not item.strip() for item in limitations):
         raise ValueError("limitations must contain non-empty strings")
-    return tuple(dict.fromkeys(limitations))
+    # Same rule as ``HostImplementation`` in the execution layer: a repeated
+    # limitation is a declaration mistake, and silently deduplicating it here
+    # would make the two declarations of the same field behave differently.
+    if len(set(limitations)) != len(limitations):
+        raise ValueError("limitations must not contain duplicates")
+    return limitations
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +182,8 @@ class CapabilityBinding:
             "availability": self.availability.value,
             "limitations": list(self.limitations),
             "policy_class": self.policy_class,
+            # Part of the ordering, so it belongs in the diagnostic form.
+            "priority": self.priority,
         }
 
 
@@ -203,8 +210,9 @@ class CapabilityResolution:
     """Ordered candidates for ``(capability, host)`` or an explicit gap.
 
     ``candidates`` holds only usable bindings when ``gap`` is ``None``. When a
-    gap is returned the ordered candidates are kept for diagnosis, so a caller
-    can report *which* limitation produced the absence.
+    gap is returned the bindings considered for the requested host are kept for
+    diagnosis, so a caller can report *which* limitation produced the absence;
+    host-level gaps keep no candidates because no binding was evaluated.
     """
 
     capability_id: str

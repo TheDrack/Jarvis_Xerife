@@ -81,9 +81,12 @@ def build_reference_capability_catalog() -> CapabilityBindingRegistry:
         policy_class="observe",
     )
 
+    # Same capability ID the execution catalog uses for this adapter in
+    # ``config/tool_registry.json``; two names for one adapter would split the
+    # identity ADR-006 §1 keeps canonical.
     for host_ref in (UBUNTU_SERVER, UBUNTU_DESKTOP):
         catalog.bind(
-            "network.discover",
+            "network.discovery.passive",
             host_ref=host_ref,
             adapter_id="network_discovery_adapter",
             policy_class="observe",
