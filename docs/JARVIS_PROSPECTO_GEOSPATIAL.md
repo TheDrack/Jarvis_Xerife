@@ -88,4 +88,4 @@ O Nominatim público do OpenStreetMap não deve ser usado como serviço de geoco
 
 ## Estado
 
-Contratos, adapter opcional CNEFE, cache DuckDB, integração CLI e exportação CSV/manifesto estão em main. A PR do mapa empresarial adiciona leitura autenticada do cache e visualização vetorial local independente da camada de dispositivos. A execução real CNEFE e o smoke test da interface ainda não foram realizados.
+Contratos, adapter opcional CNEFE, cache DuckDB, integração CLI e exportação CSV/manifesto estão em main. A PR #871 foi mesclada: a interface Desktop oferece leitura autenticada e somente leitura do cache DuckDB, com mapa vetorial local independente da camada de dispositivos. Os testes de API, frontend, suíte Python e fila de tarefas passaram no SHA `e973016f5e83ec4606b7cac0cd8fa7b2d229347a`. A execução real CNEFE, benchmark de volume e smoke test Desktop Windows/Android ainda não foram realizados.
