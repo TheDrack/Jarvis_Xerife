@@ -5,6 +5,23 @@
 **Decision:** hybrid and distributed execution across Android, PC, and Cloud  
 **Scope:** runtime placement, worker identity, device capabilities, task continuity, and mobile execution
 
+## 0. Dependency on Jarvis OS capability foundations
+
+This topology is the approved target, but its implementation order is subordinate to
+[ADR-006](ADR-006-capability-implementation-host-policy-boundaries.md).
+
+**Mandatory order:** complete and verify ADR-006 refactors **R1–R7** first; then
+deliver **C1** (capability × host × implementation binding and explicit gaps),
+**C2** (host-aware dispatcher), and the applicable security/audit increments
+**C3–C4**. Only then implement distributed placement and Android/PC/Cloud workers
+described in D1–D5 below. C5 (bootable OS image) remains a separate later workstream.
+
+D0 (architecture and contracts) is satisfied by this document plus ADR-006. The
+D1–D5 labels are work packages, not permission to bypass ADR-006 prerequisites.
+Until capability-to-host resolution exists, the distributed scheduler must not
+infer that a worker can execute a capability from a device name or self-reported
+tool list.
+
 ## 1. Decision
 
 Jarvis is one logical system with multiple execution nodes. Android, PC, and Cloud are not separate Jarvis installations with independent task queues. They are execution environments connected to the same orchestration and task system.
