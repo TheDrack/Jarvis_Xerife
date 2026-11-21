@@ -117,7 +117,7 @@ class ToolDispatcher:
         self._lock = threading.RLock()
         self._inflight: dict[tuple[str, str, str, str, str, str, str], str] = {}
         self._completed: dict[
-            tuple[str, str, str, str, str, str], tuple[str, ToolResult]
+            tuple[str, str, str, str, str, str, str], tuple[str, ToolResult]
         ] = {}
         self._rate_calls: dict[str, Any] = {}
         self._breaker_failures: dict[str, int] = {}
