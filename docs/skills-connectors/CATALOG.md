@@ -51,7 +51,7 @@ Consulte [skills/jarvis-context-memory/SKILL.md](../../skills/jarvis-context-mem
 - Dispatcher e toolchains: app/runtime/toolbox/.
 - Toolchains declarativas: config/toolchains/.
 
-O manifest catalog declara dez ferramentas no schema 1.0.0 do commit de referência; consulte config/tool_registry.json para a lista e schemas exatos. O registry valida e resolve metadados por tool_id/versão. Ele não prova que o adapter está conectado ou saudável.
+O manifest catalog declara doze ferramentas no schema 1.0.0 do commit de referência; consulte [config/tool_registry.json](../../config/tool_registry.json) para a lista e schemas exatos (dez `read_only` e duas `active_bounded`). O registry valida e resolve metadados por tool_id/versão. Ele não prova que o adapter está conectado ou saudável. A [auditoria de capacidades](../architecture/JARVIS_OS_CAPABILITY_AUDIT.md) é insumo datado dessa contagem, não estado vigente: se a contagem divergir, o registry versionado prevalece.
 
 O dispatcher valida o pedido, exige decisão de autorização, resolve o adapter e registra resultado/eventos. Sem política/principal/sessão válidos, deve recusar. Idempotência, rate limits e circuit breaker locais não são garantias distribuídas ou duráveis.
 
