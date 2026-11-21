@@ -29,6 +29,8 @@ Este índice aponta para os documentos mantidos no repositório. Documentos de a
 - [Universal communication layer](communication/UNIVERSAL_COMMUNICATION_LAYER.md)
 - [Universal toolbox](architecture/universal-toolbox.md)
 - [Universal intelligence](architecture/jarvis-universal-intelligence.md)
+- [Jarvis OS — auditoria de capacidades](architecture/JARVIS_OS_CAPABILITY_AUDIT.md)
+- [ADR-006 — capacidade, implementação, host e política](architecture/ADR-006-capability-implementation-host-policy-boundaries.md)
 - [Identidade de worker](architecture/agent-worker-identity.md)
 - [Execution plans](architecture/declarative-execution-plans.md)
 

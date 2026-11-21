@@ -9,6 +9,13 @@ The first deliverable is a portable foundation, not a bootable distribution and 
 ## Workstreams
 
 ### A. Repository reconciliation
+- Initial source-only mapping against the five-layer JARVIS OS architecture:
+  [architecture/JARVIS_OS_CAPABILITY_AUDIT.md](architecture/JARVIS_OS_CAPABILITY_AUDIT.md).
+  It records the five concurrent capability registries, the absence of capability → host
+  resolution, and the reuse/refactor/build treatment per subsystem. It is evidence input for
+  C0-CAPABILITY-MAP; it does not change the ledger in [STATUS.md](STATUS.md).
+  Its refactor and build sections are recorded as a decision in
+  [architecture/ADR-006-capability-implementation-host-policy-boundaries.md](architecture/ADR-006-capability-implementation-host-policy-boundaries.md).
 - Inventory source modules, entry points, dependency groups, configuration, tests and workflows.
 - Map existing implementations to the target architecture.
 - Mark each item: reuse, extend, refactor, new, duplicate candidate, or unverified.
