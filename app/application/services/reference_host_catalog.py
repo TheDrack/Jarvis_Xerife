@@ -35,24 +35,27 @@ _OBSERVED_ON_UBUNTU = (
 )
 
 
-def build_reference_capability_catalog() -> CapabilityBindingRegistry:
-    """Return the declared Ubuntu reference catalog.
+def build_reference_capability_catalog(
+    *, host_state: HostState = HostState.UNKNOWN
+) -> CapabilityBindingRegistry:
+    """Return declarations without assuming that either reference host is online.
 
-    Availability and limitations describe the implementation's preconditions;
-    they are not test results and they are not authorization.
+    Tests that simulate a reachable host must pass HostState.ONLINE explicitly.
+    Availability and limitations describe implementation preconditions; they
+    are not test results and they are not authorization.
     """
     catalog = CapabilityBindingRegistry()
 
     catalog.declare_host(
         UBUNTU_SERVER,
         os_family="ubuntu",
-        state=HostState.ONLINE,
+        state=host_state,
         limitations=("no-graphical-display-session",),
     )
     catalog.declare_host(
         UBUNTU_DESKTOP,
         os_family="ubuntu",
-        state=HostState.ONLINE,
+        state=host_state,
         limitations=("x11-session-only",),
     )
 
