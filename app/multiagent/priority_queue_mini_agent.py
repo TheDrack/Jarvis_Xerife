@@ -20,6 +20,14 @@ from .transport import AgentMessage
 logger = logging.getLogger(__name__)
 
 
+class TaskQueueHTTPError(RuntimeError):
+    """Sanitized HTTP failure that preserves the status for lease policy."""
+
+    def __init__(self, status_code: int, path: str) -> None:
+        self.status_code = status_code
+        super().__init__(f"Jarvis task API returned HTTP {status_code} ({path}).")
+
+
 class PriorityQueueMiniAgent:
     """Poll the authenticated Jarvis task API and execute text-only tasks.
 
@@ -252,6 +260,31 @@ class PriorityQueueMiniAgent:
                         "lease_seconds": self.lease_seconds,
                     },
                 )
+            except TaskQueueHTTPError as exc:
+                if exc.status_code in {401, 403, 404, 409}:
+                    lease_lost.set()
+                    logger.error(
+                        "Task lease renewal was rejected (task_id=%s, http_status=%s)",
+                        task_id,
+                        exc.status_code,
+                    )
+                    return
+                if time.monotonic() - last_success >= self.lease_seconds:
+                    lease_lost.set()
+                    logger.error(
+                        "Task lease renewal could not be confirmed before expiry "
+                        "(task_id=%s, http_status=%s)",
+                        task_id,
+                        exc.status_code,
+                    )
+                    return
+                logger.warning(
+                    "Task lease renewal failed; retrying before expiry "
+                    "(task_id=%s, http_status=%s)",
+                    task_id,
+                    exc.status_code,
+                )
+                continue
             except Exception as exc:  # noqa: BLE001 - retry transient network errors
                 if time.monotonic() - last_success >= self.lease_seconds:
                     lease_lost.set()
@@ -344,7 +377,7 @@ class PriorityQueueMiniAgent:
         except httpx.HTTPError as exc:
             raise RuntimeError(f"Jarvis task API is unreachable ({path}).") from exc
         if response.is_error:
-            raise RuntimeError(f"Jarvis task API returned HTTP {response.status_code} ({path}).")
+            raise TaskQueueHTTPError(response.status_code, path)
         try:
             data = response.json()
         except ValueError as exc:

@@ -363,7 +363,7 @@ def test_priority_worker_does_not_finish_when_lease_renewal_is_rejected(monkeypa
             }})
         if request.url.path.endswith("/renew"):
             renew_rejected.set()
-            return httpx.Response(200, json={"renewed": False})
+            return httpx.Response(409, json={"detail": "Task ownership or lease is stale"})
         if request.url.path.endswith("/release"):
             return httpx.Response(200, json={"released": False})
         if request.url.path.endswith("/finish"):
