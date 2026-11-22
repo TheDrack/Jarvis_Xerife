@@ -138,17 +138,23 @@ class TestNexusContract:
 # ---------------------------------------------------------------------------
 
 class TestAdapterRegistry:
-    def test_execute_handles_all_actions(self):
+    def test_legacy_registry_fails_closed_and_is_not_executable(self):
         from app.domain.models.adapter_registry import AdapterRegistry
 
-        reg = AdapterRegistry()
-        assert reg.execute({"action": "list"})["success"] is True
-        assert reg.execute({"action": "refresh"})["success"] is True
-        assert reg.execute({"action": "get", "adapter_id": "llm_router"})["adapter"] is not None
-        gap = reg.execute({"action": "find_gap", "capability": "enviar fax"})
-        assert gap["success"] is True
-        assert gap["gap"]["missing_adapter"] is True
-        assert reg.execute({"action": "nope"})["success"] is False
+        registry = AdapterRegistry()
+        result = registry.execute({"action": "list"})
+
+        assert result["success"] is False
+        assert result["error"] == "deprecated_registry"
+        assert registry.can_execute() is False
+
+    def test_legacy_gap_matching_is_exact_not_substring(self):
+        from app.domain.models.adapter_registry import AdapterRegistry
+
+        registry = AdapterRegistry()
+
+        assert registry.find_gap("plan")["missing_adapter"] is True
+        assert registry.find_gap("planning") is None
 
     def test_suggest_adapter_id_normalises(self):
         from app.domain.models.adapter_registry import AdapterRegistry
