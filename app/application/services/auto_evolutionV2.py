@@ -54,13 +54,16 @@ class AutoEvolutionServiceV2(NexusComponent):
                         "error": "Autoevolução pausada: defina EVOLUTION_ENABLED=true explicitamente após concluir a revisão de segurança.",
                     }
 
-                cap_id = context.get("cap_id")
-                if not cap_id:
+                requested_cap_id = context.get("cap_id")
+                if not requested_cap_id:
                     mission = self.find_next_mission()
                     if not mission:
                         return {"success": False, "error": "Nenhuma cap pendente encontrada."}
                     cap_id = mission["id"]
                 else:
+                    # Keep the public legacy CAP-### input compatible with the
+                    # canonical objective:CAP-### namespace introduced by R1.
+                    cap_id = normalize_objective_id(requested_cap_id)
                     mission = next(
                         (
                             c
