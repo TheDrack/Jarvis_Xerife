@@ -56,6 +56,7 @@ def _manifest_for(capability: str, catalog) -> ToolManifest:
                     "host_ref": binding.host_ref,
                     "adapter_id": binding.adapter_id,
                     "availability": binding.availability.value,
+                    "priority": binding.priority,
                     "limitations": list(binding.limitations),
                 }
                 for binding in bindings
@@ -68,6 +69,7 @@ def _declared_order(item: Any) -> tuple[int, int, str, str]:
     """Sort manifest host alternatives with the shared ordering."""
     return implementation_order_key(
         availability=item.availability,
+        priority=item.priority,
         adapter_id=item.adapter_id,
         host_ref=item.host_ref,
     )
@@ -154,6 +156,34 @@ class TestSharedDeclarationRules:
 
 
 class TestSharedOrdering:
+    def test_non_default_catalog_priority_reaches_manifest_and_dispatcher(self):
+        catalog = CapabilityBindingRegistry()
+        catalog.declare_host(
+            UBUNTU_DESKTOP, os_family="ubuntu", state=HostState.ONLINE
+        )
+        catalog.bind(
+            "screen.capture",
+            host_ref=UBUNTU_DESKTOP,
+            adapter_id="z_capture",
+            priority=20,
+        )
+        catalog.bind(
+            "screen.capture",
+            host_ref=UBUNTU_DESKTOP,
+            adapter_id="a_capture",
+            priority=10,
+        )
+
+        manifest = _manifest_for("screen.capture", catalog)
+        ordered = sorted(manifest.host_implementations, key=_declared_order)
+        chosen = _dispatcher(manifest)._select_implementation(
+            manifest, UBUNTU_DESKTOP
+        )
+
+        assert [item.priority for item in ordered] == [10, 20]
+        assert [item.adapter_id for item in ordered] == ["a_capture", "z_capture"]
+        assert chosen.adapter_id == "a_capture"
+
     def test_manifest_order_matches_catalog_order(self):
         catalog = build_reference_capability_catalog()
 
@@ -285,6 +315,13 @@ def _repository_contradictions(
                             f"{alternative.host_ref}/{alternative.adapter_id} as "
                             f"'{alternative.availability.value}', but the catalog "
                             f"declares '{binding.availability.value}'"
+                        )
+                    if binding.priority != alternative.priority:
+                        problems.append(
+                            f"'{manifest.tool_id}' declares priority "
+                            f"{alternative.priority} for "
+                            f"{alternative.host_ref}/{alternative.adapter_id}, "
+                            f"but the catalog declares {binding.priority}"
                         )
 
     return problems, compared
