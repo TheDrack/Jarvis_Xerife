@@ -24,6 +24,18 @@ from app.multiagent.transport import AgentMessage
 logger = logging.getLogger(__name__)
 
 
+def _configured_worker_model_provider() -> str:
+    """Resolve provider identity from server configuration, never worker claims."""
+    from app.multiagent.freellmapi_client import configured_provider_id
+
+    provider_id = configured_provider_id()
+    if provider_id != "unknown":
+        return provider_id
+    if os.getenv("FREELLMAPI_API_KEY", "").strip():
+        return "freellmapi"
+    return "unknown"
+
+
 def _emit_proactive_task_signal(
     owner_id: str | None,
     event_type: str,
@@ -275,6 +287,9 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
             agent_id = require_worker_identity(request.agent_id, worker)
             payload = request.model_dump(exclude={"agent_id", "available_tools"})
             payload["agent_id"] = agent_id
+            # Provider identity participates in scheduler eligibility (e.g. red-team
+            # task restrictions), so it must come from trusted server configuration.
+            payload["model_provider"] = _configured_worker_model_provider()
             payload["available_tools"] = list(worker.available_tools)
             # The current worker runtime executes one task per loop. Do not let
             # the request body inflate the scheduler's concurrency budget.

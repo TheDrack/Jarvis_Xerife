@@ -38,6 +38,10 @@ def test_heartbeat_uses_credential_identity_and_server_capabilities(monkeypatch)
         calls.append(kwargs)
         return {"agent_id": kwargs["agent_id"], "status": "available"}
 
+    monkeypatch.setattr(
+        "app.adapters.infrastructure.routers.agent_tasks._configured_worker_model_provider",
+        lambda: "groq",
+    )
     client = _client(monkeypatch, worker, heartbeat_stub=heartbeat_stub)
     response = client.post(
         "/v1/agents/heartbeat",
@@ -487,3 +491,33 @@ def test_worker_cannot_finish_after_lease_expiry(monkeypatch):
     )
 
     assert response.status_code == 409
+
+
+def test_worker_heartbeat_cannot_self_assert_a_provider_for_scheduler_eligibility(monkeypatch):
+    calls = []
+    worker = SimpleNamespace(
+        agent_id="trusted-mini-1", principal_id="worker:trusted-mini-1",
+        available_tools=("text_reasoning",),
+    )
+    monkeypatch.setattr(
+        "app.adapters.infrastructure.routers.agent_tasks._configured_worker_model_provider",
+        lambda: "groq",
+        raising=False,
+    )
+
+    def heartbeat_stub(self, **kwargs):
+        calls.append(kwargs)
+        return {"agent_id": kwargs["agent_id"], "status": "available"}
+
+    client = _client(monkeypatch, worker, heartbeat_stub=heartbeat_stub)
+    response = client.post(
+        "/v1/agents/heartbeat",
+        json={
+            "agent_id": "trusted-mini-1",
+            "model_provider": "venice",
+            "available_tools": ["text_reasoning"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert calls[0]["model_provider"] == "groq"
