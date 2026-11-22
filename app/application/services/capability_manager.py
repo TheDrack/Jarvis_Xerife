@@ -27,6 +27,7 @@ from sqlmodel import Session, create_engine, select
 from sqlalchemy.engine import Engine
 
 from app.domain.models.capability import JarvisCapability
+from app.domain.capabilities.objectives import is_selectable_objective
 
 logger = logging.getLogger(__name__)
 
@@ -434,8 +435,8 @@ class CapabilityManager(NexusComponent):
 
         executable = []
         for cap in caps:
-            if cap.get("status") == "complete":
-                continue  # já concluída
+            if not is_selectable_objective(cap):
+                continue  # concluída ou explicitamente bloqueada
             deps = cap.get("depends_on", [])
             if all(caps_by_id.get(dep, {}).get("status") == "complete" for dep in deps):
                 executable.append(cap)
