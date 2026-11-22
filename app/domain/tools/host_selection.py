@@ -71,6 +71,7 @@ class GapReason(str, Enum):
     NO_IMPLEMENTATION = "no_implementation"
     CAPABILITY_NOT_DECLARED = "capability_not_declared"
     HOST_UNKNOWN = "host_unknown"
+    HOST_STATE_UNKNOWN = "host_state_unknown"
     HOST_OFFLINE = "host_offline"
     IMPLEMENTATION_UNAVAILABLE = "implementation_unavailable"
     #: Emitted by the execution path after the policy decision, never by discovery.
