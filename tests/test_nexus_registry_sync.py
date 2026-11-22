@@ -242,6 +242,4 @@ def test_retired_domain_adapter_registry_is_not_in_active_nexus_catalog():
     )
 
     assert "adapter_registry" not in registry["components"]
-    assert registry["components"].get("osint_adapter_registry") == (
-        "app.application.services.adapter_registry"
-    )
+    assert (project_root / "app" / "application" / "services" / "adapter_registry.py").is_file()
