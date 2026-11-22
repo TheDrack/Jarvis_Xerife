@@ -47,6 +47,13 @@ def _objectives():
             "depends_on": ["objective:CAP-001"],
             "priority": 10,
         },
+        {
+            "id": "objective:CAP-005",
+            "title": "Pending objective with blocked dependency",
+            "status": "pending",
+            "depends_on": ["objective:CAP-002"],
+            "priority": 15,
+        },
     ]
 
 
@@ -101,6 +108,18 @@ def test_explicit_batch_selection_rejects_blocked_objective(monkeypatch):
     monkeypatch.setattr(evolve_all_pending, "_load_capabilities", _objectives)
     monkeypatch.setattr(
         sys, "argv", ["evolve_all_pending.py", "--cap-id", "objective:CAP-002"]
+    )
+
+    with pytest.raises(SystemExit) as raised:
+        evolve_all_pending.main()
+
+    assert raised.value.code == 1
+
+
+def test_explicit_batch_selection_rejects_uncompleted_dependencies(monkeypatch):
+    monkeypatch.setattr(evolve_all_pending, "_load_capabilities", _objectives)
+    monkeypatch.setattr(
+        sys, "argv", ["evolve_all_pending.py", "--cap-id", "objective:CAP-005"]
     )
 
     with pytest.raises(SystemExit) as raised:
