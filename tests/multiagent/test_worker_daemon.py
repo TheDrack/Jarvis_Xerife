@@ -56,7 +56,6 @@ def test_daemon_restarts_worker_group_after_unexpected_exit():
 
     assert starts == 2
     assert first_worker_stop.is_set()
-    assert first_worker_stop.is_set()
     assert groups[0].joined
     assert second_worker_stop.is_set()
     assert groups[1].joined
@@ -122,3 +121,54 @@ def test_daemon_rejects_invalid_intervals(monitor, minimum, maximum):
             min_restart_backoff_seconds=minimum,
             max_restart_backoff_seconds=maximum,
         )
+
+
+def test_daemon_restarts_group_when_only_one_worker_thread_dies():
+    class FakeThread:
+        def __init__(self, alive):
+            self.alive = alive
+
+        def is_alive(self):
+            return self.alive
+
+    class PartialGroup:
+        name = "partial-group"
+
+        def __init__(self):
+            self.threads = [FakeThread(False), FakeThread(True)]
+            self.joined = False
+
+        def is_alive(self):
+            return any(thread.is_alive() for thread in self.threads)
+
+        def join(self, timeout=None):
+            self.joined = True
+            for thread in self.threads:
+                thread.alive = False
+
+    stop = StopAfterWait(stop_after=2)
+    first_worker_stop = Event()
+    second_worker_stop = Event()
+    first_group = PartialGroup()
+    second_group = FakeGroup([True])
+    groups = iter([(first_group, first_worker_stop), (second_group, second_worker_stop)])
+    starts = 0
+
+    def start_workers():
+        nonlocal starts
+        starts += 1
+        return next(groups)
+
+    run_worker_daemon(
+        stop,
+        start_workers=start_workers,
+        monitor_interval_seconds=0.01,
+        min_restart_backoff_seconds=0.01,
+        max_restart_backoff_seconds=0.02,
+    )
+
+    assert starts == 2
+    assert first_group.joined
+    assert first_worker_stop.is_set()
+    assert second_group.joined
+    assert second_worker_stop.is_set()
