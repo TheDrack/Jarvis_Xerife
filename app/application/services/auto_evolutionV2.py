@@ -1,7 +1,13 @@
 from app.core.nexus import nexus, NexusComponent
 from app.utils.document_store import document_store
+from app.domain.capabilities.objectives import (
+    is_selectable_objective,
+    normalize_objective_id,
+    validate_catalog,
+    validate_execution_evidence,
+)
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Any, Dict, List, Mapping, Optional
 import logging
 import os
 logger = logging.getLogger(__name__)
@@ -198,7 +204,7 @@ class AutoEvolutionServiceV2(NexusComponent):
         caps = data.get("capabilities", [])
         completed_ids = {c["id"] for c in caps if c.get("status") == "complete"}
 
-        pending = [c for c in caps if c.get("status") != "complete"]
+        pending = [c for c in caps if is_selectable_objective(c)]
         # Prioridade 1 vem antes de 2
         pending.sort(key=lambda x: x.get("priority", 99))
 
@@ -236,19 +242,24 @@ class AutoEvolutionServiceV2(NexusComponent):
             f"STATUS: {cap.get('status', 'pending')}"
         )
 
-    def mark_mission_as_completed(self, cap_id: str) -> bool:
-        """Atualiza o status no JSON usando o ID único."""
+    def mark_mission_as_completed(
+        self, cap_id: str, *, evidence: Mapping[str, Any]
+    ) -> bool:
+        """Mark one objective complete only with passing execution evidence."""
+        objective_id = normalize_objective_id(cap_id)
         data = self._load_data()
-        found = False
-        for cap in data.get("capabilities", []):
-            if cap.get("id") == cap_id:
-                cap["status"] = "complete"
-                found = True
-                break
+        for objective in data.get("capabilities", []):
+            if objective.get("id") != objective_id:
+                continue
 
-        if found:
+            objective["status"] = "complete"
+            objective["evidence"] = validate_execution_evidence(evidence)
+            # The old heuristic claim is superseded by this evidence-backed result.
+            objective.pop("claimed_status", None)
+            validate_catalog(data)
             self._save_data(data)
-        return found
+            return True
+        return False
 
     def is_auto_evolution_pr(self, title: str) -> bool:
         """Detecta se um PR/Commit é parte do nosso ciclo de evolução."""
