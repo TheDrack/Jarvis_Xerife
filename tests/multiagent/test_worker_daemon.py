@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
+
+import pytest
 
 from app.multiagent.worker_daemon import WorkerDaemon
 
@@ -154,6 +157,10 @@ def test_daemon_status_never_persists_exception_text_or_secrets(tmp_path):
     assert "provider-token-must-not-be-written" not in raw
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Windows ACLs do not expose POSIX mode bits; Termux runs on POSIX.",
+)
 def test_daemon_status_file_is_private_to_the_termux_user(tmp_path):
     daemon = WorkerDaemon(
         start_worker=None,
