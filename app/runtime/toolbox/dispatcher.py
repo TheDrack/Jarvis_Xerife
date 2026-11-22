@@ -84,6 +84,7 @@ def _implementation_order_key(item: Any) -> tuple[int, int, str, str]:
     """
     return implementation_order_key(
         availability=item.availability,
+        priority=item.priority,
         adapter_id=item.adapter_id,
         host_ref=item.host_ref,
     )
