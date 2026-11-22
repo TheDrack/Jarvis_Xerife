@@ -6,17 +6,20 @@ import os
 from collections.abc import Mapping
 from functools import lru_cache
 from typing import Any, Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
+from starlette.concurrency import run_in_threadpool
 
 from app.adapters.infrastructure.agent_worker_credentials import AgentWorkerCredentialStore
 from app.application.services.agent_task_queue_service import (
     AgentTaskQueueService, TaskQueueUnavailable,
 )
 from app.core.nexus import nexus
+from app.multiagent.transport import AgentMessage
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +74,25 @@ class AgentHeartbeatRequest(BaseModel):
     estimated_latency_seconds: float = Field(default=0, ge=0)
 
 
+class AgentInferenceRequest(BaseModel):
+    agent_id: str = Field(min_length=1, max_length=200)
+    task_id: str = Field(min_length=1, max_length=200)
+    attempt_id: UUID
+    objective: str = Field(min_length=1, max_length=10000)
+    task_type: str = Field(default="general", max_length=120)
+    context: str = Field(default="", max_length=16000)
+    constraints: list[str] = Field(default_factory=list, max_length=20)
+    acceptance_criteria: list[str] = Field(default_factory=list, max_length=20)
+    model: str | None = Field(default=None, max_length=200)
+
+    @field_validator("constraints", "acceptance_criteria")
+    @classmethod
+    def validate_bounded_items(cls, values: list[str]) -> list[str]:
+        if any(not isinstance(item, str) or len(item) > 1000 for item in values):
+            raise ValueError("Each text criterion must contain at most 1000 characters")
+        return values
+
+
 class EnqueueTaskRequest(BaseModel):
     task_id: str = Field(min_length=1, max_length=200)
     objective: str = Field(min_length=1, max_length=10000)
@@ -91,6 +113,12 @@ class EnqueueTaskRequest(BaseModel):
 
 class ClaimTaskRequest(BaseModel):
     agent_id: str = Field(min_length=1, max_length=200)
+    lease_seconds: int = Field(default=90, ge=10, le=3600)
+
+
+class RenewTaskLeaseRequest(BaseModel):
+    agent_id: str = Field(min_length=1, max_length=200)
+    attempt_id: UUID
     lease_seconds: int = Field(default=90, ge=10, le=3600)
 
 
@@ -118,6 +146,23 @@ class RoutineRequest(BaseModel):
     schedule: dict[str, Any] = Field(default_factory=dict)
     task_template: dict[str, Any] = Field(default_factory=dict)
     enabled: bool = True
+
+
+@lru_cache(maxsize=1)
+def _build_remote_inference_handler():
+    """Create one server-side text-only model handler from private env config."""
+    from app.multiagent.freellmapi_client import (
+        FreeLLMAPIClient,
+        configured_provider_id,
+    )
+    from app.multiagent.model_runtime_factory import create_registered_model_handler
+
+    provider_id = configured_provider_id()
+    if not provider_id or provider_id == "unknown":
+        provider_id = "freellmapi"
+    return create_registered_model_handler(
+        FreeLLMAPIClient.from_env(), provider_id=provider_id
+    )
 
 
 def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=None) -> APIRouter:
@@ -224,7 +269,6 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
     @router.post("/agents/heartbeat")
     async def heartbeat(
         request: AgentHeartbeatRequest,
-        _user=Depends(get_current_user),
         worker=Depends(worker_dependency),
     ):
         try:
@@ -240,6 +284,53 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
             raise
         except Exception as exc:
             raise translate_error(exc) from exc
+
+    @router.post("/agent-inference/complete")
+    async def complete_agent_inference(
+        request: AgentInferenceRequest,
+        worker=Depends(worker_dependency),
+    ):
+        agent_id = require_worker_identity(request.agent_id, worker)
+        if "text_reasoning" not in tuple(getattr(worker, "available_tools", ()) or ()):
+            raise HTTPException(
+                status_code=403,
+                detail="Worker credential does not grant text_reasoning",
+            )
+        try:
+            queue = service()
+            owns_attempt = queue.owns_active_attempt(
+                request.task_id, agent_id, str(request.attempt_id)
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise translate_error(exc) from exc
+        if not owns_attempt:
+            raise HTTPException(
+                status_code=409,
+                detail="Task attempt is not currently leased to this worker",
+            )
+        message = AgentMessage.create(
+            task_id=request.task_id, sender_id="jarvis-server-inference",
+            recipient_id=agent_id, kind="request",
+            payload={
+                "attempt_id": str(request.attempt_id),
+                "objective": request.objective, "task_type": request.task_type,
+                "context": request.context, "constraints": request.constraints,
+                "acceptance_criteria": request.acceptance_criteria, "model": request.model,
+            },
+        )
+        try:
+            result = await run_in_threadpool(_build_remote_inference_handler(), message)
+            if not isinstance(result, Mapping):
+                raise TypeError("Inference handler returned a non-mapping result")
+            return {"agent_id": agent_id, "task_id": request.task_id, "result": dict(result)}
+        except Exception as exc:
+            logger.error("Remote agent inference failed (%s)", type(exc).__name__)
+            raise HTTPException(
+                status_code=503,
+                detail="Text inference provider is temporarily unavailable",
+            ) from None
 
     @router.post("/agent-tasks")
     async def enqueue(request: EnqueueTaskRequest, _user=Depends(get_current_user)):
@@ -257,7 +348,6 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
     @router.post("/agent-tasks/claim-next")
     async def claim_next(
         request: ClaimTaskRequest,
-        _user=Depends(get_current_user),
         worker=Depends(worker_dependency),
     ):
         try:
@@ -269,16 +359,36 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
         except Exception as exc:
             raise translate_error(exc) from exc
 
+    @router.post("/agent-tasks/{task_id}/renew")
+    async def renew_task_lease(
+        task_id: str,
+        request: RenewTaskLeaseRequest,
+        worker=Depends(worker_dependency),
+    ):
+        try:
+            agent_id = require_worker_identity(request.agent_id, worker)
+            renewed = service().renew_lease(
+                task_id, agent_id, str(request.attempt_id), request.lease_seconds
+            )
+            if not renewed:
+                raise HTTPException(status_code=409, detail="Task ownership or lease is stale")
+            return {"renewed": True, "task_id": task_id}
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise translate_error(exc) from exc
+
     @router.post("/agent-tasks/{task_id}/finish")
     async def finish(
         task_id: str,
         request: FinishTaskRequest,
-        _user=Depends(get_current_user),
         worker=Depends(worker_dependency),
     ):
         try:
             agent_id = require_worker_identity(request.agent_id, worker)
             queue = service()
+            if not queue.owns_active_attempt(task_id, agent_id, request.attempt_id):
+                raise HTTPException(status_code=409, detail="Task ownership, lease, or attempt is stale")
             accepted = queue.finish(
                 task_id, agent_id, request.attempt_id, request.status, request.result
             )
@@ -309,7 +419,6 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
     async def release(
         task_id: str,
         request: ReleaseTaskRequest,
-        _user=Depends(get_current_user),
         worker=Depends(worker_dependency),
     ):
         try:
