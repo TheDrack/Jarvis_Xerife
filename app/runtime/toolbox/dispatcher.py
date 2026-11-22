@@ -78,9 +78,8 @@ class _SelectedImplementation:
 def _implementation_order_key(item: Any) -> tuple[int, int, str, str]:
     """Order manifest host alternatives with the shared ADR-006 ordering.
 
-    ``ToolManifest`` host alternatives do not declare a priority yet, so the
-    shared ordering falls back to ``DEFAULT_PRIORITY`` and breaks ties by
-    adapter and host.
+    Availability and declared priority are applied first; adapter and host are
+    deterministic tie-breakers.
     """
     return implementation_order_key(
         availability=item.availability,
