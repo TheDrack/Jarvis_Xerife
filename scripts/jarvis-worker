@@ -64,6 +64,7 @@ configure() {
         printf 'JARVIS_TASK_QUEUE_API_URL=%q\n' "$api_url"
         printf '%s=%q\n' "$token_var" "$worker_token"
         printf 'JARVIS_TASK_QUEUE_LEASE_SECONDS=90\n'
+        printf 'JARVIS_OBJECTIVE_JOURNAL_ENABLED=true\nJARVIS_OBJECTIVE_JOURNAL_PATH=%q\n' "$HOME/jarvis-mobile/state/agent-objectives.sqlite3"
     } > "$tmp"
     chmod 600 "$tmp"
     mv -f "$tmp" "$ENV_FILE"
@@ -102,10 +103,22 @@ case "${1:-status}" in
         if [ -f "$STATUS_FILE" ]; then cat "$STATUS_FILE"; else echo "Estado do worker ainda não publicado."; fi
         ;;
     logs) [ -f "$LOG_FILE" ] && tail -n 100 -F "$LOG_FILE" || echo "Log ainda não criado." ;;
+    objectives|prune-objectives)
+        repo_root="${JARVIS_REPO_ROOT:-$HOME/Jarvis_Xerife_repo}"
+        journal="${JARVIS_OBJECTIVE_JOURNAL_PATH:-$HOME/jarvis-mobile/state/agent-objectives.sqlite3}"
+        if [ ! -f "$journal" ]; then
+            echo "Nenhum objetivo persistido ainda em $journal."
+            exit 0
+        fi
+        args=(--status)
+        [ "$1" = "prune-objectives" ] && args+=(--prune)
+        PYTHONPATH="$repo_root${PYTHONPATH:+:$PYTHONPATH}" \
+            "$PREFIX/bin/python" -m app.multiagent.objective_journal --path "$journal" "${args[@]}"
+        ;;
     provision-help)
         echo "Em ambiente administrativo confiável, com DATABASE_URL/JARVIS_TASK_QUEUE_DATABASE_URL apontando ao PostgreSQL compartilhado:"
         echo "python scripts/manage_agent_worker_credentials.py issue --agent-id jarvis-termux-mini-1 --capability text_reasoning"
         echo "O token aparece uma única vez. Não o envie por chat; use jarvis-worker configure diretamente no Termux."
         ;;
-    *) echo "Uso: jarvis-worker {configure|start|stop|restart|status|logs|provision-help}" >&2; exit 2 ;;
+    *) echo "Uso: jarvis-worker {configure|start|stop|restart|status|logs|objectives|prune-objectives|provision-help}" >&2; exit 2 ;;
 esac

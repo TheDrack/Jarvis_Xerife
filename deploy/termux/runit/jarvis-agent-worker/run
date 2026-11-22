@@ -41,6 +41,9 @@ export JARVIS_AGENT_ID
 export JARVIS_AGENT_ENVIRONMENT="${JARVIS_AGENT_ENVIRONMENT:-termux-android}"
 export JARVIS_MINI_AGENT_WORKERS=1
 export JARVIS_WORKER_STATUS_FILE="$STATUS_FILE"
+# Objective progress is persisted on the phone so an interrupted attempt resumes.
+export JARVIS_OBJECTIVE_JOURNAL_ENABLED="${JARVIS_OBJECTIVE_JOURNAL_ENABLED:-true}"
+export JARVIS_OBJECTIVE_JOURNAL_PATH="${JARVIS_OBJECTIVE_JOURNAL_PATH:-$HOME/jarvis-mobile/state/agent-objectives.sqlite3}"
 export PYTHONPATH="$REPO${PYTHONPATH:+:$PYTHONPATH}"
 mkdir -p "$(dirname "$STATUS_FILE")"
 cd "$REPO"

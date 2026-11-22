@@ -15,6 +15,7 @@ from typing import Any, Callable
 
 from app.adapters.infrastructure.agent_worker_credentials import worker_token_env_name
 
+from .persistent_objective_agent import wrap_handler_with_objective_journal
 from .priority_queue_mini_agent import PriorityQueueMiniAgent
 
 logger = logging.getLogger(__name__)
@@ -232,6 +233,11 @@ def start_configured_worker() -> tuple[WorkerGroup, threading.Event] | None:
         workers = [
             PriorityQueueMiniAgent.from_env(agent_id=agent_id) for agent_id in agent_ids
         ]
+
+    for worker in workers:
+        handler = getattr(worker, "handler", None)
+        if handler is not None:
+            worker.handler = wrap_handler_with_objective_journal(handler)
 
     threads = [
         threading.Thread(

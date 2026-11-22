@@ -20,6 +20,10 @@ through the authenticated Jarvis API; it does not create a second queue.
   not receive shell, GitHub, browser or other tool grants.
 - Termux starts with one worker slot to bound mobile CPU/RAM and avoid sharing a
   per-agent credential across concurrent identities.
+- Objective progress is journaled on the phone, so an attempt that ends because
+  of a reboot, Doze, battery saver, network loss or an expired lease resumes from
+  the recorded steps instead of starting the objective again. See
+  [Local objective persistence](#local-objective-persistence).
 
 ## Install
 
@@ -68,6 +72,36 @@ password, JWT or provider key. The API URL defaults to
 `https://jarvis-api-c47i.onrender.com`; its `/health` endpoint returned HTTP 200
 when this Termux deployment was prepared. The URL can be changed in the local
 configuration flow.
+
+## Local objective persistence
+
+Model inference stays remote: the API holds the provider configuration. What
+runs on the phone is the state that lets the worker *finish* an objective across
+interruptions.
+
+- `app/multiagent/objective_journal.py` keeps a SQLite journal at
+  `~/jarvis-mobile/state/agent-objectives.sqlite3` (mode 600, WAL,
+  `synchronous=FULL`): objective text, acceptance criteria, attempts, each step's
+  bounded output, the failure class and the last successful result.
+- `app/multiagent/persistent_objective_agent.py` wraps the inference handler: it
+  opens or resumes the objective before the call, records the step, marks a step
+  left `started` as `interrupted` when an attempt died, feeds the recorded
+  progress into the next attempt's context, and replays the stored result when the
+  queue retries a task whose completion never reached the server.
+- `JARVIS_OBJECTIVE_JOURNAL_ENABLED=true` enables the journal (the runit service
+  sets it by default) and `JARVIS_OBJECTIVE_JOURNAL_PATH` relocates the file. If
+  the journal cannot be opened, the worker keeps consuming the queue without
+  local persistence instead of failing to start.
+
+Stored text is only what was already sent to the model, the bounded output it
+returned and error *classes* - never provider keys, worker tokens, user
+credentials, exception messages or raw provider payloads. Retention keeps the
+newest 100 finished objectives and 50 steps per objective.
+
+```bash
+jarvis-worker objectives         # status of persisted objectives
+jarvis-worker prune-objectives  # apply retention now
+```
 
 ## Operations
 
