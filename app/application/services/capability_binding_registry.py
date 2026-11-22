@@ -51,8 +51,9 @@ class NamespaceViolation(ValueError):
 
 
 class HostState(str, Enum):
-    """Reachability of a declared host, independent of any capability."""
+    """Observed reachability of a declared host, independent of any capability."""
 
+    UNKNOWN = "unknown"
     ONLINE = "online"
     OFFLINE = "offline"
 
@@ -102,7 +103,7 @@ class HostRecord:
 
     host_ref: str
     os_family: str
-    state: HostState = HostState.ONLINE
+    state: HostState = HostState.UNKNOWN
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -259,7 +260,7 @@ class CapabilityBindingRegistry(AdapterRegistry):
         host_ref: str,
         *,
         os_family: str,
-        state: HostState = HostState.ONLINE,
+        state: HostState = HostState.UNKNOWN,
         limitations: Iterable[str] = (),
     ) -> HostRecord:
         record = HostRecord(
@@ -362,6 +363,14 @@ class CapabilityBindingRegistry(AdapterRegistry):
                     f"host is declared but offline: {requested_host}",
                     (),
                 )
+            if record.state is HostState.UNKNOWN:
+                return self._gap(
+                    capability_id,
+                    requested_host,
+                    GapReason.HOST_STATE_UNKNOWN,
+                    f"host reachability has not been verified: {requested_host}",
+                    (),
+                )
             ordered = tuple(
                 sorted(
                     (item for item in declared if item.host_ref == requested_host),
@@ -393,6 +402,20 @@ class CapabilityBindingRegistry(AdapterRegistry):
             if hosts[item.host_ref].state is HostState.ONLINE
         )
         if not reachable:
+            unknown_hosts = {
+                item.host_ref
+                for item in declared
+                if hosts[item.host_ref].state is HostState.UNKNOWN
+            }
+            if unknown_hosts:
+                return self._gap(
+                    capability_id,
+                    None,
+                    GapReason.HOST_STATE_UNKNOWN,
+                    "reachability is unverified for declaring hosts: "
+                    + ", ".join(sorted(unknown_hosts)),
+                    (),
+                )
             return self._gap(
                 capability_id,
                 None,
