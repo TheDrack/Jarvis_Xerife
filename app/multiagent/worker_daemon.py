@@ -26,7 +26,9 @@ def _worker_group_has_exited(worker_group: Any) -> bool:
     threads = getattr(worker_group, "threads", None)
     if threads is not None:
         return any(not thread.is_alive() for thread in threads)
-    return not worker_group.is_alive()
+    # The outer monitor already checks is_alive() for generic group objects.
+    # Avoid probing it twice: real WorkerGroup exposes its member threads.
+    return False
 
 
 def run_worker_daemon(
