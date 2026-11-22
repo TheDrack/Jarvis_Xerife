@@ -623,6 +623,13 @@ class ToolDispatcher:
         """
         declared = manifest.host_implementations
         if not declared:
+            if requested_host is not None:
+                raise _CapabilityUnavailableError(
+                    GapReason.CAPABILITY_NOT_DECLARED.value,
+                    f"'{manifest.tool_id}' não declara alternativas de implementação "
+                    f"para o host '{requested_host}'.",
+                    requested_host,
+                )
             return _SelectedImplementation(manifest.adapter_id, None)
 
         if requested_host is not None:

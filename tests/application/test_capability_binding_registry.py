@@ -179,8 +179,12 @@ class TestResolution:
 
     def test_priority_breaks_ties_deterministically(self):
         catalog = CapabilityBindingRegistry()
-        catalog.declare_host(DESKTOP, os_family="ubuntu")
-        catalog.declare_host(SERVER, os_family="ubuntu")
+        catalog.declare_host(
+            DESKTOP, os_family="ubuntu", state=HostState.ONLINE
+        )
+        catalog.declare_host(
+            SERVER, os_family="ubuntu", state=HostState.ONLINE
+        )
         catalog.bind(
             "screen.capture",
             host_ref=SERVER,

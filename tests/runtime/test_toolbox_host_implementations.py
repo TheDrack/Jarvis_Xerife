@@ -163,6 +163,26 @@ class TestHostSelection:
         assert result.host_ref == "host:ubuntu-laptop"
         assert calls == []
 
+    def test_host_request_without_alternatives_fails_closed(self):
+        data = _manifest(host_implementations=[])
+        calls = []
+        dispatcher = ToolDispatcher(
+            ToolRegistry([data]),
+            resolver=lambda adapter_id: calls.append(adapter_id) or _Adapter(adapter_id),
+            authorizer=_Authorizer(),
+        )
+
+        result = asyncio.run(
+            dispatcher.dispatch_async(_request(host_ref=DESKTOP))
+        )
+
+        assert result.success is False
+        assert result.status == "rejected"
+        assert result.error_code == "capability_unavailable"
+        assert result.host_ref == DESKTOP
+        assert calls == []
+
+
     def test_authorization_still_decides_before_host_selection(self):
         dispatcher, calls = _dispatcher(granted=False)
 
