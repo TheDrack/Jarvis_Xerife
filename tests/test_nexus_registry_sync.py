@@ -231,51 +231,17 @@ def test_load_local_registry_falls_back_to_versioned_json_when_jrvs_is_missing(t
     }
 
 
-def test_json_registry_resolves_adapter_registry_in_nexus_strict_mode(tmp_path):
-    """The JSON fallback must avoid a filesystem-wide discovery in strict mode."""
+def test_retired_domain_adapter_registry_is_not_in_active_nexus_catalog():
+    """The compatibility shim must not be registered as an active Nexus component."""
     import json
     from pathlib import Path
-    from threading import RLock
-
-    from app.core.nexus import JarvisNexus
-    from app.domain.models.adapter_registry import AdapterRegistry
 
     project_root = Path(__file__).resolve().parents[1]
-    data_dir = tmp_path / "data"
-    data_dir.mkdir()
-    registry = {
-        "components": {
-            "adapter_registry": "app.domain.models.adapter_registry.AdapterRegistry",
-        }
-    }
-    (data_dir / "nexus_registry.json").write_text(
-        json.dumps(registry), encoding="utf-8"
+    registry = json.loads(
+        (project_root / "data" / "nexus_registry.json").read_text(encoding="utf-8")
     )
 
-    nexus = JarvisNexus.__new__(JarvisNexus)
-    nexus.base_dir = str(tmp_path)
-    nexus._cache = {}
-    nexus._path_map = {}
-    nexus._lock = RLock()
-    nexus._executor = None
-
-    try:
-        with patch(
-            "app.core.nexus_registry._jrvs_read",
-            side_effect=FileNotFoundError("generated JRVS mirror is absent"),
-        ):
-            nexus._cache.update(nexus._load_local_registry())
-
-        with patch("app.core.nexus_discovery.NEXUS_STRICT_MODE", True):
-            resolved = nexus.resolve_class("adapter_registry")
-
-        assert resolved is AdapterRegistry
-        assert nexus._cache["adapter_registry"] == (
-            "app.domain.models.adapter_registry"
-        )
-        assert project_root.joinpath(
-            "app", "domain", "models", "adapter_registry.py"
-        ).is_file()
-    finally:
-        if nexus._executor is not None:
-            nexus._executor.shutdown(wait=True)
+    assert "adapter_registry" not in registry["components"]
+    assert registry["components"].get("osint_adapter_registry") == (
+        "app.application.services.adapter_registry"
+    )
