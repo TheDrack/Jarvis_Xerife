@@ -228,3 +228,90 @@ def test_get_task_owner_returns_persisted_owner():
     }
 
     assert service.get_task_owner("task-42") == "owner-42"
+
+
+def test_owns_active_attempt_checks_agent_fence_and_live_lease():
+    service, connection = _ownership_service_with_connection()
+    connection.execute.return_value.scalar_one.return_value = True
+
+    owned = service.owns_active_attempt(
+        "task-1", "worker-1", "00000000-0000-0000-0000-000000000001"
+    )
+
+    statement = str(connection.execute.call_args.args[0]).lower()
+    params = connection.execute.call_args.args[1]
+    assert owned is True
+    assert "assigned_agent_id" in statement
+    assert "attempt_id" in statement
+    assert "lease_expires_at > now()" in statement
+    assert params == {
+        "task_id": "task-1", "agent_id": "worker-1",
+        "attempt_id": "00000000-0000-0000-0000-000000000001",
+    }
+
+
+def test_owns_active_attempt_returns_false_for_stale_attempt():
+    service, connection = _ownership_service_with_connection()
+    connection.execute.return_value.scalar_one.return_value = False
+
+    assert service.owns_active_attempt(
+        "task-1", "worker-1", "00000000-0000-0000-0000-000000000001"
+    ) is False
+
+
+def test_owns_active_attempt_rejects_empty_identity_before_database_call():
+    engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+    service = AgentTaskQueueService(engine)
+    service.engine.connect = MagicMock(side_effect=AssertionError("DB must not be called"))
+
+    with pytest.raises(ValueError, match="task_id"):
+        service.owns_active_attempt("", "worker-1", "00000000-0000-0000-0000-000000000001")
+
+
+def test_renew_lease_uses_attempt_fence_and_requested_duration():
+    engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+    service = AgentTaskQueueService(engine)
+    connection = MagicMock()
+    connection.execute.return_value.scalar_one.return_value = True
+    transaction = MagicMock()
+    transaction.__enter__.return_value = connection
+    engine.begin = MagicMock(return_value=transaction)
+
+    renewed = service.renew_lease(
+        "task-1", "worker-1", "00000000-0000-0000-0000-000000000001", 120
+    )
+
+    statement = str(connection.execute.call_args.args[0])
+    params = connection.execute.call_args.args[1]
+    assert renewed is True
+    assert "renew_jarvis_agent_task_lease" in statement
+    assert params == {
+        "task_id": "task-1", "agent_id": "worker-1",
+        "attempt_id": "00000000-0000-0000-0000-000000000001",
+        "lease_seconds": 120,
+    }
+
+
+def test_renew_lease_rejects_expired_or_stale_attempt():
+    engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+    service = AgentTaskQueueService(engine)
+    connection = MagicMock()
+    connection.execute.return_value.scalar_one.return_value = False
+    transaction = MagicMock()
+    transaction.__enter__.return_value = connection
+    engine.begin = MagicMock(return_value=transaction)
+
+    assert service.renew_lease(
+        "task-1", "worker-1", "00000000-0000-0000-0000-000000000001"
+    ) is False
+
+
+def test_renew_lease_validates_duration_and_identifiers_before_database_call():
+    engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+    service = AgentTaskQueueService(engine)
+    service.engine.begin = MagicMock(side_effect=AssertionError("DB must not be called"))
+
+    with pytest.raises(ValueError, match="lease_seconds"):
+        service.renew_lease("task-1", "worker-1", "attempt", 0)
+    with pytest.raises(ValueError, match="task_id"):
+        service.renew_lease(" ", "worker-1", "attempt", 90)

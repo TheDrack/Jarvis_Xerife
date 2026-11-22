@@ -1,0 +1,48 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -Eeuo pipefail
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+HOME="${HOME:-/data/data/com.termux/files/home}"
+PATH="$PREFIX/bin:$PATH"
+REPO="${JARVIS_REPO_ROOT:-$HOME/Jarvis_Xerife_repo}"
+ENV_FILE="${JARVIS_WORKER_ENV_FILE:-$HOME/.config/jarvis/agent-worker/worker.env}"
+STATUS_FILE="$HOME/jarvis-mobile/state/agent-worker.status"
+
+if [ ! -f "$ENV_FILE" ]; then
+    echo "[WORKER] Configuração ausente: $ENV_FILE"
+    exit 78
+fi
+chmod 600 "$ENV_FILE"
+set -a
+. "$ENV_FILE"
+set +a
+
+JARVIS_AGENT_ID="${JARVIS_AGENT_ID:-jarvis-termux-mini-1}"
+normalized_agent="$(printf '%s' "$JARVIS_AGENT_ID" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g; s/^_*//; s/_*$//')"
+worker_token_var="JARVIS_TASK_QUEUE_WORKER_TOKEN_${normalized_agent}"
+worker_token="${!worker_token_var:-${JARVIS_TASK_QUEUE_WORKER_TOKEN:-}}"
+missing=()
+[ "${JARVIS_MINI_AGENT_ENABLED:-false}" = "true" ] || missing+=("JARVIS_MINI_AGENT_ENABLED=true")
+[ -n "${JARVIS_TASK_QUEUE_API_URL:-}" ] || missing+=("JARVIS_TASK_QUEUE_API_URL")
+if [ "${JARVIS_AGENT_REMOTE_INFERENCE:-false}" != "true" ]; then
+    if [ -z "${JARVIS_TASK_QUEUE_API_TOKEN:-}" ] && { [ -z "${JARVIS_TASK_QUEUE_USERNAME:-}" ] || [ -z "${JARVIS_TASK_QUEUE_PASSWORD:-}" ]; }; then
+        missing+=("JARVIS_TASK_QUEUE_API_TOKEN or JARVIS_TASK_QUEUE_USERNAME+JARVIS_TASK_QUEUE_PASSWORD")
+    fi
+    if [ -z "${FREELLMAPI_API_KEY:-}" ] && [ -z "${GROQ_API_KEY:-}" ] && [ -z "${VENICE_API_KEY:-}" ]; then
+        missing+=("FREELLMAPI_API_KEY or GROQ_API_KEY or VENICE_API_KEY")
+    fi
+fi
+[ -n "$worker_token" ] || missing+=("$worker_token_var")
+if [ "${#missing[@]}" -gt 0 ]; then
+    printf '[WORKER] BLOQUEADO; configuração ausente: %s\n' "${missing[*]}"
+    exit 78
+fi
+
+export JARVIS_AGENT_ID
+export JARVIS_AGENT_ENVIRONMENT="${JARVIS_AGENT_ENVIRONMENT:-termux-android}"
+export JARVIS_MINI_AGENT_WORKERS=1
+export JARVIS_WORKER_STATUS_FILE="$STATUS_FILE"
+export PYTHONPATH="$REPO${PYTHONPATH:+:$PYTHONPATH}"
+mkdir -p "$(dirname "$STATUS_FILE")"
+cd "$REPO"
+echo "[WORKER] Iniciando consumidor autenticado da fila compartilhada (agent_id=$JARVIS_AGENT_ID)."
+exec "$PREFIX/bin/python" -m app.multiagent.worker_daemon

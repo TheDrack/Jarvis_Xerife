@@ -1,0 +1,111 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -Eeuo pipefail
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+HOME="${HOME:-/data/data/com.termux/files/home}"
+ENV_FILE="${JARVIS_WORKER_ENV_FILE:-$HOME/.config/jarvis/agent-worker/worker.env}"
+SERVICE="$PREFIX/var/service/jarvis-agent-worker"
+STATUS_FILE="$HOME/jarvis-mobile/state/agent-worker.status"
+LOG_FILE="$HOME/jarvis-mobile/logs/agent-worker/current"
+
+load_config() {
+    [ -f "$ENV_FILE" ] || return 1
+    set -a
+    . "$ENV_FILE"
+    set +a
+}
+
+missing_config() {
+    local missing=() agent normalized token_var
+    agent="${JARVIS_AGENT_ID:-jarvis-termux-mini-1}"
+    normalized="$(printf '%s' "$agent" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g; s/^_*//; s/_*$//')"
+    token_var="JARVIS_TASK_QUEUE_WORKER_TOKEN_${normalized}"
+    [ "${JARVIS_MINI_AGENT_ENABLED:-false}" = "true" ] || missing+=("JARVIS_MINI_AGENT_ENABLED=true")
+    [ -n "${JARVIS_TASK_QUEUE_API_URL:-}" ] || missing+=("JARVIS_TASK_QUEUE_API_URL")
+    if [ "${JARVIS_AGENT_REMOTE_INFERENCE:-false}" != "true" ]; then
+        if [ -z "${JARVIS_TASK_QUEUE_API_TOKEN:-}" ] && { [ -z "${JARVIS_TASK_QUEUE_USERNAME:-}" ] || [ -z "${JARVIS_TASK_QUEUE_PASSWORD:-}" ]; }; then
+            missing+=("JARVIS_TASK_QUEUE_API_TOKEN or JARVIS_TASK_QUEUE_USERNAME+JARVIS_TASK_QUEUE_PASSWORD")
+        fi
+        if [ -z "${FREELLMAPI_API_KEY:-}" ] && [ -z "${GROQ_API_KEY:-}" ] && [ -z "${VENICE_API_KEY:-}" ]; then
+            missing+=("FREELLMAPI_API_KEY or GROQ_API_KEY or VENICE_API_KEY")
+        fi
+    fi
+    [ -n "${!token_var:-${JARVIS_TASK_QUEUE_WORKER_TOKEN:-}}" ] || missing+=("$token_var")
+    printf '%s\n' "${missing[@]}"
+}
+
+configure() {
+    local api_url agent_id worker_token normalized token_var tmp
+    mkdir -p "$(dirname "$ENV_FILE")"
+    load_config || true
+    api_url="${JARVIS_TASK_QUEUE_API_URL:-https://jarvis-api-c47i.onrender.com}"
+    read -r -p "URL da API [$api_url]: " value || true
+    [ -n "${value:-}" ] && api_url="$value"
+    agent_id="${JARVIS_AGENT_ID:-jarvis-termux-mini-1}"
+    read -r -p "ID do agente [$agent_id]: " value || true
+    [ -n "${value:-}" ] && agent_id="$value"
+    normalized="$(printf '%s' "$agent_id" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g; s/^_*//; s/_*$//')"
+    token_var="JARVIS_TASK_QUEUE_WORKER_TOKEN_${normalized}"
+    worker_token="${!token_var:-}"
+    if [ -z "$worker_token" ]; then
+        read -r -s -p "Token individual do worker ($token_var): " worker_token; echo
+    else
+        echo "Token individual ja provisionado localmente; sera preservado sem exibicao."
+    fi
+    if [ -z "$worker_token" ]; then
+        echo "Token individual do worker ausente; configuracao cancelada." >&2
+        return 2
+    fi
+    tmp="$(mktemp "$(dirname "$ENV_FILE")/.worker.env.XXXXXX")"
+    umask 077
+    {
+        printf 'JARVIS_MINI_AGENT_ENABLED=true\nJARVIS_MINI_AGENT_WORKERS=1\n'
+        printf 'JARVIS_AGENT_ID=%q\n' "$agent_id"
+        printf 'JARVIS_AGENT_ENVIRONMENT=termux-android\nJARVIS_AGENT_REMOTE_INFERENCE=true\nJARVIS_AGENT_REMOTE_INFERENCE_TIMEOUT=55\n'
+        printf 'JARVIS_TASK_QUEUE_API_URL=%q\n' "$api_url"
+        printf '%s=%q\n' "$token_var" "$worker_token"
+        printf 'JARVIS_TASK_QUEUE_LEASE_SECONDS=90\n'
+    } > "$tmp"
+    chmod 600 "$tmp"
+    mv -f "$tmp" "$ENV_FILE"
+    unset worker_token
+    echo "Configuracao remota gravada com permissao 600; nenhum segredo de provedor ou JWT foi solicitado."
+    start_service
+}
+
+start_service() {
+    if ! load_config; then echo "Configuração ausente. Execute: jarvis-worker configure" >&2; return 2; fi
+    local missing
+    missing="$(missing_config)"
+    if [ -n "$missing" ]; then
+        echo "Worker BLOQUEADO; faltam:"; printf ' - %s\n' "$missing"; return 2
+    fi
+    "$PREFIX/bin/sv" up "$SERVICE"
+    "$PREFIX/bin/sv" status "$SERVICE"
+}
+
+case "${1:-status}" in
+    configure) configure ;;
+    start) start_service ;;
+    boot-start)
+        if load_config && [ -z "$(missing_config)" ]; then
+            "$PREFIX/bin/sv" up "$SERVICE" >/dev/null 2>&1 || true
+            "$PREFIX/bin/sv" status "$SERVICE"
+        else
+            "$PREFIX/bin/sv" down "$SERVICE" >/dev/null 2>&1 || true
+            echo "[BOOT] Worker não iniciado: configuração/credenciais ainda ausentes."
+        fi
+        ;;
+    stop) "$PREFIX/bin/sv" down "$SERVICE"; "$PREFIX/bin/sv" status "$SERVICE" ;;
+    restart) load_config || { echo "Configuração ausente."; exit 2; }; [ -z "$(missing_config)" ] || { echo "Configuração incompleta."; exit 2; }; "$PREFIX/bin/sv" restart "$SERVICE"; "$PREFIX/bin/sv" status "$SERVICE" ;;
+    status)
+        "$PREFIX/bin/sv" status "$SERVICE" 2>&1 || true
+        if [ -f "$STATUS_FILE" ]; then cat "$STATUS_FILE"; else echo "Estado do worker ainda não publicado."; fi
+        ;;
+    logs) [ -f "$LOG_FILE" ] && tail -n 100 -F "$LOG_FILE" || echo "Log ainda não criado." ;;
+    provision-help)
+        echo "Em ambiente administrativo confiável, com DATABASE_URL/JARVIS_TASK_QUEUE_DATABASE_URL apontando ao PostgreSQL compartilhado:"
+        echo "python scripts/manage_agent_worker_credentials.py issue --agent-id jarvis-termux-mini-1 --capability text_reasoning"
+        echo "O token aparece uma única vez. Não o envie por chat; use jarvis-worker configure diretamente no Termux."
+        ;;
+    *) echo "Uso: jarvis-worker {configure|start|stop|restart|status|logs|provision-help}" >&2; exit 2 ;;
+esac

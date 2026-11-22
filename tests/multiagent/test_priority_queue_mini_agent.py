@@ -223,3 +223,169 @@ def test_from_env_does_not_reuse_global_token_for_multiple_slots(monkeypatch):
 
     with pytest.raises(RuntimeError, match="JARVIS_TASK_QUEUE_WORKER_TOKEN"):
         PriorityQueueMiniAgent.from_env(agent_id="mini-freellmapi-1")
+
+
+def test_priority_worker_advertises_configured_runtime_environment(monkeypatch):
+    calls = []
+    monkeypatch.setenv("JARVIS_AGENT_ENVIRONMENT", "termux-android")
+
+    def transport(request):
+        import json
+        calls.append((request.url.path, json.loads(request.content)))
+        if request.url.path.endswith("/heartbeat"):
+            return httpx.Response(200, json={"status": "available"})
+        if request.url.path.endswith("/claim-next"):
+            return httpx.Response(200, json={"task": None})
+        raise AssertionError(request.url.path)
+
+    client = httpx.Client(transport=httpx.MockTransport(transport))
+    worker = PriorityQueueMiniAgent(
+        api_base_url="https://jarvis.example", api_token="token",
+        worker_token="worker-test-token", agent_id="jarvis-termux-mini-1",
+        handler=FakeHandler(), client=client,
+    )
+    try:
+        assert worker.run_once() is None
+    finally:
+        client.close()
+
+    heartbeat = next(body for path, body in calls if path.endswith("/heartbeat"))
+    assert heartbeat["environment"] == "termux-android"
+
+
+def test_from_env_remote_inference_needs_no_jwt_or_provider_key(monkeypatch):
+    from app.multiagent.remote_inference_client import RemoteInferenceHandler
+
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_URL", "https://jarvis.example")
+    monkeypatch.setenv("JARVIS_AGENT_REMOTE_INFERENCE", "true")
+    monkeypatch.setenv("JARVIS_AGENT_ID", "jarvis-termux-mini-1")
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_API_TOKEN", raising=False)
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_USERNAME", raising=False)
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_PASSWORD", raising=False)
+    monkeypatch.delenv("FREELLMAPI_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("VENICE_API_KEY", raising=False)
+
+    worker = PriorityQueueMiniAgent.from_env(
+        worker_token="preprovisioned-worker-token",
+    )
+
+    assert worker.remote_inference is True
+    assert worker.api_token == ""
+    assert isinstance(worker.handler, RemoteInferenceHandler)
+
+
+def test_remote_mode_worker_requests_do_not_send_user_jwt():
+    requests = []
+
+    def transport(request):
+        requests.append(request)
+        if request.url.path.endswith("/heartbeat"):
+            return httpx.Response(200, json={"status": "available"})
+        if request.url.path.endswith("/claim-next"):
+            return httpx.Response(200, json={"task": None})
+        raise AssertionError(request.url.path)
+
+    client = httpx.Client(transport=httpx.MockTransport(transport))
+    worker = PriorityQueueMiniAgent(
+        api_base_url="https://jarvis.example", worker_token="worker-only-token",
+        agent_id="jarvis-termux-mini-1", handler=FakeHandler(),
+        remote_inference=True, client=client,
+    )
+    try:
+        assert worker.run_once() is None
+    finally:
+        client.close()
+
+    assert len(requests) == 2
+    assert all(request.headers["X-Jarvis-Worker-Token"] == "worker-only-token" for request in requests)
+    assert all("Authorization" not in request.headers for request in requests)
+
+
+def test_priority_worker_renews_lease_while_handler_is_running(monkeypatch):
+    import threading
+
+    renewed = threading.Event()
+    calls = []
+
+    def transport(request):
+        calls.append(request.url.path)
+        if request.url.path.endswith("/heartbeat"):
+            return httpx.Response(200, json={})
+        if request.url.path.endswith("/claim-next"):
+            return httpx.Response(200, json={"task": {
+                "task_id": "task-lease", "attempt_id": "00000000-0000-0000-0000-000000000031",
+                "objective": "Long running task",
+            }})
+        if request.url.path.endswith("/renew"):
+            renewed.set()
+            return httpx.Response(200, json={"renewed": True})
+        if request.url.path.endswith("/finish"):
+            return httpx.Response(200, json={"accepted": True})
+        raise AssertionError(request.url.path)
+
+    class BlockingHandler:
+        def __call__(self, message):
+            assert renewed.wait(2), "worker did not renew the active lease"
+            return {"success": True, "output": "done"}
+
+    monkeypatch.setattr(PriorityQueueMiniAgent, "_lease_renewal_interval", lambda self: 0.01)
+    client = httpx.Client(transport=httpx.MockTransport(transport))
+    worker = PriorityQueueMiniAgent(
+        api_base_url="https://jarvis.example", api_token="user-token",
+        worker_token="worker-token", agent_id="mini-1", handler=BlockingHandler(),
+        client=client,
+    )
+    try:
+        result = worker.run_once()
+    finally:
+        client.close()
+
+    assert result["status"] == "completed"
+    assert "/v1/agent-tasks/task-lease/renew" in calls
+    assert calls.index("/v1/agent-tasks/task-lease/renew") < calls.index("/v1/agent-tasks/task-lease/finish")
+
+
+def test_priority_worker_does_not_finish_when_lease_renewal_is_rejected(monkeypatch):
+    import threading
+
+    renew_rejected = threading.Event()
+    calls = []
+
+    def transport(request):
+        calls.append(request.url.path)
+        if request.url.path.endswith("/heartbeat"):
+            return httpx.Response(200, json={})
+        if request.url.path.endswith("/claim-next"):
+            return httpx.Response(200, json={"task": {
+                "task_id": "task-stale", "attempt_id": "00000000-0000-0000-0000-000000000032",
+                "objective": "Stale task",
+            }})
+        if request.url.path.endswith("/renew"):
+            renew_rejected.set()
+            return httpx.Response(409, json={"detail": "Task ownership or lease is stale"})
+        if request.url.path.endswith("/release"):
+            return httpx.Response(200, json={"released": False})
+        if request.url.path.endswith("/finish"):
+            raise AssertionError("a stale attempt must never be completed")
+        raise AssertionError(request.url.path)
+
+    class BlockingHandler:
+        def __call__(self, message):
+            assert renew_rejected.wait(2), "worker did not attempt lease renewal"
+            return {"success": True, "output": "must be discarded"}
+
+    monkeypatch.setattr(PriorityQueueMiniAgent, "_lease_renewal_interval", lambda self: 0.01)
+    client = httpx.Client(transport=httpx.MockTransport(transport))
+    worker = PriorityQueueMiniAgent(
+        api_base_url="https://jarvis.example", api_token="user-token",
+        worker_token="worker-token", agent_id="mini-1", handler=BlockingHandler(),
+        client=client,
+    )
+    try:
+        with pytest.raises(RuntimeError, match="lease.*lost"):
+            worker.run_once()
+    finally:
+        client.close()
+
+    assert not any(path.endswith("/finish") for path in calls)

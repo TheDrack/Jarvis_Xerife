@@ -205,6 +205,55 @@ class AgentTaskQueueService:
             """), {"agent_id": agent_id, "lease_seconds": lease_seconds}).mappings().first()
         return dict(row) if row else None
 
+    def renew_lease(
+        self,
+        task_id: str,
+        agent_id: str,
+        attempt_id: str,
+        lease_seconds: int = 90,
+    ) -> bool:
+        """Extend only the current, still-live attempt lease for its assigned agent."""
+        self._ensure_postgres()
+        if not task_id.strip() or not agent_id.strip() or not attempt_id.strip():
+            raise ValueError("task_id, agent_id and attempt_id must not be empty")
+        if not isinstance(lease_seconds, int) or not 10 <= lease_seconds <= 3600:
+            raise ValueError("lease_seconds must be between 10 and 3600")
+        with self.engine.begin() as conn:
+            renewed = conn.execute(text("""
+                select public.renew_jarvis_agent_task_lease(
+                    :task_id, :agent_id, cast(:attempt_id as uuid), :lease_seconds
+                )
+            """), {
+                "task_id": task_id,
+                "agent_id": agent_id,
+                "attempt_id": attempt_id,
+                "lease_seconds": lease_seconds,
+            }).scalar_one()
+        return bool(renewed)
+
+    def owns_active_attempt(self, task_id: str, agent_id: str, attempt_id: str) -> bool:
+        """Verify that this worker still owns the live lease for this exact attempt."""
+        self._ensure_postgres()
+        if not task_id.strip() or not agent_id.strip() or not attempt_id.strip():
+            raise ValueError("task_id, agent_id and attempt_id must not be empty")
+        with self.engine.connect() as conn:
+            active = conn.execute(text("""
+                select exists (
+                    select 1
+                      from public.jarvis_agent_tasks
+                     where task_id = :task_id
+                       and assigned_agent_id = :agent_id
+                       and attempt_id = cast(:attempt_id as uuid)
+                       and status in ('claimed', 'in_progress', 'verifying')
+                       and lease_expires_at > now()
+                )
+            """), {
+                "task_id": task_id,
+                "agent_id": agent_id,
+                "attempt_id": attempt_id,
+            }).scalar_one()
+        return bool(active)
+
     def finish(
         self,
         task_id: str,
