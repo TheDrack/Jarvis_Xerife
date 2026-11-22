@@ -90,6 +90,22 @@ always-on background worker requires an independently configured Render worker
 resource and may incur cost. Do not repurpose the API start command or deploy a
 new paid resource without reviewing its plan and environment first.
 
+## Durability boundary
+
+This daemon makes the **worker process** persistent and relies on the existing
+PostgreSQL queue for task-level ownership, leases, attempt fencing, and recovery.
+It does not yet provide transparent step-by-step replay of arbitrary
+`TaskRunner.execute_plan` executions. The current `execution_plan_events`
+table is append-only audit history; the interpreter has no event loader or
+persisted result checkpoint protocol.
+
+If a process disappears after a side-effecting connector starts but before its
+completion is durably recorded, the outcome is unknown. The safe behavior is to
+hold that execution for reconciliation rather than blindly replaying the side
+effect. Full declarative-plan replay requires a separate design for plan-digest
+binding, completed-step recovery, and safe result references; it must not store
+raw tool arguments or results in the existing audit journal.
+
 ## Operational invariants
 
 - Empty queue means remain alive and wait; it does not mean task completion.
