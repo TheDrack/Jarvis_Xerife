@@ -19,7 +19,7 @@ from pydantic import (
     model_validator,
 )
 
-from app.domain.tools.host_selection import Availability
+from app.domain.tools.host_selection import Availability, DEFAULT_PRIORITY
 
 _TOOL_ID_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
 _SEMVER_PATTERN = re.compile(
@@ -81,6 +81,7 @@ class HostImplementation(BaseModel):
     #: Shared vocabulary with the capability catalog; see
     #: ``app.domain.tools.host_selection`` for usability and ordering.
     availability: Availability = Availability.AVAILABLE
+    priority: int = Field(default=DEFAULT_PRIORITY, strict=True)
     limitations: tuple[str, ...] = ()
 
     @field_validator("availability", mode="before")
