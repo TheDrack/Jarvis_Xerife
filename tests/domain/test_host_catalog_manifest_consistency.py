@@ -202,7 +202,7 @@ class TestSharedOrdering:
             assert from_manifest == from_catalog
 
     def test_dispatcher_agrees_with_catalog_on_every_declared_host(self):
-        catalog = build_reference_capability_catalog()
+        catalog = build_reference_capability_catalog(host_state=HostState.ONLINE)
 
         for capability in SHARED_CAPABILITIES:
             manifest = _manifest_for(capability, catalog)
@@ -223,7 +223,7 @@ class TestSharedOrdering:
                     assert raised.value.reason == resolution.gap.reason.value
 
     def test_headless_ubuntu_server_is_unavailable_in_both_layers(self):
-        catalog = build_reference_capability_catalog()
+        catalog = build_reference_capability_catalog(host_state=HostState.ONLINE)
         manifest = _manifest_for("screen.capture", catalog)
 
         resolution = catalog.resolve_capability("screen.capture", UBUNTU_SERVER)
