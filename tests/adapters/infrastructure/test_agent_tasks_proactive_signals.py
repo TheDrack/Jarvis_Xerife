@@ -64,6 +64,7 @@ def test_blocked_signal_targets_persisted_task_owner_not_worker_api_user(monkeyp
         "app.adapters.infrastructure.routers.agent_tasks.nexus.resolve",
         lambda component_id: assistant if component_id == "assistant_service" else None,
     )
+    monkeypatch.setattr(AgentTaskQueueService, "owns_active_attempt", lambda self, *args: True)
     monkeypatch.setattr(AgentTaskQueueService, "finish", lambda self, *args, **kwargs: True)
     monkeypatch.setattr(
         AgentTaskQueueService, "get_task_owner",
