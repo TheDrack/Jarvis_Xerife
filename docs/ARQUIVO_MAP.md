@@ -36,7 +36,7 @@ graph LR
     app_adapters_infrastructure_prospecting["<b>prospecting</b><br/><hr/>📄 acate_directory.py: AcateDirectoryAdapter<br/>📄 acate_observatory.py: AcateObservatoryAdapter, load<br/>📄 cnpj_open_data.py: from, CnpjOpenDataFiles, missing<br/>📄 cnpj_store.py: from, CnpjStoreFiles, missing<br/>📄 composite.py: CompositeDiscoveryProvider<br/>📄 demand_store.py: DemandNotFound<br/>📄 external_leads.py: ExternalLeadsAdapter<br/>📄 geocodebr_geocoder.py: GeocodeBrGeocoder, geocode_companies<br/>📄 geocoding_store.py: DuckDBGeocodingRepository<br/>📄 prospecting_adapter.py: ProspectingAdapter, database_path"]
     class app_adapters_infrastructure_prospecting adapter
     app_adapters_infrastructure --> app_adapters_infrastructure_prospecting
-    app_adapters_infrastructure_routers["<b>routers</b><br/><hr/>📄 admin_recovery.py: AdminPasswordResetRequest, create_admin_recovery_router<br/>📄 agent_tasks.py: AgentHeartbeatRequest, EnqueueTaskRequest<br/>📄 assistant.py: create_assistant_router<br/>📄 bridge.py: create_bridge_router, require_authenticated_principal, local_bridge_websocket<br/>📄 dev_agent.py: create_dev_agent_router, run_dev_agent, list_dev_agent_jobs<br/>📄 devices.py: create_devices_router, register_device<br/>📄 environment_observations.py: EnvironmentObservationCreate, Config, validate_device_id<br/>📄 evolution.py: create_evolution_router, get_evolution_status<br/>📄 extensions.py: create_extensions_router, install_package, get_package_status<br/>📄 github.py: create_github_router, github_worker_operation, auto_heal_ci_failure<br/>📄 github_webhook.py: verify_github_signature, create_github_webhook_router, receive_github_webhook<br/>📄 google_identity.py: GoogleLoginRequest<br/>📄 health.py: create_health_router, health_check, health_detail<br/>📄 missions.py: create_missions_router, execute_mission, control_browser<br/>📄 mobile_push.py: MobileDeviceRegistration, MobileDeviceRevoke, MobileAgentNotification<br/>📄 mobile_sessions.py: MobileLoginRequest, MobileRefreshRequest, MobileRevokeRequest<br/>📄 network_discovery.py: DeviceInspectionRequest, CameraDiscoveryRequest, MdnsDiscoveryRequest<br/>📄 thoughts.py: create_thoughts_router, create_thought_log<br/>📄 utility.py: create_utility_router, get_api_key_guides, analyze_missing_resources"]
+    app_adapters_infrastructure_routers["<b>routers</b><br/><hr/>📄 admin_recovery.py: AdminPasswordResetRequest, create_admin_recovery_router<br/>📄 agent_tasks.py: AgentHeartbeatRequest<br/>📄 assistant.py: create_assistant_router<br/>📄 bridge.py: create_bridge_router, require_authenticated_principal, local_bridge_websocket<br/>📄 dev_agent.py: create_dev_agent_router, run_dev_agent, list_dev_agent_jobs<br/>📄 devices.py: create_devices_router, register_device<br/>📄 environment_observations.py: EnvironmentObservationCreate, Config, validate_device_id<br/>📄 evolution.py: create_evolution_router, get_evolution_status<br/>📄 extensions.py: create_extensions_router, install_package, get_package_status<br/>📄 github.py: create_github_router, github_worker_operation, auto_heal_ci_failure<br/>📄 github_webhook.py: verify_github_signature, create_github_webhook_router, receive_github_webhook<br/>📄 google_identity.py: GoogleLoginRequest<br/>📄 health.py: create_health_router, health_check, health_detail<br/>📄 missions.py: create_missions_router, execute_mission, control_browser<br/>📄 mobile_push.py: MobileDeviceRegistration, MobileDeviceRevoke, MobileAgentNotification<br/>📄 mobile_sessions.py: MobileLoginRequest, MobileRefreshRequest, MobileRevokeRequest<br/>📄 network_discovery.py: DeviceInspectionRequest, CameraDiscoveryRequest, MdnsDiscoveryRequest<br/>📄 thoughts.py: create_thoughts_router, create_thought_log<br/>📄 utility.py: create_utility_router, get_api_key_guides, analyze_missing_resources"]
     class app_adapters_infrastructure_routers adapter
     app_adapters_infrastructure --> app_adapters_infrastructure_routers
     app_adapters_infrastructure_secrets["<b>secrets</b><br/><hr/>📄 env_secrets_provider.py: EnvSecretsProvider, execute, get_secret"]
@@ -129,7 +129,7 @@ graph LR
     app_domain_tools["<b>tools</b><br/><hr/>📄 contracts.py: HealthPolicy, validate_periodic_interval, RateLimitPolicy<br/>📄 registry.py: DuplicateToolManifestError, ToolRegistry"]
     class app_domain_tools support
     app_domain --> app_domain_tools
-    app_multiagent["<b>multiagent</b><br/><hr/>📄 agent_worker_runtime.py: run_worker_loop, WorkerGroup<br/>📄 contracts.py: TaskStatus, AgentProfile<br/>📄 execution_plan.py: from, PlanValidationError, StepOutcome<br/>📄 freellmapi_client.py: configured_provider_id, FreeLLMAPIError<br/>📄 freellmapi_handler.py: FreeLLMAgentHandler, close<br/>📄 leader.py: from, class, AgentLeader<br/>📄 model_plan_adapter.py: extract_json_object, repair_model_plan<br/>📄 model_registry.py: ModelProfile<br/>📄 model_runtime_factory.py: ChatGPTPlanOAuthPort, load_valid_profile, get_access_token<br/>📄 priority_queue_mini_agent.py: PriorityQueueMiniAgent, from_env<br/>📄 scheduler.py: from, NoEligibleAgentError<br/>📄 supabase_queue.py: SupabaseQueueConnector, send<br/>📄 supabase_store.py: SupabaseAgentStore, register_agent<br/>📄 supabase_task_worker.py: SupabaseTaskQueueMiniAgent, from_env<br/>📄 transport.py: AgentMessage, create, to_dict<br/>📄 worker.py: AcknowledgingConnector, send, receive"]
+    app_multiagent["<b>multiagent</b><br/><hr/>📄 agent_worker_runtime.py: run_worker_loop, WorkerGroup<br/>📄 contracts.py: TaskStatus, AgentProfile<br/>📄 execution_plan.py: from, PlanValidationError, StepOutcome<br/>📄 freellmapi_client.py: configured_provider_id, FreeLLMAPIError<br/>📄 freellmapi_handler.py: FreeLLMAgentHandler, close<br/>📄 leader.py: from, class, AgentLeader<br/>📄 model_plan_adapter.py: extract_json_object, repair_model_plan<br/>📄 model_registry.py: ModelProfile<br/>📄 model_runtime_factory.py: ChatGPTPlanOAuthPort, load_valid_profile, get_access_token<br/>📄 priority_queue_mini_agent.py: TaskQueueHTTPError, PriorityQueueMiniAgent<br/>📄 remote_inference_client.py: RemoteInferenceHandler<br/>📄 scheduler.py: from, NoEligibleAgentError<br/>📄 supabase_queue.py: SupabaseQueueConnector, send<br/>📄 supabase_store.py: SupabaseAgentStore, register_agent<br/>📄 supabase_task_worker.py: SupabaseTaskQueueMiniAgent, from_env<br/>📄 transport.py: AgentMessage, create, to_dict<br/>📄 worker.py: AcknowledgingConnector, send, receive<br/>📄 worker_daemon.py: default_status_path, acquire_instance_lock, WorkerDaemon"]
     class app_multiagent support
     app --> app_multiagent
     app_plugins["<b>plugins</b><br/><hr/>📄 plugin_loader.py: PluginLoader, execute"]
@@ -171,6 +171,23 @@ graph LR
     config --> config_toolchains
     dags["<b>dags</b><br/><hr/>📄 jarvis_status_dag.py: get_assistant_status, send_notification"]
     class dags support
+    deploy["<b>deploy</b>"]
+    class deploy support
+    deploy_termux["<b>termux</b>"]
+    class deploy_termux support
+    deploy --> deploy_termux
+    deploy_termux_boot["<b>boot</b>"]
+    class deploy_termux_boot support
+    deploy_termux --> deploy_termux_boot
+    deploy_termux_runit["<b>runit</b>"]
+    class deploy_termux_runit support
+    deploy_termux --> deploy_termux_runit
+    deploy_termux_runit_jarvis-agent-worker["<b>jarvis-agent-worker</b>"]
+    class deploy_termux_runit_jarvis-agent-worker support
+    deploy_termux_runit --> deploy_termux_runit_jarvis-agent-worker
+    deploy_termux_runit_jarvis-agent-worker_log["<b>log</b>"]
+    class deploy_termux_runit_jarvis-agent-worker_log support
+    deploy_termux_runit_jarvis-agent-worker --> deploy_termux_runit_jarvis-agent-worker_log
     desktop["<b>desktop</b>"]
     class desktop support
     linux["<b>linux</b>"]
