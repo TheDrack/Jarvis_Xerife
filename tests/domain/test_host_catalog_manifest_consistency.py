@@ -252,7 +252,7 @@ def _repository_contradictions(
 ) -> tuple[list[str], int]:
     """Compare the real registry against the catalog, declaration by declaration.
 
-    Returns the contradictions found and how many ``availability`` comparisons
+    Returns the contradictions found and how many host binding comparisons
     actually ran. The count matters: an earlier version of this check compared
     only capabilities, so a manifest without host alternatives was never
     verified against the catalog at all.
