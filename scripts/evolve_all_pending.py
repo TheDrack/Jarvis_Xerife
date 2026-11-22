@@ -150,8 +150,12 @@ def _topological_sort(caps: List[Dict], completed_ids: Set[str]) -> List[Dict]:
                 still_pending.append(cap)
         remaining = still_pending
         if not progress:
-            # Dependências circulares ou deps faltando — adiciona o restante na ordem atual
-            resolved.extend(remaining)
+            # Fail closed: circular, missing or blocked dependencies are not runnable.
+            unresolved_ids = ", ".join(cap["id"] for cap in remaining)
+            print(
+                "⚠️ Objectives não enfileirados por dependências não concluídas "
+                f"ou cíclicas: {unresolved_ids}"
+            )
             break
 
     return resolved
@@ -215,6 +219,17 @@ def main() -> None:
             print(
                 f"❌ {requested_id} não pode ser evoluído: "
                 f"status={target.get('status')!r}"
+            )
+            sys.exit(1)
+        unresolved_dependencies = [
+            dependency
+            for dependency in target.get("depends_on", [])
+            if dependency not in completed_ids
+        ]
+        if unresolved_dependencies:
+            print(
+                f"❌ {requested_id} depende de objectives não concluídos: "
+                f"{', '.join(unresolved_dependencies)}"
             )
             sys.exit(1)
         pending_ordered = [target]
