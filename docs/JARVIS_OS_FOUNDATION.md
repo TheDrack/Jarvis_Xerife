@@ -15,7 +15,12 @@ The first deliverable is a portable foundation, not a bootable distribution and 
   resolution, and the reuse/refactor/build treatment per subsystem. It is evidence input for
   C0-CAPABILITY-MAP; it does not change the ledger in [STATUS.md](STATUS.md).
   Its refactor and build sections are recorded as a decision in
-  [architecture/ADR-006-capability-implementation-host-policy-boundaries.md](architecture/ADR-006-capability-implementation-host-policy-boundaries.md).
+  [architecture/ADR-006-capability-implementation-host-policy-boundaries.md](architecture/ADR-006-capability-implementation-host-policy-boundaries.md),
+  which tracks per-increment implementation evidence. C1 (capability × host ×
+  implementation bindings with explicit gaps) and C2 (host selection in the
+  dispatcher) are implemented and unit-tested; the Ubuntu reference hosts are
+  declared in `app/application/services/reference_host_catalog.py`. R1, R2, R4,
+  R5 and C3-C5 remain pending and are declared as such in that ADR.
 - Inventory source modules, entry points, dependency groups, configuration, tests and workflows.
 - Map existing implementations to the target architecture.
 - Mark each item: reuse, extend, refactor, new, duplicate candidate, or unverified.
@@ -57,6 +62,9 @@ The first deliverable is a portable foundation, not a bootable distribution and 
 ### E. Host integration
 - Add hardware discovery and resource telemetry as optional modules.
 - Keep all privileged operations behind typed, policy-checked interfaces.
+- Express host variation as declared data, not as branches in callers: a
+  `ToolManifest` may list `host_implementations`, and the dispatcher selects one
+  after authorization without widening the policy decision (ADR-006 C2).
 - Add systemd units and desktop integration only in the OS profile.
 - Keep the harness useful on Windows, macOS and Linux.
 

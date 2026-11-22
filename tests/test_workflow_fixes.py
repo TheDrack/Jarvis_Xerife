@@ -155,6 +155,38 @@ def test_auto_evolution_service():
     assert is_not_auto is False, "is_auto_evolution_pr() should not match regular PRs"
 
 
+def test_auto_evolution_evolve_cap_normalizes_legacy_objective_id(monkeypatch):
+    """The explicit evolve_cap action accepts legacy CAP-### IDs after R1."""
+    from unittest.mock import MagicMock, patch
+
+    import app.application.services.auto_evolutionV2 as mod
+
+    monkeypatch.setenv("EVOLUTION_ENABLED", "true")
+    service = mod.AutoEvolutionServiceV2(
+        capabilities_path=str(PROJECT_ROOT / "data" / "capabilities.json")
+    )
+    canonical_id = "objective:CAP-001"
+    assert any(
+        item.get("id") == canonical_id
+        for item in service._load_data().get("capabilities", [])
+    )
+
+    orchestrator = MagicMock()
+    orchestrator.execute.return_value = {
+        "success": True,
+        "proposal": "data/evolution_proposals/legacy-id.py",
+    }
+    with patch.object(mod, "nexus") as mock_nexus:
+        mock_nexus.resolve.return_value = orchestrator
+        result = service.execute(
+            {"action": "evolve_cap", "cap_id": "CAP-001"}
+        )
+
+    assert result["success"] is True
+    assert result["evolved"] == canonical_id
+    assert orchestrator.execute.call_args.args[0]["cap_id"] == canonical_id
+
+
 def test_auto_evolution_evolve_uses_evolution_orchestrator(monkeypatch):
     """A mutação de capabilities deve passar pelo EvolutionOrchestrator (via Nexus).
 

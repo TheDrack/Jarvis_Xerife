@@ -19,7 +19,7 @@ from app.runtime.toolbox.host_authorization import (
 )
 
 
-def _manifest(*, risk_level="read_only"):
+def _manifest(*, risk_level="read_only", host_implementations=()):
     return ToolManifest(
         tool_id="sample.read" if risk_level == "read_only" else "sample.write",
         version="1.0.0",
@@ -30,6 +30,7 @@ def _manifest(*, risk_level="read_only"):
         authorization_capability="sample_adapter",
         risk_level=risk_level,
         allowed_scopes=("local", "account:*"),
+        host_implementations=host_implementations,
         input_schema={"type": "object", "properties": {}, "additionalProperties": False},
     )
 
@@ -338,6 +339,55 @@ def test_approval_cannot_be_replayed_with_changed_arguments_or_scope():
 
     with pytest.raises(PermissionError, match="does not match"):
         policy.authorize_tool(changed, manifest)
+
+
+def test_approval_cannot_be_replayed_for_a_different_host():
+    manifest = _manifest(
+        risk_level="active",
+        host_implementations=[
+            {"host_ref": "host:ubuntu-desktop", "adapter_id": "desktop_writer"},
+            {"host_ref": "host:ubuntu-server", "adapter_id": "server_writer"},
+        ],
+    )
+    approved_request = ToolRequest(
+        tool_id=manifest.tool_id,
+        capability="sample.write",
+        arguments={"value": "approved"},
+        scope="local",
+        approval_id="approval-host-bound",
+        host_ref="host:ubuntu-desktop",
+    )
+    changed_request = approved_request.model_copy(
+        update={"host_ref": "host:ubuntu-server"}
+    )
+    assert tool_request_digest(approved_request) != tool_request_digest(changed_request)
+
+    now = datetime.now(timezone.utc)
+    approval = VerifiedToolApproval(
+        approval_id="approval-host-bound",
+        status="approved",
+        principal_id="user-1",
+        approver_session_id="approver-session-1",
+        task_id=None,
+        tool_id=manifest.tool_id,
+        tool_version=manifest.version,
+        capability="sample.write",
+        scope="local",
+        operation=manifest.operation,
+        arguments_digest=tool_request_digest(approved_request),
+        approved_at=now - timedelta(seconds=1),
+        expires_at=now + timedelta(minutes=2),
+    )
+    policy = HostToolAuthorizationPolicy(
+        principal_resolver=lambda: _principal(capabilities=("sample.write",)),
+        approval_verifier=lambda approval_id, request, principal_id, executor_id: {
+            **approval.model_dump(), "status": "consumed"
+        },
+        clock=lambda: now,
+    )
+
+    with pytest.raises(PermissionError, match="does not match"):
+        policy.authorize_tool(changed_request, manifest)
 
 
 def test_expired_or_rejected_approval_is_denied():

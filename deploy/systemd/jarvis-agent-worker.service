@@ -1,0 +1,26 @@
+[Unit]
+Description=Jarvis persistent multi-agent queue worker
+Documentation=https://github.com/TheDrack/Jarvis_Xerife/blob/main/docs/operations/PERSISTENT_WORKER_DAEMON.md
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=jarvis
+Group=jarvis
+WorkingDirectory=/opt/jarvis/Jarvis_Xerife
+EnvironmentFile=/etc/jarvis/worker.env
+ExecStart=/opt/jarvis/venv/bin/python -m app.multiagent.worker_daemon
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

@@ -9,6 +9,13 @@ WORKFLOW = (
     / "auto_evolution_triggerV2.yml"
 )
 
+MANUAL_VALIDATION_WORKFLOW = (
+    Path(__file__).resolve().parents[1]
+    / ".github"
+    / "workflows"
+    / "validação_auto_evo.yml"
+)
+
 
 def test_mission_metadata_is_not_interpolated_into_shell_source():
     workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -32,7 +39,7 @@ def test_mission_metadata_is_not_interpolated_into_shell_source():
 def test_workflow_rejects_malformed_mission_ids_before_candidate_generation():
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
-    assert 're.fullmatch(r"CAP-[0-9]+", cap_id)' in workflow
+    assert 're.fullmatch(r"objective:CAP-[0-9]{3}", cap_id)' in workflow
     assert 'output.write("action=blocked\\n")' in workflow
 
 
@@ -46,3 +53,12 @@ def test_workflow_uses_manifest_selector_and_keeps_empty_manifest_a_noop():
     assert manifest["roadmap_path"] == "docs/COGNITIVE_ROADMAP.md"
     assert manifest["missions"] == []
     assert "C0 remains open" in manifest["hold_reason"]
+
+def test_manual_validation_normalizes_objective_ids_and_validates_the_catalog():
+    workflow = MANUAL_VALIDATION_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "objective:CAP-001" in workflow
+    assert "normalize_objective_id(cap_id)" in workflow
+    assert "validate_catalog(payload)" in workflow
+    assert "legacy CAP-001 accepted" in workflow
+    assert "sys.exit(1)" in workflow

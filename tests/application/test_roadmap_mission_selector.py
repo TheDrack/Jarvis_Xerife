@@ -110,7 +110,7 @@ def _repository(tmp_path: Path, missions=None) -> tuple[Path, dict]:
         "def test_target():\n    assert True\n", encoding="utf-8"
     )
     (tmp_path / "data" / "capabilities.json").write_text(
-        json.dumps({"capabilities": [{"id": "CAP-058", "status": "pending"}]}),
+        json.dumps({"capabilities": [{"id": "objective:CAP-058", "status": "pending"}]}),
         encoding="utf-8",
     )
     manifest = {
@@ -129,7 +129,7 @@ def _mission(**overrides):
     mission = {
         "criterion_id": "C0-CAPABILITY-MAP",
         "phase": "C0",
-        "legacy_capability_id": "CAP-058",
+        "legacy_capability_id": "objective:CAP-058",
         "status": "ready",
         "risk": "low",
         "priority": 1,
@@ -167,7 +167,7 @@ def test_selects_only_reviewed_low_risk_mission_and_builds_roadmap_context(tmp_p
 
     assert selected is not None
     assert selected["criterion_id"] == "C0-CAPABILITY-MAP"
-    assert selected["legacy_capability_id"] == "CAP-058"
+    assert selected["legacy_capability_id"] == "objective:CAP-058"
     assert selected["target_file"] == "app/services/target.py"
     assert selected["tests"] == ["tests/test_target.py"]
     assert '"source_of_truth": "docs/COGNITIVE_ROADMAP.md"' in selected["roadmap_context"]
@@ -222,7 +222,11 @@ def test_priority_is_deterministic_and_dependencies_must_be_complete(tmp_path):
         ({"target_file": "scripts/evolve_all_pending.py"}, "mission_target_file_not_eligible"),
         ({"tests": []}, "mission_tests_required"),
         ({"tests": ["docs/COGNITIVE_ROADMAP.md"]}, "mission_test_path_invalid"),
-        ({"legacy_capability_id": "CAP-999"}, "mission_legacy_capability_id_unknown"),
+        ({"legacy_capability_id": "CAP-058"}, "mission_legacy_capability_id_invalid"),
+        (
+            {"legacy_capability_id": "objective:CAP-999"},
+            "mission_legacy_capability_id_unknown",
+        ),
         ({"depends_on": ["C0-MISSING"]}, "roadmap_manifest_unknown_dependency"),
     ],
 )
@@ -396,7 +400,7 @@ def test_evolve_preserves_roadmap_criterion_in_candidate_artifact(monkeypatch):
     monkeypatch.setattr(evolve_all_pending, "_get_orchestrator", lambda: fake)
 
     result = evolve_all_pending.evolve(
-        "CAP-058",
+        "objective:CAP-058",
         roadmap_context='{"criterion_id":"C0-CAPABILITY-MAP"}',
         target_file="app/services/target.py",
         mission_id="C0-CAPABILITY-MAP",
@@ -404,7 +408,7 @@ def test_evolve_preserves_roadmap_criterion_in_candidate_artifact(monkeypatch):
     )
 
     assert result is True
-    assert fake.context["cap_id"] == "CAP-058"
+    assert fake.context["cap_id"] == "objective:CAP-058"
     assert fake.context["mission_id"] == "C0-CAPABILITY-MAP"
     assert fake.context["cap_title"] == "Complete the C0 capability map"
     assert fake.context["target_file"] == "app/services/target.py"
@@ -446,7 +450,7 @@ def test_real_c0_criterion_cannot_be_marked_complete_without_production_status_e
         "def test_target():\n    assert True\n", encoding="utf-8"
     )
     (tmp_path / "data" / "capabilities.json").write_text(
-        json.dumps({"capabilities": [{"id": "CAP-058", "status": "pending"}]}),
+        json.dumps({"capabilities": [{"id": "objective:CAP-058", "status": "pending"}]}),
         encoding="utf-8",
     )
     mission = _mission(criterion_id=criterion_id, status="complete")

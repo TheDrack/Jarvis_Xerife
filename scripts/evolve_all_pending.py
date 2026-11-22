@@ -9,7 +9,7 @@ Pipeline:
   4. Loga progresso e contagem de sucesso/falha ao final.
 
 Uso:
-  python scripts/evolve_all_pending.py [--dry-run] [--limit N] [--cap-id CAP-042] [--delay 2.0]
+  python scripts/evolve_all_pending.py [--dry-run] [--limit N] [--cap-id objective:CAP-042] [--delay 2.0]
 """
 import argparse
 import os
@@ -23,6 +23,10 @@ from typing import Dict, List, Optional, Set
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
+from app.domain.capabilities.objectives import (  # noqa: E402
+    is_selectable_objective,
+    normalize_objective_id,
+)
 from app.utils.document_store import document_store  # noqa: E402
 
 # Default priority assigned to capabilities that don't specify one
@@ -123,7 +127,7 @@ def _topological_sort(caps: List[Dict], completed_ids: Set[str]) -> List[Dict]:
     uma cap só é enfileirada quando todas as suas depends_on estão em completed_ids
     (ou já foram enfileiradas antes dela nesta rodada).
     """
-    pending = {c["id"]: c for c in caps if c.get("status") != "complete"}
+    pending = {c["id"]: c for c in caps if is_selectable_objective(c)}
     resolved: List[Dict] = []
     resolved_ids: Set[str] = set(completed_ids)
     remaining = list(pending.values())
@@ -146,8 +150,12 @@ def _topological_sort(caps: List[Dict], completed_ids: Set[str]) -> List[Dict]:
                 still_pending.append(cap)
         remaining = still_pending
         if not progress:
-            # Dependências circulares ou deps faltando — adiciona o restante na ordem atual
-            resolved.extend(remaining)
+            # Fail closed: circular, missing or blocked dependencies are not runnable.
+            unresolved_ids = ", ".join(cap["id"] for cap in remaining)
+            print(
+                "⚠️ Objectives não enfileirados por dependências não concluídas "
+                f"ou cíclicas: {unresolved_ids}"
+            )
             break
 
     return resolved
@@ -161,7 +169,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evolução em lote de capacidades JARVIS")
     parser.add_argument("--dry-run", action="store_true", help="Lista sem executar")
     parser.add_argument("--limit", type=int, default=None, help="Máximo de caps a evoluir")
-    parser.add_argument("--cap-id", help="Evolve apenas uma cap específica (ex: CAP-042)")
+    parser.add_argument(
+        "--cap-id",
+        help="Evolve apenas um objective específico (ex: objective:CAP-042; CAP-042 legado aceito)",
+    )
     parser.add_argument(
         "--target-file",
         help="Caminho relativo confiável do arquivo-alvo, vindo do manifesto revisado do roadmap",
@@ -194,10 +205,32 @@ def main() -> None:
     completed_ids: Set[str] = {c["id"] for c in all_caps if c.get("status") == "complete"}
 
     if args.cap_id:
-        # Modo de cap específica
-        target = next((c for c in all_caps if c["id"] == args.cap_id), None)
+        # Modo de objective específico. O catálogo usa `objective:CAP-###`; o
+        # formulário legado `CAP-###` continua aceito na linha de comando.
+        try:
+            requested_id = normalize_objective_id(args.cap_id)
+        except ValueError as exc:
+            parser.error(str(exc))
+        target = next((c for c in all_caps if c["id"] == requested_id), None)
         if not target:
-            print(f"❌ {args.cap_id} não encontrado em capabilities.jrvs")
+            print(f"❌ {requested_id} não encontrado em capabilities.jrvs")
+            sys.exit(1)
+        if not is_selectable_objective(target):
+            print(
+                f"❌ {requested_id} não pode ser evoluído: "
+                f"status={target.get('status')!r}"
+            )
+            sys.exit(1)
+        unresolved_dependencies = [
+            dependency
+            for dependency in target.get("depends_on", [])
+            if dependency not in completed_ids
+        ]
+        if unresolved_dependencies:
+            print(
+                f"❌ {requested_id} depende de objectives não concluídos: "
+                f"{', '.join(unresolved_dependencies)}"
+            )
             sys.exit(1)
         pending_ordered = [target]
     else:

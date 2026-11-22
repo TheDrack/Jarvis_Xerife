@@ -8,9 +8,10 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.domain.tools.contracts import ToolManifest
+from app.domain.tools.contracts import HostImplementation, ToolManifest
 
 __all__ = [
+    "HostImplementation",
     "ToolManifest",
     "ToolRequest",
     "ToolResult",
@@ -40,6 +41,11 @@ class ToolRequest(BaseModel):
     approval_id: Optional[str] = Field(
         default=None, min_length=1, max_length=256
     )
+    #: Untrusted host preference. It selects among declared implementations and
+    #: never grants access; authorization is decided for the tool and scope.
+    host_ref: Optional[str] = Field(
+        default=None, pattern=r"^host:[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    )
     task_id: Optional[str] = Field(default=None, min_length=1, max_length=200)
     attempt_id: Optional[str] = Field(default=None, min_length=1, max_length=64)
     idempotency_key: Optional[str] = None
@@ -62,6 +68,9 @@ class ToolResult(BaseModel):
     latency_ms: Optional[int] = None
     provider: Optional[str] = None
     tool_version: Optional[str] = None
+    capability: Optional[str] = None
+    adapter_id: Optional[str] = None
+    host_ref: Optional[str] = None
     retryable: bool = False
     retry_after_seconds: Optional[float] = None
     evidence_refs: list[str] = Field(default_factory=list)
@@ -112,6 +121,9 @@ class ToolExecutionEvent(BaseModel):
     tool_id: str
     tool_version: Optional[str] = None
     provider: Optional[str] = None
+    capability: Optional[str] = None
+    adapter_id: Optional[str] = None
+    host_ref: Optional[str] = None
     request_fingerprint: Optional[str] = None
     cost_units: int = Field(default=1, ge=0)
     caller: str

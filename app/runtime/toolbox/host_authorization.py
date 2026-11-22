@@ -84,6 +84,7 @@ def tool_request_digest(request: ToolRequest) -> str:
             "arguments": request.arguments,
             "scope": request.scope,
             "task_id": request.task_id,
+            "host_ref": request.host_ref,
             "idempotency_key": request.idempotency_key,
         },
         sort_keys=True,

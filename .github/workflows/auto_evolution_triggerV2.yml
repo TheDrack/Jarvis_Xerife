@@ -90,10 +90,10 @@ jobs:
               mission_title = str(next_mission.get("title") or "").strip()
               target_file = str(next_mission.get("target_file") or "").strip()
 
-              if not re.fullmatch(r"CAP-[0-9]+", cap_id):
+              if not re.fullmatch(r"objective:CAP-[0-9]{3}", cap_id):
                   with open(github_output, "a", encoding="utf-8") as output:
                       output.write("action=blocked\n")
-                  print("⛔ Referência de compatibilidade CAP ausente ou inválida; evolução bloqueada.")
+                  print("⛔ Referência de objetivo (objective:CAP-###) ausente ou inválida; evolução bloqueada.")
                   sys.exit(0)
 
               if not re.fullmatch(r"C[0-8]-[A-Z0-9]+(?:-[A-Z0-9]+)*", mission_id):

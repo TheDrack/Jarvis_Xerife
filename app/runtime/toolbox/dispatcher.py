@@ -11,11 +11,16 @@ import logging
 import threading
 import time
 from collections import deque
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
 from jsonschema import Draft202012Validator, ValidationError
 
+from app.domain.tools.host_selection import (
+    GapReason,
+    implementation_order_key,
+)
 from app.runtime.toolbox.contracts import (
     ToolAuthorizationDecision,
     ToolExecutionEvent,
@@ -50,6 +55,40 @@ class _CircuitOpenError(RuntimeError):
         self.retry_after_seconds = max(0.0, retry_after_seconds)
 
 
+class _CapabilityUnavailableError(RuntimeError):
+    """No declared implementation can serve the requested capability/host."""
+
+    def __init__(
+        self, reason: str, message: str, host_ref: Optional[str]
+    ) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.host_ref = host_ref
+
+
+@dataclass(frozen=True, slots=True)
+class _SelectedImplementation:
+    """The implementation the dispatcher resolved and will invoke."""
+
+    adapter_id: str
+    host_ref: Optional[str]
+    limitations: tuple[str, ...] = ()
+
+
+def _implementation_order_key(item: Any) -> tuple[int, int, str, str]:
+    """Order manifest host alternatives with the shared ADR-006 ordering.
+
+    Availability and declared priority are applied first; adapter and host are
+    deterministic tie-breakers.
+    """
+    return implementation_order_key(
+        availability=item.availability,
+        priority=item.priority,
+        adapter_id=item.adapter_id,
+        host_ref=item.host_ref,
+    )
+
+
 class ToolDispatcher:
     """Validates, authorizes, resolves and audits tool calls.
 
@@ -76,9 +115,9 @@ class ToolDispatcher:
         self._event_sink = event_sink
         self._max_idempotency_entries = max(1, int(max_idempotency_entries))
         self._lock = threading.RLock()
-        self._inflight: dict[tuple[str, str, str, str, str, str], str] = {}
+        self._inflight: dict[tuple[str, str, str, str, str, str, str], str] = {}
         self._completed: dict[
-            tuple[str, str, str, str, str, str], tuple[str, ToolResult]
+            tuple[str, str, str, str, str, str, str], tuple[str, ToolResult]
         ] = {}
         self._rate_calls: dict[str, Any] = {}
         self._breaker_failures: dict[str, int] = {}
@@ -228,6 +267,7 @@ class ToolDispatcher:
         operation_started = False
         result: ToolResult
         authorization_decision: Optional[ToolAuthorizationDecision] = None
+        implementation: Optional[_SelectedImplementation] = None
         try:
             authorizer = self._get_authorizer()
             if authorizer is None or not callable(
@@ -264,6 +304,7 @@ class ToolDispatcher:
                     manifest.version,
                     requested_capability,
                     envelope.task_id or "",
+                    envelope.host_ref or "",
                     envelope.idempotency_key,
                 )
                 idempotency_digest = self._arguments_digest(
@@ -271,6 +312,7 @@ class ToolDispatcher:
                     authorization_decision.principal_id,
                     envelope.scope,
                     envelope.task_id,
+                    envelope.host_ref,
                 )
                 with self._lock:
                     completed = self._completed.get(idempotency_ref)
@@ -339,10 +381,14 @@ class ToolDispatcher:
             if breaker_retry_after is not None:
                 raise _CircuitOpenError(breaker_retry_after)
 
-            adapter = self._resolver(manifest.adapter_id)
+            # Host selection happens after authorization and never changes it.
+            implementation = self._select_implementation(
+                manifest, envelope.host_ref
+            )
+            adapter = self._resolver(implementation.adapter_id)
             if adapter is None or getattr(adapter, "__is_cloud_mock__", False):
                 raise _AdapterPreconditionError(
-                    f"Adapter indisponível: {manifest.adapter_id}"
+                    f"Adapter indisponível: {implementation.adapter_id}"
                 )
 
             can_execute = getattr(adapter, "can_execute", None)
@@ -364,7 +410,7 @@ class ToolDispatcher:
             if not callable(operation):
                 raise LookupError(
                     f"Operação '{manifest.operation}' não existe em "
-                    f"'{manifest.adapter_id}'."
+                    f"'{implementation.adapter_id}'."
                 )
             operation_started = True
             if inspect.iscoroutinefunction(operation):
@@ -472,6 +518,13 @@ class ToolDispatcher:
                     "A ferramenta excedeu o timeout configurado.",
                     retryable=manifest.risk_level == "read_only",
                 )
+        except _CapabilityUnavailableError as exc:
+            implementation = _SelectedImplementation(
+                adapter_id="", host_ref=exc.host_ref
+            )
+            result = self._failure(
+                envelope, "rejected", "capability_unavailable", str(exc)
+            )
         except _AdapterPreconditionError as exc:
             result = self._failure(
                 envelope, "failed", "adapter_not_ready", str(exc)
@@ -552,6 +605,79 @@ class ToolDispatcher:
             started_at,
             result,
             authorization_decision,
+            capability=requested_capability,
+            implementation=implementation,
+        )
+
+    def _select_implementation(
+        self,
+        manifest: ToolManifest,
+        requested_host: Optional[str],
+    ) -> _SelectedImplementation:
+        """Choose a declared implementation without widening policy.
+
+        Manifests that declare no host alternatives keep the single
+        ``adapter_id`` behaviour. A request bound to a host that does not
+        declare the tool fails explicitly; there is no silent fallback to
+        another host or implementation (ADR-006 invariant 4).
+        """
+        declared = manifest.host_implementations
+        if not declared:
+            if requested_host is not None:
+                raise _CapabilityUnavailableError(
+                    GapReason.CAPABILITY_NOT_DECLARED.value,
+                    f"'{manifest.tool_id}' não declara alternativas de implementação "
+                    f"para o host '{requested_host}'.",
+                    requested_host,
+                )
+            return _SelectedImplementation(manifest.adapter_id, None)
+
+        if requested_host is not None:
+            matches = tuple(
+                item for item in declared if item.host_ref == requested_host
+            )
+            if not matches:
+                raise _CapabilityUnavailableError(
+                    GapReason.CAPABILITY_NOT_DECLARED.value,
+                    f"'{manifest.tool_id}' não é declarada no host "
+                    f"'{requested_host}'.",
+                    requested_host,
+                )
+            usable = tuple(
+                item for item in matches if item.availability.usable
+            )
+            if not usable:
+                # Report every declared alternative for the host, not only the
+                # first one the ordering happens to pick: the catalog's gap does
+                # the same, and a single limitation can hide the real blocker.
+                detail = "; ".join(
+                    f"{item.adapter_id}: "
+                    f"{', '.join(item.limitations) or 'sem motivo declarado'}"
+                    for item in matches
+                )
+                raise _CapabilityUnavailableError(
+                    GapReason.IMPLEMENTATION_UNAVAILABLE.value,
+                    "Implementação declarada indisponível no host "
+                    f"'{requested_host}': {detail}.",
+                    requested_host,
+                )
+            chosen = min(usable, key=_implementation_order_key)
+            return _SelectedImplementation(
+                chosen.adapter_id, chosen.host_ref, chosen.limitations
+            )
+
+        usable = tuple(
+            item for item in declared if item.availability.usable
+        )
+        if not usable:
+            raise _CapabilityUnavailableError(
+                GapReason.IMPLEMENTATION_UNAVAILABLE.value,
+                f"Nenhuma implementação disponível para '{manifest.tool_id}'.",
+                None,
+            )
+        chosen = min(usable, key=_implementation_order_key)
+        return _SelectedImplementation(
+            chosen.adapter_id, chosen.host_ref, chosen.limitations
         )
 
     def _get_authorizer(self) -> Any:
@@ -622,6 +748,7 @@ class ToolDispatcher:
         caller: str,
         scope: str,
         task_id: Optional[str] = None,
+        host_ref: Optional[str] = None,
     ) -> str:
         canonical = json.dumps(
             {
@@ -629,6 +756,7 @@ class ToolDispatcher:
                 "caller": caller,
                 "scope": scope,
                 "task_id": task_id,
+                "host_ref": host_ref,
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -739,6 +867,9 @@ class ToolDispatcher:
         started_at: Any,
         result: ToolResult,
         authorization_decision: Optional[ToolAuthorizationDecision] = None,
+        *,
+        capability: Optional[str] = None,
+        implementation: Optional[_SelectedImplementation] = None,
     ) -> ToolResult:
         latency = int((time.monotonic() - started) * 1000)
         updates = {}
@@ -749,6 +880,15 @@ class ToolDispatcher:
                 updates["provider"] = manifest.provider
             if result.tool_version is None:
                 updates["tool_version"] = manifest.version
+        # ADR-006 invariant 6: a result records the capability it served and the
+        # implementation/host that ran, without secrets.
+        if capability and result.capability is None:
+            updates["capability"] = capability
+        if implementation is not None:
+            if implementation.adapter_id and result.adapter_id is None:
+                updates["adapter_id"] = implementation.adapter_id
+            if implementation.host_ref and result.host_ref is None:
+                updates["host_ref"] = implementation.host_ref
         if updates:
             result = result.model_copy(update=updates)
         event = ToolExecutionEvent(
@@ -757,6 +897,9 @@ class ToolDispatcher:
             tool_id=request.tool_id,
             tool_version=manifest.version if manifest else None,
             provider=manifest.provider if manifest else None,
+            capability=result.capability,
+            adapter_id=result.adapter_id,
+            host_ref=result.host_ref,
             request_fingerprint=self._arguments_digest(
                 request.arguments,
                 (
