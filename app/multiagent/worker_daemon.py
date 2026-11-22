@@ -21,6 +21,14 @@ logger = logging.getLogger(__name__)
 WorkerRuntimeFactory = Callable[[], tuple[Any, threading.Event] | None]
 
 
+def _worker_group_has_exited(worker_group: Any) -> bool:
+    """Detect a partially dead group; WorkerGroup.is_alive() means any alive."""
+    threads = getattr(worker_group, "threads", None)
+    if threads is not None:
+        return any(not thread.is_alive() for thread in threads)
+    return not worker_group.is_alive()
+
+
 def run_worker_daemon(
     stop_event: Any,
     *,
@@ -70,7 +78,11 @@ def run_worker_daemon(
                 getattr(worker_group, "name", "worker-group"),
             )
 
-            while not stop_event.is_set() and worker_group.is_alive():
+            while (
+                not stop_event.is_set()
+                and worker_group.is_alive()
+                and not _worker_group_has_exited(worker_group)
+            ):
                 stop_event.wait(monitor_interval_seconds)
 
             worker_stop.set()
