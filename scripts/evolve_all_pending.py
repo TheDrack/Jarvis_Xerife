@@ -23,7 +23,10 @@ from typing import Dict, List, Optional, Set
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from app.domain.capabilities.objectives import normalize_objective_id  # noqa: E402
+from app.domain.capabilities.objectives import (  # noqa: E402
+    is_selectable_objective,
+    normalize_objective_id,
+)
 from app.utils.document_store import document_store  # noqa: E402
 
 # Default priority assigned to capabilities that don't specify one
@@ -124,7 +127,7 @@ def _topological_sort(caps: List[Dict], completed_ids: Set[str]) -> List[Dict]:
     uma cap só é enfileirada quando todas as suas depends_on estão em completed_ids
     (ou já foram enfileiradas antes dela nesta rodada).
     """
-    pending = {c["id"]: c for c in caps if c.get("status") != "complete"}
+    pending = {c["id"]: c for c in caps if is_selectable_objective(c)}
     resolved: List[Dict] = []
     resolved_ids: Set[str] = set(completed_ids)
     remaining = list(pending.values())
@@ -207,6 +210,12 @@ def main() -> None:
         target = next((c for c in all_caps if c["id"] == requested_id), None)
         if not target:
             print(f"❌ {requested_id} não encontrado em capabilities.jrvs")
+            sys.exit(1)
+        if not is_selectable_objective(target):
+            print(
+                f"❌ {requested_id} não pode ser evoluído: "
+                f"status={target.get('status')!r}"
+            )
             sys.exit(1)
         pending_ordered = [target]
     else:
