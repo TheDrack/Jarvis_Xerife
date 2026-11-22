@@ -41,6 +41,18 @@ CAPABILITY_NAMESPACE = "capability:"
 OBJECTIVE_STATUSES = frozenset(
     {"pending", "partial", "unverified", "complete", "blocked"}
 )
+
+SELECTABLE_OBJECTIVE_TERMINAL_STATUSES = frozenset({"complete", "blocked"})
+
+
+def is_selectable_objective(entry: object) -> bool:
+    """Return whether an objective may enter an automatic evolution queue.
+
+    The validated roadmap catalog constrains the allowed statuses. The broader
+    predicate preserves legacy callers that still use "nonexistent" while
+    ensuring terminal or explicitly blocked objectives never advance.
+    """
+    return isinstance(entry, Mapping) and entry.get("status") not in SELECTABLE_OBJECTIVE_TERMINAL_STATUSES
 EXECUTION_EVIDENCE_FIELDS = ("command", "result", "recorded_at")
 EXECUTION_RESULT_PASSED = "passed"
 
