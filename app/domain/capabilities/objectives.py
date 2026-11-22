@@ -52,7 +52,12 @@ def is_selectable_objective(entry: object) -> bool:
     predicate preserves legacy callers that still use "nonexistent" while
     ensuring terminal or explicitly blocked objectives never advance.
     """
-    return isinstance(entry, Mapping) and entry.get("status") not in SELECTABLE_OBJECTIVE_TERMINAL_STATUSES
+    return (
+        isinstance(entry, Mapping)
+        and entry.get("status") not in SELECTABLE_OBJECTIVE_TERMINAL_STATUSES
+    )
+
+
 EXECUTION_EVIDENCE_FIELDS = ("command", "result", "recorded_at")
 EXECUTION_RESULT_PASSED = "passed"
 
