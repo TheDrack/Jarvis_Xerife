@@ -46,7 +46,7 @@ def test_daemon_restarts_worker_group_after_unexpected_exit():
             return groups[0], first_worker_stop
         return groups[1], second_worker_stop
 
-    run_worker_daemon(
+    generations = run_worker_daemon(
         stop,
         start_workers=start_workers,
         monitor_interval_seconds=0.01,
@@ -54,6 +54,7 @@ def test_daemon_restarts_worker_group_after_unexpected_exit():
         max_restart_backoff_seconds=0.02,
     )
 
+    assert generations == 2
     assert starts == 2
     assert first_worker_stop.is_set()
     assert groups[0].joined
