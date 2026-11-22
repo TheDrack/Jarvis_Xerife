@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       cap_id:
-        description: "CAP cuja mudança deve ser conferida (ex: CAP-001). Deixe vazio para conferir o estado geral."
+        description: "Objective to verify (objective:CAP-001; legacy CAP-001 accepted). Leave empty for overall status."
         required: false
         default: ""
         type: string
@@ -162,25 +162,38 @@ jobs:
           python - <<'PYEOF'
           import json, os, sys
           from pathlib import Path
+          from app.domain.capabilities.objectives import (
+              ObjectiveCatalogError,
+              normalize_objective_id,
+              validate_catalog,
+          )
 
           cap_id = os.environ.get("CAP_ID", "").strip()
           if not cap_id:
-              print("⚠️ Nenhum CAP informado.")
+              print("⚠️ Nenhum objective informado.")
               sys.exit(0)
 
           caps_path = Path("data/capabilities.json")
           if not caps_path.exists():
-              print("⚠️ data/capabilities.json não encontrado.")
-              sys.exit(0)
+              print("❌ data/capabilities.json não encontrado.")
+              sys.exit(1)
 
-          caps = json.loads(caps_path.read_text(encoding="utf-8")).get("capabilities", [])
-          found = [c for c in caps if str(c.get("id")) == cap_id]
+          payload = json.loads(caps_path.read_text(encoding="utf-8"))
+          caps = payload.get("capabilities", [])
+          try:
+              objective_id = normalize_objective_id(cap_id)
+              validate_catalog(payload)
+          except ObjectiveCatalogError as exc:
+              print(f"❌ ID ou catálogo de objectives inválido: {exc}")
+              sys.exit(1)
+
+          found = [c for c in caps if str(c.get("id")) == objective_id]
           if not found:
-              print(f"⚠️ CAP {cap_id} não encontrado em data/capabilities.json.")
-              sys.exit(0)
+              print(f"❌ Objective {objective_id} não encontrado em data/capabilities.json.")
+              sys.exit(1)
 
           cap = found[0]
-          print(f"🧾 CAP selecionado para conferência: {cap_id}")
+          print(f"🧾 Objective selecionado para conferência: {objective_id}")
           print(f"- status: {cap.get('status')}")
           print(f"- title: {cap.get('title')}")
           print(f"- priority: {cap.get('priority')}")
