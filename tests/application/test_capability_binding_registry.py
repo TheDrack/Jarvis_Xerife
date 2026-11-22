@@ -25,8 +25,10 @@ SERVER = "host:ubuntu-server"
 def _two_host_catalog() -> CapabilityBindingRegistry:
     """Two hosts; only the desktop host declares screen capture."""
     catalog = CapabilityBindingRegistry()
-    catalog.declare_host(DESKTOP, os_family="ubuntu")
-    catalog.declare_host(SERVER, os_family="ubuntu", limitations=("headless",))
+    catalog.declare_host(DESKTOP, os_family="ubuntu", state=HostState.ONLINE)
+    catalog.declare_host(
+        SERVER, os_family="ubuntu", state=HostState.ONLINE, limitations=("headless",)
+    )
     catalog.bind(
         "screen.capture", host_ref=DESKTOP, adapter_id="hardware_controller"
     )
@@ -93,6 +95,28 @@ class TestResolution:
         assert resolution.gap is not None
         assert resolution.gap.reason is GapReason.HOST_UNKNOWN
 
+    def test_unknown_host_state_reports_an_explicit_gap(self):
+        catalog = CapabilityBindingRegistry()
+        catalog.declare_host(SERVER, os_family="ubuntu")
+        catalog.bind("screen.capture", host_ref=SERVER, adapter_id="x11_capture")
+
+        resolution = catalog.resolve_capability("screen.capture", SERVER)
+
+        assert resolution.available is False
+        assert resolution.gap is not None
+        assert resolution.gap.reason is GapReason.HOST_STATE_UNKNOWN
+
+    def test_unverified_hosts_are_not_offered_without_a_host_selection(self):
+        catalog = CapabilityBindingRegistry()
+        catalog.declare_host(DESKTOP, os_family="ubuntu")
+        catalog.bind("screen.capture", host_ref=DESKTOP, adapter_id="x11_capture")
+
+        resolution = catalog.resolve_capability("screen.capture")
+
+        assert resolution.available is False
+        assert resolution.gap is not None
+        assert resolution.gap.reason is GapReason.HOST_STATE_UNKNOWN
+
     def test_offline_host_reports_the_gap(self):
         catalog = CapabilityBindingRegistry()
         catalog.declare_host(
@@ -121,7 +145,7 @@ class TestResolution:
         assert {item.host_ref for item in resolution.candidates} == {DESKTOP}
 
     def test_unavailable_implementation_keeps_its_limitation_for_diagnosis(self):
-        catalog = build_reference_capability_catalog()
+        catalog = build_reference_capability_catalog(host_state=HostState.ONLINE)
 
         resolution = catalog.resolve_capability("screen.capture", UBUNTU_SERVER)
 
@@ -135,8 +159,8 @@ class TestResolution:
 
     def test_orders_available_before_unavailable_regardless_of_insertion(self):
         catalog = CapabilityBindingRegistry()
-        catalog.declare_host(DESKTOP, os_family="ubuntu")
-        catalog.declare_host(SERVER, os_family="ubuntu")
+        catalog.declare_host(DESKTOP, os_family="ubuntu", state=HostState.ONLINE)
+        catalog.declare_host(SERVER, os_family="ubuntu", state=HostState.ONLINE)
         catalog.bind(
             "screen.capture",
             host_ref=SERVER,
@@ -242,9 +266,11 @@ class TestReferenceCatalog:
 
         assert server is not None and server.os_family == "ubuntu"
         assert desktop is not None and desktop.os_family == "ubuntu"
+        assert server.state is HostState.UNKNOWN
+        assert desktop.state is HostState.UNKNOWN
 
     def test_screen_capture_resolves_differently_per_ubuntu_host(self):
-        catalog = build_reference_capability_catalog()
+        catalog = build_reference_capability_catalog(host_state=HostState.ONLINE)
 
         desktop = catalog.resolve_capability("screen.capture", UBUNTU_DESKTOP)
         server = catalog.resolve_capability("screen.capture", UBUNTU_SERVER)
@@ -259,7 +285,7 @@ class TestReferenceCatalog:
         assert server.gap.reason is GapReason.IMPLEMENTATION_UNAVAILABLE
 
     def test_telemetry_is_available_on_both_ubuntu_hosts(self):
-        catalog = build_reference_capability_catalog()
+        catalog = build_reference_capability_catalog(host_state=HostState.ONLINE)
 
         resolution = catalog.resolve_capability("host.observe.resources")
 
