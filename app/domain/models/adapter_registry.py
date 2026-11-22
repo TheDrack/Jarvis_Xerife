@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""AdapterRegistry — Registro simplificado do que o Jarvis PODE fazer.
+"""Deprecated compatibility shim for the retired domain adapter catalog.
 
-Diferença do consolidated context:
-- Consolidated: CÓDIGO COMPLETO (500KB+)
-- AdapterRegistry: LISTA DE HABILIDADES (5KB)
+The application AdapterRegistry is the only active capability-to-adapter
+registry. This module remains importable for old serialized Nexus references,
+but it must never advertise itself as an executable component.
 """
 import logging
 from pathlib import Path
@@ -38,28 +38,20 @@ class AdapterInfo:
 
 
 class AdapterRegistry(NexusComponent):
-    """Registro de adapters disponíveis no Jarvis."""
+    """Legacy compatibility facade; not an active execution registry."""
     
     def __init__(self):
         super().__init__()
         self._cache: Optional[Dict[str, AdapterInfo]] = None
     
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        ctx = context or {}
-        action = ctx.get("action", "list")
-        if action == "list":
-            return {"success": True, "adapters": self.list_adapters()}
-        elif action == "get":
-            adapter_id = ctx.get("adapter_id")
-            return {"success": True, "adapter": self.get_adapter(adapter_id)}
-        elif action == "find_gap":
-            capability = ctx.get("capability")
-            return {"success": True, "gap": self.find_gap(capability)}
-        elif action == "refresh":
-            self._cache = None
-            return {"success": True, "adapters": self.list_adapters()}
-        
-        return {"success": False, "error": "Ação não reconhecida"}
+        # The legacy catalog has no execution authority. Keep the method only
+        # so stale Nexus references fail closed with a stable response.
+        return {
+            "success": False,
+            "error": "deprecated_registry",
+            "message": "Use app.application.services.adapter_registry.AdapterRegistry",
+        }
     
     def list_adapters(self) -> List[Dict[str, Any]]:
         """Lista todos os adapters disponíveis."""
@@ -87,11 +79,11 @@ class AdapterRegistry(NexusComponent):
     def find_gap(self, capability: str) -> Optional[Dict[str, Any]]:
         """Identifica se existe adapter para uma capability."""
         adapters = self.list_adapters()
-        capability_lower = capability.lower()
+        capability_lower = capability.strip().casefold()
         
         for adapter in adapters:
             for cap in adapter.get("capabilities", []):
-                if capability_lower in cap.lower():
+                if capability_lower == cap.casefold():
                     return None
         
         return {
@@ -204,4 +196,5 @@ class AdapterRegistry(NexusComponent):
         return capability.title() + " Adapter"
     
     def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
-        return True
+        """Legacy registry is never an executable Nexus component."""
+        return False
