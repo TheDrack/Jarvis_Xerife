@@ -1,7 +1,6 @@
 """Regression tests for the scheduled evolution workflow trust boundary."""
 from pathlib import Path
 
-
 WORKFLOW = (
     Path(__file__).resolve().parents[1]
     / ".github"
@@ -37,12 +36,32 @@ def test_workflow_rejects_malformed_mission_ids_before_candidate_generation():
 
 
 
-def test_workflow_uses_manifest_selector_and_keeps_empty_manifest_a_noop():
+def test_workflow_has_first_c1_mission_but_keeps_it_gated_by_c0_evidence():
     import json
+
+    from app.application.services.roadmap_mission_selector import RoadmapMissionSelector
 
     root = Path(__file__).resolve().parents[1]
     manifest = json.loads((root / "data" / "roadmap_missions.json").read_text(encoding="utf-8"))
 
     assert manifest["roadmap_path"] == "docs/COGNITIVE_ROADMAP.md"
-    assert manifest["missions"] == []
-    assert "C0 remains open" in manifest["hold_reason"]
+    assert [mission["criterion_id"] for mission in manifest["missions"]] == ["C1-WORLD-MODEL"]
+    assert manifest["missions"][0]["status"] == "ready"
+    assert len(manifest["missions"][0]["depends_on"]) == 3
+    assert "C0 evidence is pending" in manifest["hold_reason"]
+
+    selector = RoadmapMissionSelector(repository_root=root)
+    assert selector.find_next_mission() is None
+    assert "C0 evidence is pending" in selector.hold_reason
+
+
+def test_workflow_dispatch_supports_one_time_run_without_global_enablement():
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "run_once:" in workflow
+    assert "type: boolean" in workflow
+    assert "MANUAL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.run_once }}" in workflow
+    assert "needs.gate.outputs.evolution_enabled" in workflow
+    assert 'echo "evolution_enabled=true"' in workflow
+    assert 'echo "evolution_enabled=false"' in workflow
+    assert "EVOLUTION_ENABLED: ${{ needs.gate.outputs.evolution_enabled }}" in workflow

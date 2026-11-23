@@ -5,12 +5,10 @@ import json
 from pathlib import Path
 
 import pytest
-
 from app.application.services.roadmap_mission_selector import (
     RoadmapManifestError,
     RoadmapMissionSelector,
 )
-
 
 ROADMAP_HEADING = "## 4. Fase 0 — Auditoria de capacidades e contratos"
 ROADMAP_HEADING_C1 = "## 5. Fase 1 — World Model"
@@ -323,11 +321,11 @@ def test_status_ledger_must_cover_all_roadmap_criteria(tmp_path):
         _selector(root).find_next_mission()
 
 
-def test_real_repository_roadmap_and_empty_manifest_remain_a_safe_noop():
+def test_real_repository_roadmap_keeps_first_mission_blocked_until_c0_evidence_is_verified():
     selector = RoadmapMissionSelector()
 
     assert selector.find_next_mission() is None
-    assert "C0 remains open" in selector.hold_reason
+    assert "C0 evidence is pending" in selector.hold_reason
 
 
 def test_c1_mission_requires_all_c0_acceptance_criteria(tmp_path):
@@ -345,10 +343,6 @@ def test_c1_mission_requires_all_c0_acceptance_criteria(tmp_path):
 
 
 def test_c1_mission_is_selectable_only_after_all_c0_criteria_are_verified(tmp_path):
-    completed_c0 = [
-        _mission(criterion_id=criterion_id, status="complete", priority=index + 1)
-        for index, criterion_id in enumerate(ROADMAP_CRITERIA)
-    ]
     c1_mission = _mission(
         criterion_id="C1-WORLD-MODEL",
         phase="C1",
@@ -356,7 +350,7 @@ def test_c1_mission_is_selectable_only_after_all_c0_criteria_are_verified(tmp_pa
         depends_on=list(ROADMAP_CRITERIA),
         priority=10,
     )
-    root, _ = _repository(tmp_path, [*completed_c0, c1_mission])
+    root, _ = _repository(tmp_path, [c1_mission])
     _write_status_ledger(
         root,
         ROADMAP_ALL_CRITERIA,
@@ -464,3 +458,89 @@ def test_real_c0_criterion_cannot_be_marked_complete_without_production_status_e
         RoadmapManifestError, match="mission_complete_without_status_evidence"
     ):
         _selector(tmp_path).find_next_mission()
+
+
+def test_get_progress_counts_verified_and_pending_criteria(tmp_path):
+    root, _ = _repository(tmp_path)
+    _write_status_ledger(
+        root,
+        ROADMAP_ALL_CRITERIA,
+        {
+            "C0-CAPABILITY-MAP": _verified_evidence(),
+            "C1-WORLD-MODEL": _verified_evidence(),
+        },
+    )
+
+    progress = _selector(root).get_progress()
+
+    assert progress["total_criteria"] == 4
+    assert progress["completed_criteria"] == 2
+    assert progress["pending_criteria"] == 2
+    assert progress["blocked_criteria"] == 0
+    assert progress["completion_rate"] == 0.5
+    assert progress["phase_progress"]["C0"] == {
+        "total": 3, "verified": 1, "pending": 2, "blocked": 0
+    }
+    assert progress["phase_progress"]["C1"] == {
+        "total": 1, "verified": 1, "pending": 0, "blocked": 0
+    }
+    assert progress["next_mission"] is None
+    assert progress["hold_reason"] == "No approved mission."
+
+
+def test_get_progress_counts_blocked_criteria_without_marking_them_complete(tmp_path):
+    root, _ = _repository(tmp_path)
+    status_path = root / "docs" / "STATUS.md"
+    content = status_path.read_text(encoding="utf-8")
+    start = content.index(_STATUS_START)
+    end = content.index(_STATUS_END) + len(_STATUS_END)
+    payload = {
+        "schema_version": 1,
+        "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
+        "criteria": [
+            {
+                "criterion_id": criterion_id,
+                "state": "blocked" if criterion_id == "C0-GAPS-RECORDED" else "pending",
+                "evidence": {
+                    "commit_url": None,
+                    "check_urls": [],
+                    "implementation_paths": [],
+                    "consumer_paths": [],
+                    "test_paths": [],
+                },
+            }
+            for criterion_id in ROADMAP_ALL_CRITERIA
+        ],
+    }
+    fence = chr(96) * 3
+    block = _STATUS_START + "\n" + fence + "json\n" + json.dumps(payload) + "\n" + fence + "\n" + _STATUS_END
+    status_path.write_text(content[:start] + block + content[end:], encoding="utf-8")
+
+    progress = _selector(root).get_progress()
+
+    assert progress["blocked_criteria"] == 1
+    assert progress["pending_criteria"] == 3
+    assert progress["completed_criteria"] == 0
+    assert progress["phase_progress"]["C0"]["blocked"] == 1
+
+
+def test_real_manifest_has_first_world_model_mission_waiting_for_c0_evidence():
+    root = Path(__file__).resolve().parents[2]
+    selector = RoadmapMissionSelector(repository_root=root)
+
+    assert selector.find_next_mission() is None
+    assert "C0 evidence is pending" in selector.hold_reason
+
+    progress = selector.get_progress()
+    assert progress["total_criteria"] == 4
+    assert progress["completed_criteria"] == 0
+    assert progress["pending_criteria"] == 4
+    assert progress["phase_progress"]["C0"]["total"] == 3
+    assert progress["phase_progress"]["C1"]["total"] == 1
+    assert progress["next_mission"] is None
+
+    manifest = json.loads((root / "data" / "roadmap_missions.json").read_text(encoding="utf-8"))
+    missions = {mission["criterion_id"]: mission for mission in manifest["missions"]}
+    assert missions["C1-WORLD-MODEL"]["status"] == "ready"
+    assert set(missions["C1-WORLD-MODEL"]["depends_on"]) == set(ROADMAP_CRITERIA)
+    assert len(missions) == 1

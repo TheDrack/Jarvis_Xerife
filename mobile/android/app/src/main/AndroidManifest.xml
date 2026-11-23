@@ -23,8 +23,9 @@
         <!-- Scoped visibility for communication apps; no QUERY_ALL_PACKAGES grant. -->
         <package android:name="com.openai.chatgpt" />
         <package android:name="com.anthropic.claude" />
-        <package android:name="com.google.android.apps.bard" />
+        <package android:name="com.google.android.googlequicksearchbox" />
         <package android:name="ai.x.grok" />
+        <package android:name="ai.qwenlm.chat.android" />
         <package android:name="ai.qwenlm.chat.android" />
         <package android:name="com.whatsapp" />
         <package android:name="com.Slack" />

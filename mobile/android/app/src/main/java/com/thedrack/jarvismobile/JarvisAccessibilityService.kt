@@ -2,6 +2,7 @@ package com.thedrack.jarvismobile
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.content.Intent
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.Bitmap
@@ -123,6 +124,7 @@ class JarvisAccessibilityService : AccessibilityService() {
         if (method == "GET" && path == "/v1/snapshot") return onMain { snapshot() }
         if (method == "GET" && path == "/v1/network/flows") return networkFlows()
         if (method == "GET" && path == "/v1/screenshot") return screenshot()
+        if (method == "POST" && path == "/v1/apps/launch") return onMain { launchApp(body) }
         if (method == "POST" && path == "/v1/action") return onMain { performAction(body) }
         return JSONObject().put("error", "not_found")
     }
@@ -308,6 +310,22 @@ class JarvisAccessibilityService : AccessibilityService() {
         else JSONObject().put("available", false).put("reason", failure)
     }
 
+    private fun launchApp(body: JSONObject): JSONObject {
+        val packageName = body.optString("package_name")
+        if (packageName !in ALLOWED_LLM_PACKAGES) {
+            return JSONObject().put("success", false).put("error", "app_not_allowlisted")
+        }
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+            ?: return JSONObject().put("success", false).put("error", "app_not_installed")
+        return try {
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(launchIntent)
+            JSONObject().put("success", true).put("package_name", packageName)
+        } catch (_: Exception) {
+            JSONObject().put("success", false).put("error", "app_launch_failed")
+        }
+    }
+
     private fun performAction(body: JSONObject): JSONObject {
         val action = body.optString("action")
         val success = when (action) {
@@ -337,6 +355,29 @@ class JarvisAccessibilityService : AccessibilityService() {
                 val viewId = body.optString("view_id")
                 if (viewId.isBlank() || viewId.length > 300) false
                 else findNode { it.viewIdResourceName == viewId }?.let { clickNode(it) } ?: false
+            }
+            "click_index" -> {
+                val index = body.optInt("index", -1)
+                if (index !in 0 until MAX_NODES) false
+                else findNodeByIndex(index)?.let { clickNode(it) } ?: false
+            }
+            "set_text_index" -> {
+                val index = body.optInt("index", -1)
+                val text = body.optString("text")
+                if (index !in 0 until MAX_NODES || text.length > 12000) false
+                else {
+                    val target = findNodeByIndex(index)
+                    try {
+                        target?.takeIf { it.isEditable && !it.isPassword }?.performAction(
+                            AccessibilityNodeInfo.ACTION_SET_TEXT,
+                            Bundle().apply {
+                                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+                            }
+                        ) ?: false
+                    } finally {
+                        target?.recycle()
+                    }
+                }
             }
             "set_text" -> {
                 val viewId = body.optString("view_id")
@@ -372,6 +413,25 @@ class JarvisAccessibilityService : AccessibilityService() {
         } finally {
             root.recycle()
         }
+    }
+
+    private fun findNodeByIndex(targetIndex: Int): AccessibilityNodeInfo? {
+        val root = rootInActiveWindow ?: return null
+        val count = intArrayOf(0)
+        fun search(node: AccessibilityNodeInfo, depth: Int): AccessibilityNodeInfo? {
+            if (depth > MAX_DEPTH || count[0] >= MAX_NODES) return null
+            val currentIndex = count[0]++
+            if (currentIndex == targetIndex) return AccessibilityNodeInfo.obtain(node)
+            for (index in 0 until node.childCount) {
+                if (count[0] >= MAX_NODES) break
+                val child = node.getChild(index) ?: continue
+                val found = search(child, depth + 1)
+                child.recycle()
+                if (found != null) return found
+            }
+            return null
+        }
+        return try { search(root, 0) } finally { root.recycle() }
     }
 
     private fun clickNode(node: AccessibilityNodeInfo): Boolean {
@@ -442,7 +502,14 @@ class JarvisAccessibilityService : AccessibilityService() {
     companion object {
         const val PORT = 18766
         private const val TAG = "JarvisAccessibility"
-        private const val MAX_BODY_BYTES = 32 * 1024
+        private const val MAX_BODY_BYTES = 64 * 1024
+        private val ALLOWED_LLM_PACKAGES = setOf(
+            "com.openai.chatgpt",
+            "com.anthropic.claude",
+            "com.google.android.googlequicksearchbox",
+            "ai.x.grok",
+            "ai.qwenlm.chat.android",
+        )
         private const val MAX_NODES = 300
         private const val MAX_DEPTH = 12
         @Volatile var isEnabled: Boolean = false

@@ -26,6 +26,11 @@ SUPPORTED_WORKER_MODEL_PROVIDERS = frozenset({
     "gemini",
     "xai",
     "qwen",
+    "android_app:chatgpt",
+    "android_app:claude",
+    "android_app:gemini",
+    "android_app:grok",
+    "android_app:qwen",
 })
 
 
@@ -260,6 +265,36 @@ class AgentWorkerCredentialStore:
                 str(row.get("model_provider") or "unknown").strip().lower() or "unknown"
             ),
         )
+
+    def set_model_provider(self, agent_id: str, model_provider: str) -> None:
+        """Change an agent's trusted provider binding without rotating its token."""
+        normalized_agent = agent_id.strip() if isinstance(agent_id, str) else ""
+        normalized_provider = model_provider.strip().lower() if isinstance(model_provider, str) else ""
+        if not normalized_agent:
+            raise ValueError("agent_id must not be empty")
+        if normalized_provider not in SUPPORTED_WORKER_MODEL_PROVIDERS:
+            raise ValueError(f"unsupported worker model provider: {normalized_provider}")
+        agents_table = f"{self._schema}jarvis_agents"
+        lock_suffix = " FOR UPDATE" if self._schema else ""
+        now = datetime.now(timezone.utc)
+        with self.engine.begin() as connection:
+            registered = connection.execute(
+                text(f"SELECT agent_id FROM {agents_table} WHERE agent_id = :agent_id{lock_suffix}"),
+                {"agent_id": normalized_agent},
+            ).first()
+            if registered is None:
+                raise ValueError(f"worker agent is not registered: {normalized_agent}")
+            updated = connection.execute(
+                text(f"""
+                    UPDATE {agents_table}
+                       SET model_provider = :model_provider,
+                           updated_at = :now
+                     WHERE agent_id = :agent_id
+                """),
+                {"agent_id": normalized_agent, "model_provider": normalized_provider, "now": now},
+            )
+            if updated.rowcount != 1:
+                raise RuntimeError("worker model provider update did not affect exactly one agent")
 
     def revoke_agent(self, agent_id: str) -> int:
         """Revoke every active credential for one agent without affecting others."""

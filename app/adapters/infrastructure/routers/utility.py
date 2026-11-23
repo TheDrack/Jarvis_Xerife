@@ -4,7 +4,7 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -30,7 +30,7 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
     router = APIRouter()
 
     @router.get("/v1/scavenger-hunt/api-keys")
-    async def get_api_key_guides(api_key_names: str = None) -> Dict[str, Any]:
+    async def get_api_key_guides(api_key_names: str = None) -> dict[str, Any]:
         """
         Get step-by-step guides for obtaining missing API keys.
 
@@ -41,7 +41,7 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
 
         if api_key_names:
             keys = [k.strip() for k in api_key_names.split(",")]
-            guides: Dict[str, Any] = {}
+            guides: dict[str, Any] = {}
             for key in keys:
                 guide = ScavengerHunt.find_guide(key)
                 if guide:
@@ -68,7 +68,7 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
         }
 
     @router.post("/v1/scavenger-hunt/missing-resources")
-    async def analyze_missing_resources(capability_id: int) -> Dict[str, Any]:
+    async def analyze_missing_resources(capability_id: int) -> dict[str, Any]:
         """
         Analyze missing resources for a capability and provide acquisition guides.
 
@@ -112,16 +112,16 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
 
     @router.post("/v1/telemetry")
     async def receive_telemetry(
-        telemetry_data: Dict[str, Any],
+        telemetry_data: dict[str, Any],
         current_user: User = Depends(get_current_user),
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Receive telemetry data from mobile/desktop clients (battery, GPS, device type).
 
         Used for context-aware assistance and urgency detection.
         """
         logger.info(f"Telemetry received from {current_user.username}: {telemetry_data}")
-        response: Dict[str, Any] = {
+        response: dict[str, Any] = {
             "status": "received",
             "timestamp": datetime.now().isoformat(),
         }
@@ -144,7 +144,7 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
     @router.get("/v1/evolution/status")
     async def get_evolution_status_simple(
         current_user: User = Depends(get_current_user),
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get simplified evolution status for HUD display (next plugin + count)."""
         try:
             from app.application.services.capability_manager import CapabilityManager
@@ -179,23 +179,28 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
     @router.get("/v1/roadmap/progress")
     async def get_roadmap_progress(
         current_user: User = Depends(get_current_user),
-    ) -> Dict[str, Any]:
-        """Get roadmap completion percentage based on capabilities inventory (HUD display)."""
+    ) -> dict[str, Any]:
+        """Get Cognitive Roadmap progress from verified STATUS evidence (HUD display)."""
         try:
             from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
 
             metrics = AutoEvolutionServiceV2().get_success_metrics()
 
-            evolution_rate = metrics.get("evolution_rate", 0.0)
-            missions_completed = metrics.get("missions_completed", 0)
+            roadmap = metrics.get("roadmap", {})
             total_missions = metrics.get("total_missions", 0)
-
+            missions_completed = metrics.get("missions_completed", 0)
             return {
-                "completion_percentage": round(evolution_rate * 100, 2),
+                "completion_percentage": round(metrics.get("evolution_rate", 0.0) * 100, 2),
                 "total_missions": total_missions,
                 "completed": missions_completed,
                 "in_progress": 0,
-                "planned": max(0, total_missions - missions_completed),
+                "planned": roadmap.get("pending_criteria", max(0, total_missions - missions_completed)),
+                "blocked": roadmap.get("blocked_criteria", 0),
+                "status": metrics.get("status", "unknown"),
+                "hold_reason": roadmap.get("hold_reason"),
+                "next_mission": roadmap.get("next_mission"),
+                "phase_progress": roadmap.get("phase_progress", {}),
+                "criteria": roadmap.get("criteria", []),
             }
         except Exception as e:
             logger.error(f"Error getting roadmap progress: {e}")
@@ -210,9 +215,9 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
 
     @router.post("/v1/translate/jrvs")
     async def trigger_jrvs_translation(
-        payload: Optional[Dict[str, Any]] = None,
+        payload: Optional[dict[str, Any]] = None,
         current_user: User = Depends(get_current_user),
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Dispara o fluxo de atualização tradutiva entre arquivos .jrvs e
         seus equivalentes legíveis por humanos (JSON, YAML, TXT).
@@ -229,7 +234,7 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
 
         body = payload or {}
         translator = JrvsTranslator()
-        context: Dict[str, Any] = {
+        context: dict[str, Any] = {
             "action": body.get("action", "sync_all"),
         }
         if "path" in body:

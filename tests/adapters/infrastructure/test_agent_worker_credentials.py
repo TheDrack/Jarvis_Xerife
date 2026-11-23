@@ -197,3 +197,69 @@ def test_issue_rejects_unrecognized_model_provider():
         assert "unsupported worker model provider" in str(exc)
     else:
         raise AssertionError("unrecognized model providers must not be provisioned")
+
+
+def test_credential_binds_allowlisted_android_app_provider_to_agent():
+    _, store = _store()
+    token = store.issue(
+        agent_id="claude-worker",
+        principal_id="worker:claude-worker",
+        available_tools=["text_reasoning"],
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        model_provider="android_app:claude",
+    )
+
+    principal = store.authenticate(token)
+
+    assert principal is not None
+    assert principal.model_provider == "android_app:claude"
+
+
+def test_credential_rejects_non_allowlisted_android_app_provider():
+    _, store = _store()
+    try:
+        store.issue(
+            agent_id="invalid-app-worker",
+            principal_id="worker:invalid-app-worker",
+            available_tools=["text_reasoning"],
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            model_provider="android_app:settings",
+        )
+    except ValueError as exc:
+        assert "unsupported worker model provider" in str(exc)
+    else:
+        raise AssertionError("non-allowlisted Android apps must not be provisioned")
+
+
+def test_model_provider_can_be_updated_without_rotating_worker_token():
+    _, store = _store()
+    token = store.issue(
+        agent_id="provider-change-worker",
+        principal_id="worker:provider-change-worker",
+        available_tools=["text_reasoning"],
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        model_provider="groq",
+    )
+
+    store.set_model_provider("provider-change-worker", "android_app:claude")
+
+    principal = store.authenticate(token)
+    assert principal is not None
+    assert principal.model_provider == "android_app:claude"
+
+
+def test_model_provider_update_rejects_unknown_agent_and_provider():
+    _, store = _store()
+    try:
+        store.set_model_provider("missing-agent", "android_app:claude")
+    except ValueError as exc:
+        assert "not registered" in str(exc)
+    else:
+        raise AssertionError("unknown agent must not be created implicitly")
+
+    try:
+        store.set_model_provider("missing-agent", "android_app:settings")
+    except ValueError as exc:
+        assert "unsupported worker model provider" in str(exc)
+    else:
+        raise AssertionError("unknown provider must be rejected")

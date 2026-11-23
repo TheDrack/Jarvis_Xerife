@@ -234,3 +234,50 @@ def test_server_side_inference_does_not_require_a_local_provider_key(clean_env, 
 
     assert report["verdict"] == "ready"
     assert report["groups"]["inference_by_agent"] == {"jarvis-mobile": "server_remote"}
+
+
+def test_android_app_provider_requires_live_accessibility_bridge(clean_env, capsys, monkeypatch):
+    clean_env.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    clean_env.setenv("JARVIS_AGENT_ID", "jarvis-termux-mini-1")
+    clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
+    clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_JARVIS_TERMUX_MINI_1", "worker-token")
+    clean_env.setenv("JARVIS_AGENT_REMOTE_INFERENCE_JARVIS_TERMUX_MINI_1", "false")
+    clean_env.setenv("JARVIS_AGENT_MODEL_PROVIDER_JARVIS_TERMUX_MINI_1", "android_app:claude")
+    monkeypatch.setattr(checker, "android_accessibility_ready", lambda: True)
+
+    report, _ = run_cli(capsys)
+
+    assert report["verdict"] == "ready"
+    assert report["groups"]["inference_by_agent"] == {
+        "jarvis-termux-mini-1": "android_app:claude"
+    }
+
+
+def test_android_app_provider_is_blocked_when_accessibility_service_is_off(clean_env, capsys, monkeypatch):
+    clean_env.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    clean_env.setenv("JARVIS_AGENT_ID", "jarvis-termux-mini-1")
+    clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
+    clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_JARVIS_TERMUX_MINI_1", "worker-token")
+    clean_env.setenv("JARVIS_AGENT_REMOTE_INFERENCE_JARVIS_TERMUX_MINI_1", "false")
+    clean_env.setenv("JARVIS_AGENT_MODEL_PROVIDER_JARVIS_TERMUX_MINI_1", "android_app:claude")
+    monkeypatch.setattr(checker, "android_accessibility_ready", lambda: False)
+
+    report, _ = run_cli(capsys)
+
+    assert report["verdict"] == "blocked"
+    assert report["groups"]["inference_by_agent"] == {}
+    assert report["blockers"]
+
+
+def test_android_app_provider_rejects_unknown_app_id(clean_env, capsys, monkeypatch):
+    clean_env.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    clean_env.setenv("JARVIS_AGENT_ID", "jarvis-termux-mini-1")
+    clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
+    clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_JARVIS_TERMUX_MINI_1", "worker-token")
+    clean_env.setenv("JARVIS_AGENT_REMOTE_INFERENCE_JARVIS_TERMUX_MINI_1", "false")
+    clean_env.setenv("JARVIS_AGENT_MODEL_PROVIDER_JARVIS_TERMUX_MINI_1", "android_app:settings")
+    monkeypatch.setattr(checker, "android_accessibility_ready", lambda: True)
+
+    report, _ = run_cli(capsys)
+
+    assert report["verdict"] == "blocked"

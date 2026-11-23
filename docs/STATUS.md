@@ -90,6 +90,22 @@ Esta página substitui snapshots antigos como descrição geral de estado. Resul
 - A API da branch reporta `main.protected=false`; a consulta de rulesets retorna `[]`. A leitura do endpoint de branch protection retorna 403 para a integração; nenhuma configuração foi alterada. Issue [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682) continua aberta.
 - Self Healing V3 run [44753874490](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44753874490) foi `skipped`; não houve reparo nessa execução. `homeostase.yml` continua limitado a workflows confiáveis originados em `main` e não observa PR Validation/Task Queue. O fluxo trusted-main permanece preservado; autocorreção automática de PRs continua não comprovada.
 
+## Revalidação técnica — 2026-11-23 — Cognitive Capability Audit
+
+- Snapshot da `main` após a PR #879: `8b1bc667` (merge funcional `b1782c61b983b552fee9a205d291ae35adf0a6bd`). O mapa técnico detalhado está em `docs/COGNITIVE_CAPABILITY_AUDIT.md`; a classificação usa callers, testes, workflow e runtime, não nomes de módulos.
+- Worker Termux `jarvis-termux-mini-1`: PID `6598`, `running`, sem erro reportado; Supabase `available`, provider `groq`, `active_tasks=0`, `available_tools=["text_reasoning"]`. O diário local tinha zero objetivos e zero etapas.
+- A fila Supabase continha duas tarefas `ready` (`prod-agent-audit-20261027-01`, prioridade 90; `prod-agent-optimize-20261027-02`, prioridade 80). Ambas exigem `repository_read`, `github_read` e `production_read`; o worker não anuncia essas ferramentas e corretamente não as reivindica.
+- O Termux não tinha GitHub CLI autenticado nem credenciais locais de Render/Supabase. Não foram adicionadas capacidades fictícias nem alteradas as tarefas existentes.
+- O bridge Android tinha token pareado, mas nenhum listener em `127.0.0.1:18766`. ChatGPT, Claude, Gemini, Qwen e Grok estavam instalados; o serviço de acessibilidade ainda precisava ser habilitado no Android.
+- Implementação local adicionada nesta branch: provider-neutral UI runtime para ChatGPT/Claude/Gemini/Grok/Qwen; launch/index actions protegidas por allowlist no bridge Android; seleção de provider e modo de inferência por agente no Termux; provider do scheduler derivado de binding server-side por identidade autenticada. A suíte Python cobre o contrato, mas o APK ainda precisa passar no workflow Android e o smoke test real depende da ativação manual da acessibilidade.
+- O worker ativo continua com `JARVIS_AGENT_REMOTE_INFERENCE=true`; nenhuma configuração de produção foi trocada para UI inference. O caminho de API permanece intacto até a validação local.
+- A execução integrada de evolução [45151249242](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45151249242) concluiu o gate, mas `EVOLUTION_ENABLED` estava vazio; geração/validação e publicação foram `skipped`. `data/roadmap_missions.json` continuava com `missions: []`.
+- O ledger agora inclui o critério inicial `C1-WORLD-MODEL`, ainda `pending`. Os três critérios C0 também permanecem `pending` até o merge da auditoria e o registro de evidências imutáveis de commit, Actions, implementação, consumidor e testes.
+- PR [#879](https://github.com/TheDrack/Jarvis_Xerife/pull/879) foi mesclada em `b1782c61b983b552fee9a205d291ae35adf0a6bd`: autenticação por token dedicado, providers/APIs por agente, configurações independentes por slot e diagnóstico read-only do ambiente.
+- A branch de continuação adiciona runtimes locais para apps Android e seleção por agente `android_app:*`, mas a implementação ainda precisa passar pela CI. A credencial existente não foi alterada; o serviço de acessibilidade permanece desabilitado, e o worker continua no caminho remoto Groq.
+- O manifesto `data/roadmap_missions.json` deixou de estar vazio: `C1-WORLD-MODEL` está mapeada para `intelligence_recurring_worker.py` e testes existentes, com dependência explícita dos três critérios C0. O seletor consulta o ledger para dependências de fases anteriores; como C0 ainda está `pending`, nenhuma missão é executada prematuramente.
+- O caminho `CognitiveRouter`/`jarvis_chat.yml` foi classificado como isolado; o caminho de produção de conversação é `AssistantService → IntentProcessor → llm_service/ai_gateway`. A decisão evita adicionar um segundo classificador sem contrato funcional de `llm_engine`.
+
 ## Ledger verificável dos critérios cognitivos
 
 Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser tratado como concluído quando estiver como `verified` e trouxer referência imutável de commit, execução de Actions, implementação, consumidor e testes. A presença das referências é validada pelo selector; a autenticidade e a suficiência técnica continuam sujeitas à revisão humana.
@@ -124,6 +140,17 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
     },
     {
       "criterion_id": "C0-NO-NAME-BASED-COMPLETION",
+      "state": "pending",
+      "evidence": {
+        "commit_url": null,
+        "check_urls": [],
+        "implementation_paths": [],
+        "consumer_paths": [],
+        "test_paths": []
+      }
+    },
+    {
+      "criterion_id": "C1-WORLD-MODEL",
       "state": "pending",
       "evidence": {
         "commit_url": null,

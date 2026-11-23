@@ -1,6 +1,29 @@
 {
   "schema_version": 1,
   "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
-  "hold_reason": "C0 remains open. No criterion currently has a reviewed, existing Python target and regression-test mapping suitable for autonomous generation. Do not infer targets from legacy capability notes or model output.",
-  "missions": []
+  "hold_reason": "C0 evidence is pending review and CI verification. C1-WORLD-MODEL has a reviewed target and regression-test mapping, but remains blocked until all C0 criteria are verified in the STATUS ledger.",
+  "missions": [
+    {
+      "criterion_id": "C1-WORLD-MODEL",
+      "phase": "C1",
+      "legacy_capability_id": "CAP-058",
+      "status": "ready",
+      "risk": "low",
+      "priority": 1,
+      "title": "Bridge intelligence observations into the World Model",
+      "objective": "Project normalized IntelligenceObservation records into stable graph nodes, preserving source, provenance, observed time, confidence, and scope.",
+      "expected_result": "Repeated observations are idempotent, graph nodes are queryable by entity and scope, and every persisted node retains source provenance.",
+      "roadmap_heading": "## 5. Fase 1 — World Model",
+      "target_file": "app/application/services/intelligence_recurring_worker.py",
+      "tests": [
+        "tests/application/test_intelligence_recurring_worker.py",
+        "tests/adapters/infrastructure/graph/test_graph_store.py"
+      ],
+      "depends_on": [
+        "C0-CAPABILITY-MAP",
+        "C0-GAPS-RECORDED",
+        "C0-NO-NAME-BASED-COMPLETION"
+      ]
+    }
+  ]
 }

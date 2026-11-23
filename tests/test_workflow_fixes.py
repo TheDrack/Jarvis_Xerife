@@ -16,8 +16,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-import pytest
-
 PROJECT_ROOT = Path(__file__).parent.parent
 
 
@@ -144,7 +142,9 @@ def test_evolve_all_pending_unknown_cap_id_fails():
 
 def test_auto_evolution_service():
     """AutoEvolutionServiceV2 must be importable and respond to basic queries."""
-    from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2  # noqa: PLC0415
+    from app.application.services.auto_evolutionV2 import (
+        AutoEvolutionServiceV2,  # noqa: PLC0415
+    )
 
     service = AutoEvolutionServiceV2()
 
@@ -155,51 +155,151 @@ def test_auto_evolution_service():
     assert is_not_auto is False, "is_auto_evolution_pr() should not match regular PRs"
 
 
-def test_auto_evolution_evolve_uses_evolution_orchestrator(monkeypatch):
-    """A mutação de capabilities deve passar pelo EvolutionOrchestrator (via Nexus).
+class FakeRoadmapSelector:
+    def __init__(self, mission=None, progress=None, hold_reason="C0 remains open"):
+        self.mission = mission
+        self.hold_reason = hold_reason
+        self.progress = progress or {
+            "total_criteria": 3,
+            "completed_criteria": 0,
+            "pending_criteria": 3,
+            "blocked_criteria": 0,
+            "completion_rate": 0.0,
+            "phase_progress": {"C0": {"total": 3, "verified": 0, "pending": 3, "blocked": 0}},
+            "criteria": [],
+            "next_mission": mission,
+            "hold_reason": hold_reason,
+            "status": "ready" if mission else "blocked",
+        }
 
-    O antigo ``scripts/evolution_mutator.py`` foi removido do projeto; a ação
-    ``evolve_next`` precisa funcionar através do orchestrator registrado.
-    """
+    def find_next_mission(self):
+        return self.mission
+
+    def get_progress(self):
+        return self.progress
+
+
+def _selected_roadmap_mission():
+    return {
+        "criterion_id": "C1-WORLD-MODEL",
+        "phase": "C1",
+        "legacy_capability_id": "CAP-058",
+        "status": "ready",
+        "risk": "low",
+        "priority": 1,
+        "title": "Bridge intelligence observations into the World Model",
+        "objective": "Persist normalized observations as graph nodes with stable identity and provenance.",
+        "expected_result": "Repeated observations are idempotent and preserve source provenance.",
+        "roadmap_heading": "## 5. Fase 1 — World Model",
+        "target_file": "app/application/services/intelligence_recurring_worker.py",
+        "tests": ["tests/application/test_intelligence_recurring_worker.py"],
+        "depends_on": ["C0-CAPABILITY-MAP", "C0-GAPS-RECORDED", "C0-NO-NAME-BASED-COMPLETION"],
+        "roadmap_context": '{"criterion_id":"C1-WORLD-MODEL","source_of_truth":"docs/COGNITIVE_ROADMAP.md"}',
+    }
+
+
+def test_auto_evolution_evolve_uses_evolution_orchestrator(monkeypatch, tmp_path):
+    """A geração deve usar a missão elegível do roadmap, não o inventário legado."""
+    import json
     from unittest.mock import MagicMock, patch
 
     import app.application.services.auto_evolutionV2 as mod
 
     monkeypatch.setenv("EVOLUTION_ENABLED", "true")
-    service = mod.AutoEvolutionServiceV2(capabilities_path=str(PROJECT_ROOT / 'data' / 'capabilities.json'))
-    mission = service.find_next_mission()
-    assert mission is not None, "O inventário precisa ter ao menos uma cap pendente"
-
+    capabilities = tmp_path / "capabilities.json"
+    capabilities.write_text(json.dumps({"capabilities": [{"id": "CAP-058", "status": "pending"}]}), encoding="utf-8")
+    service = mod.AutoEvolutionServiceV2(
+        capabilities_path=str(capabilities),
+        mission_selector=FakeRoadmapSelector(mission=_selected_roadmap_mission()),
+    )
     orchestrator = MagicMock()
-    orchestrator.execute.return_value = {"success": True, "proposal": "data/evolution_proposals/x.py"}
+    orchestrator.execute.return_value = {"success": True, "pr_url": "https://github.com/TheDrack/Jarvis_Xerife/pull/999"}
 
     with patch.object(mod, "nexus") as mock_nexus:
         mock_nexus.resolve.return_value = orchestrator
         result = service.execute({"action": "evolve_next"})
 
     assert result["success"] is True
-    assert result["evolved"] == mission["id"]
+    assert result["status"] == "pr_created"
+    assert result["criterion_id"] == "C1-WORLD-MODEL"
     mock_nexus.resolve.assert_called_with("evolution_orchestrator")
     payload = orchestrator.execute.call_args.args[0]
-    assert payload["cap_id"] == mission["id"]
-    assert payload["roadmap_context"]
+    assert payload["cap_id"] == "CAP-058"
+    assert payload["mission_id"] == "C1-WORLD-MODEL"
+    assert payload["target_file"] == "app/application/services/intelligence_recurring_worker.py"
+    assert payload["tests"] == ["tests/application/test_intelligence_recurring_worker.py"]
+    assert payload["roadmap_context"] == _selected_roadmap_mission()["roadmap_context"]
 
 
-def test_auto_evolution_falls_back_to_json_inventory():
-    """Sem o ``.jrvs``, o inventário ``.json`` equivalente deve ser usado.
+def test_auto_evolution_does_not_select_legacy_capability_when_manifest_has_no_mission(tmp_path):
+    import json
 
-    O serviço registrado no Nexus usa ``data/capabilities.jrvs`` por padrão; como
-    o inventário versionado está em ``capabilities.json``, o fallback evita que a
-    auto-evolução responda ``empty_inventory`` e nunca encontre missões.
-    """
     import app.application.services.auto_evolutionV2 as mod
 
-    service = mod.AutoEvolutionServiceV2()
+    capabilities = tmp_path / "capabilities.json"
+    capabilities.write_text(json.dumps({"capabilities": [{"id": "CAP-058", "status": "pending"}]}), encoding="utf-8")
+    selector = FakeRoadmapSelector(mission=None, hold_reason="C0 remains open")
+    service = mod.AutoEvolutionServiceV2(capabilities_path=str(capabilities), mission_selector=selector)
+
+    assert service.find_next_mission() is None
+
+
+def test_auto_evolution_evolve_cap_cannot_bypass_selected_roadmap_mission(monkeypatch):
+    from unittest.mock import patch
+
+    import app.application.services.auto_evolutionV2 as mod
+
+    monkeypatch.setenv("EVOLUTION_ENABLED", "true")
+    service = mod.AutoEvolutionServiceV2(mission_selector=FakeRoadmapSelector(mission=_selected_roadmap_mission()))
+    with patch.object(mod, "nexus") as mock_nexus:
+        result = service.execute({"action": "evolve_cap", "cap_id": "CAP-999"})
+
+    assert result["success"] is False
+    assert result["reason"] == "requested_capability_not_eligible_roadmap_mission"
+    mock_nexus.resolve.assert_not_called()
+
+
+def test_auto_evolution_does_not_complete_legacy_inventory_without_status_evidence(tmp_path):
+    import json
+
+    import app.application.services.auto_evolutionV2 as mod
+
+    capabilities = tmp_path / "capabilities.json"
+    capabilities.write_text(json.dumps({"capabilities": [{"id": "CAP-058", "status": "pending"}]}), encoding="utf-8")
+    service = mod.AutoEvolutionServiceV2(capabilities_path=str(capabilities))
+
+    assert service.mark_mission_as_completed("CAP-058") is False
+    assert json.loads(capabilities.read_text(encoding="utf-8"))["capabilities"][0]["status"] == "pending"
+
+
+def test_auto_evolution_metrics_use_verified_roadmap_evidence_not_legacy_inventory():
+    import app.application.services.auto_evolutionV2 as mod
+
+    selector = FakeRoadmapSelector(
+        mission=None,
+        progress={
+            "total_criteria": 4,
+            "completed_criteria": 0,
+            "pending_criteria": 4,
+            "blocked_criteria": 0,
+            "completion_rate": 0.0,
+            "phase_progress": {"C0": {"total": 3, "verified": 0, "pending": 3, "blocked": 0}, "C1": {"total": 1, "verified": 0, "pending": 1, "blocked": 0}},
+            "criteria": [],
+            "next_mission": None,
+            "hold_reason": "C0 remains open",
+            "status": "blocked",
+        },
+    )
+    service = mod.AutoEvolutionServiceV2(mission_selector=selector)
     metrics = service.get_success_metrics()
 
-    assert metrics["total_missions"] > 0, "O inventário real deve ser carregado"
-    assert metrics["status"] == "operational"
-    assert service.find_next_mission() is not None
+    assert metrics["total_missions"] == 4
+    assert metrics["missions_completed"] == 0
+    assert metrics["evolution_rate"] == 0.0
+    assert metrics["status"] == "blocked"
+    assert metrics["roadmap"]["hold_reason"] == "C0 remains open"
+    assert metrics["legacy_inventory"]["total_capabilities"] > 0
+    assert service.find_next_mission() is None
 
 
 def test_auto_evolution_resolved_path_prefers_existing_sibling(tmp_path):
@@ -231,7 +331,10 @@ def test_auto_evolution_evolve_reports_missing_orchestrator(monkeypatch):
     import app.application.services.auto_evolutionV2 as mod
 
     monkeypatch.setenv("EVOLUTION_ENABLED", "true")
-    service = mod.AutoEvolutionServiceV2(capabilities_path=str(PROJECT_ROOT / 'data' / 'capabilities.json'))
+    service = mod.AutoEvolutionServiceV2(
+        capabilities_path=str(PROJECT_ROOT / 'data' / 'capabilities.json'),
+        mission_selector=FakeRoadmapSelector(mission=_selected_roadmap_mission()),
+    )
 
     with patch.object(mod, "nexus") as mock_nexus:
         mock_nexus.resolve.side_effect = RuntimeError("component not found")
@@ -275,6 +378,7 @@ def test_services_package_importable_without_sqlmodel():
 def test_auto_evolution_is_paused_without_explicit_opt_in(monkeypatch):
     """Mutation is fail-closed by default while status/discovery remain available."""
     from unittest.mock import patch
+
     import app.application.services.auto_evolutionV2 as mod
 
     monkeypatch.delenv("EVOLUTION_ENABLED", raising=False)
@@ -300,3 +404,18 @@ def test_auto_evolution_status_is_available_while_paused(monkeypatch):
 
     assert result["success"] is True
     assert result["metrics"]["total_missions"] > 0
+
+
+def test_default_auto_evolution_service_reports_real_c0_status_not_legacy_progress():
+    import app.application.services.auto_evolutionV2 as mod
+
+    service = mod.AutoEvolutionServiceV2()
+    metrics = service.get_success_metrics()
+
+    assert metrics["total_missions"] == 4
+    assert metrics["missions_completed"] == 0
+    assert metrics["status"] == "blocked"
+    assert metrics["roadmap"]["pending_criteria"] == 4
+    assert metrics["roadmap"]["next_mission"] is None
+    assert metrics["legacy_inventory"]["is_completion_evidence"] is False
+    assert service.find_next_mission() is None
