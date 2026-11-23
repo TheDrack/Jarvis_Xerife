@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
-  "hold_reason": "A fase C0 ainda aguarda revisão, merge e CI verde. A primeira missão C1-WORLD-MODEL já está mapeada, mas permanece bloqueada até que os três critérios C0 tenham evidências verificadas no ledger docs/STATUS.md.",
+  "hold_reason": "A fase C0 foi concluída e verificada. C1-WORLD-MODEL está pronta para execução; sua conclusão exigirá implementação, consumidor e testes com evidência de merge e CI.",
   "missions": [
     {
       "criterion_id": "C1-WORLD-MODEL",

@@ -99,8 +99,12 @@ The UI adapter serializes all requests through one worker-process-wide lock, lau
 - `C0-GAPS-RECORDED`: the disconnected call paths, inactive services, missing tools, and roadmap gate are listed explicitly above.
 - `C0-NO-NAME-BASED-COMPLETION`: all classifications are based on callers, tests, workflow evidence, and observed runtime state. A module or legacy capability label alone never establishes completion.
 
-The machine-readable ledger in `docs/STATUS.md` remains authoritative for completion. These criteria must stay `pending` until the audit is merged and its commit/check evidence is recorded there.
+The machine-readable ledger in `docs/STATUS.md` remains authoritative for completion. PR #880 was merged as `9ad37374465c25a40f9bf3ceb51fa9889622aae9`; the three C0 criteria now carry verified commit, CI, implementation, consumer and test evidence. `C1-WORLD-MODEL` is consequently eligible for execution.
 
 ## Roadmap execution gate update
 
-The machine-readable mission manifest now contains the first bounded C1 task, `C1-WORLD-MODEL`, with an existing implementation target and regression tests. The selector accepts prior-phase dependencies directly from the evidence ledger, so C1 does not need placeholder C0 code-generation missions. All three C0 criteria remain `pending`; therefore `find_next_mission()` correctly returns no mission today. Once the C0 audit PR is merged, its green Actions runs and consumer/test paths are recorded in `docs/STATUS.md`, the three C0 entries can be marked `verified` and the C1 mission becomes eligible without changing the selector again.
+The machine-readable mission manifest contains the first bounded C1 task, `C1-WORLD-MODEL`, with an existing implementation target and regression tests. The selector accepts prior-phase dependencies directly from the evidence ledger, so C1 does not need placeholder C0 code-generation missions. After PR #880 merged and its commit/check/consumer/test evidence was recorded, all three C0 criteria became `verified`; `find_next_mission()` now selects C1 without another selector change.
+
+## C0 evidence closure — 2026-11-23
+
+PR [#880](https://github.com/TheDrack/Jarvis_Xerife/pull/880) merged as [9ad3737](https://github.com/TheDrack/Jarvis_Xerife/commit/9ad37374465c25a40f9bf3ceb51fa9889622aae9). The following checks passed on its final head: [full pytest suite](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194770911), [task queue and full tests](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194771350), and [Android APK build](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194772160). The three C0 ledger criteria now record those immutable evidence URLs. The selector should now expose `C1-WORLD-MODEL` as the next mission.

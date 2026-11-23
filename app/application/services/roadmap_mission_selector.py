@@ -400,6 +400,8 @@ class RoadmapMissionSelector:
         phase_progress: dict[str, dict[str, int]] = {}
         ordered_criteria: list[str] = []
         for phase_number, criterion_ids in sorted(criteria_by_phase.items()):
+            if not criterion_ids:
+                continue
             counts = {"total": len(criterion_ids), "verified": 0, "pending": 0, "blocked": 0}
             for criterion_id in criterion_ids:
                 state = evidence[criterion_id]["state"]
@@ -554,4 +556,5 @@ class RoadmapMissionSelector:
             ensure_ascii=False,
             indent=2,
         )
+        self.hold_reason = None
         return selected

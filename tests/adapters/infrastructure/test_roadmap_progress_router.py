@@ -13,14 +13,14 @@ def test_roadmap_progress_uses_verified_status_ledger():
 
     assert response.status_code == 200
     body = response.json()
-    assert body["completion_percentage"] == 0.0
+    assert body["completion_percentage"] == 75.0
     assert body["total_missions"] == 4
-    assert body["completed"] == 0
-    assert body["planned"] == 4
+    assert body["completed"] == 3
+    assert body["planned"] == 1
     assert body["blocked"] == 0
-    assert body["status"] == "blocked"
-    assert body["next_mission"] is None
-    assert "A fase C0 ainda aguarda" in body["hold_reason"]
+    assert body["status"] == "ready"
+    assert body["next_mission"]["criterion_id"] == "C1-WORLD-MODEL"
+    assert body["hold_reason"] is None
 
 
 def test_health_detail_uses_evidence_based_roadmap_metrics(monkeypatch):
@@ -36,7 +36,8 @@ def test_health_detail_uses_evidence_based_roadmap_metrics(monkeypatch):
 
     assert response.status_code == 200
     evolution = response.json()["evolution"]
-    assert evolution["status"] == "blocked"
+    assert evolution["status"] == "ready"
     assert evolution["roadmap"]["total_criteria"] == 4
-    assert evolution["roadmap"]["completed_criteria"] == 0
+    assert evolution["roadmap"]["completed_criteria"] == 3
+    assert evolution["roadmap"]["next_mission"]["criterion_id"] == "C1-WORLD-MODEL"
     assert evolution["legacy_inventory"]["is_completion_evidence"] is False

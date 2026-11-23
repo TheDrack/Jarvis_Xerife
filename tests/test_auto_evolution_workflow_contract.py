@@ -36,7 +36,7 @@ def test_workflow_rejects_malformed_mission_ids_before_candidate_generation():
 
 
 
-def test_workflow_has_first_c1_mission_but_keeps_it_gated_by_c0_evidence():
+def test_workflow_exposes_c1_mission_after_c0_evidence_closure():
     import json
 
     from app.application.services.roadmap_mission_selector import RoadmapMissionSelector
@@ -48,11 +48,12 @@ def test_workflow_has_first_c1_mission_but_keeps_it_gated_by_c0_evidence():
     assert [mission["criterion_id"] for mission in manifest["missions"]] == ["C1-WORLD-MODEL"]
     assert manifest["missions"][0]["status"] == "ready"
     assert len(manifest["missions"][0]["depends_on"]) == 3
-    assert "A fase C0 ainda aguarda" in manifest["hold_reason"]
+    assert "C0 foi concluída" in manifest["hold_reason"]
 
     selector = RoadmapMissionSelector(repository_root=root)
-    assert selector.find_next_mission() is None
-    assert "A fase C0 ainda aguarda" in selector.hold_reason
+    mission = selector.find_next_mission()
+    assert mission is not None
+    assert mission["criterion_id"] == "C1-WORLD-MODEL"
 
 
 def test_workflow_dispatch_supports_one_time_run_without_global_enablement():
