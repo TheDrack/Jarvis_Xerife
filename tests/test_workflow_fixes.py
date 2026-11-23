@@ -183,7 +183,7 @@ def _selected_roadmap_mission():
     return {
         "criterion_id": "C1-WORLD-MODEL",
         "phase": "C1",
-        "legacy_capability_id": "CAP-058",
+        "legacy_capability_id": "CAP-029",
         "status": "ready",
         "risk": "low",
         "priority": 1,
@@ -207,7 +207,7 @@ def test_auto_evolution_evolve_uses_evolution_orchestrator(monkeypatch, tmp_path
 
     monkeypatch.setenv("EVOLUTION_ENABLED", "true")
     capabilities = tmp_path / "capabilities.json"
-    capabilities.write_text(json.dumps({"capabilities": [{"id": "CAP-058", "status": "pending"}]}), encoding="utf-8")
+    capabilities.write_text(json.dumps({"capabilities": [{"id": "CAP-029", "status": "pending"}]}), encoding="utf-8")
     service = mod.AutoEvolutionServiceV2(
         capabilities_path=str(capabilities),
         mission_selector=FakeRoadmapSelector(mission=_selected_roadmap_mission()),
@@ -224,7 +224,7 @@ def test_auto_evolution_evolve_uses_evolution_orchestrator(monkeypatch, tmp_path
     assert result["criterion_id"] == "C1-WORLD-MODEL"
     mock_nexus.resolve.assert_called_with("evolution_orchestrator")
     payload = orchestrator.execute.call_args.args[0]
-    assert payload["cap_id"] == "CAP-058"
+    assert payload["cap_id"] == "CAP-029"
     assert payload["mission_id"] == "C1-WORLD-MODEL"
     assert payload["target_file"] == "app/application/services/intelligence_recurring_worker.py"
     assert payload["tests"] == ["tests/application/test_intelligence_recurring_worker.py"]
@@ -237,7 +237,7 @@ def test_auto_evolution_does_not_select_legacy_capability_when_manifest_has_no_m
     import app.application.services.auto_evolutionV2 as mod
 
     capabilities = tmp_path / "capabilities.json"
-    capabilities.write_text(json.dumps({"capabilities": [{"id": "CAP-058", "status": "pending"}]}), encoding="utf-8")
+    capabilities.write_text(json.dumps({"capabilities": [{"id": "CAP-029", "status": "pending"}]}), encoding="utf-8")
     selector = FakeRoadmapSelector(mission=None, hold_reason="C0 remains open")
     service = mod.AutoEvolutionServiceV2(capabilities_path=str(capabilities), mission_selector=selector)
 
@@ -265,10 +265,10 @@ def test_auto_evolution_does_not_complete_legacy_inventory_without_status_eviden
     import app.application.services.auto_evolutionV2 as mod
 
     capabilities = tmp_path / "capabilities.json"
-    capabilities.write_text(json.dumps({"capabilities": [{"id": "CAP-058", "status": "pending"}]}), encoding="utf-8")
+    capabilities.write_text(json.dumps({"capabilities": [{"id": "CAP-029", "status": "pending"}]}), encoding="utf-8")
     service = mod.AutoEvolutionServiceV2(capabilities_path=str(capabilities))
 
-    assert service.mark_mission_as_completed("CAP-058") is False
+    assert service.mark_mission_as_completed("CAP-029") is False
     assert json.loads(capabilities.read_text(encoding="utf-8"))["capabilities"][0]["status"] == "pending"
 
 

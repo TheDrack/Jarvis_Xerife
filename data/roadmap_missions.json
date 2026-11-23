@@ -6,7 +6,7 @@
     {
       "criterion_id": "C1-WORLD-MODEL",
       "phase": "C1",
-      "legacy_capability_id": "CAP-058",
+      "legacy_capability_id": "CAP-029",
       "status": "ready",
       "risk": "low",
       "priority": 1,
