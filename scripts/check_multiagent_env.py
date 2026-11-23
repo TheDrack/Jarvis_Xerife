@@ -22,9 +22,16 @@ import argparse
 import json
 import os
 import platform
-import re
+import sys
 import urllib.error
 import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from app.multiagent.worker_env import worker_env_name, worker_env_value  # noqa: E402
 
 LEGACY_QUEUE_ACCESS = ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY")
 QUEUE_API_KEYS = (
@@ -38,10 +45,16 @@ INFERENCE_KEYS = ("FREELLMAPI_API_KEY", "GROQ_API_KEY", "VENICE_API_KEY")
 OPTIONAL = (
     "JARVIS_AGENT_ID",
     "JARVIS_MINI_AGENT_WORKERS",
+    "JARVIS_AGENT_REMOTE_INFERENCE",
+    "JARVIS_AGENT_REMOTE_INFERENCE_TIMEOUT",
+    "JARVIS_AGENT_MODEL_PROVIDER",
     "JARVIS_TASK_QUEUE_LEASE_SECONDS",
     "FREELLMAPI_BASE_URL",
     "FREELLMAPI_MODEL",
     "FREELLMAPI_PROVIDER",
+    "FREELLMAPI_TIMEOUT_SECONDS",
+    "GROQ_MODEL",
+    "VENICE_MODEL",
     "JARVIS_TASK_QUEUE_DATABASE_URL",
     "DATABASE_URL",
 )
@@ -81,8 +94,7 @@ def _worker_agent_ids() -> list[str]:
 
 
 def _worker_token_env_name(agent_id: str) -> str:
-    normalized = re.sub(r"[^A-Za-z0-9]+", "_", agent_id.strip()).strip("_").upper()
-    return f"JARVIS_TASK_QUEUE_WORKER_TOKEN_{normalized}"
+    return worker_env_name("JARVIS_TASK_QUEUE_WORKER_TOKEN", agent_id)
 
 
 def _queue_variable_names() -> tuple[str, ...]:
@@ -115,25 +127,12 @@ def queue_group() -> tuple[str, dict[str, bool]]:
             if name.startswith("JARVIS_TASK_QUEUE_WORKER_TOKEN_")
         )
     )
-    has_caller = bool(
-        os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
-        or (
-            os.getenv("JARVIS_TASK_QUEUE_USERNAME", "").strip()
-            and os.getenv("JARVIS_TASK_QUEUE_PASSWORD", "").strip()
-        )
-    )
     http_ready = bool(
         os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip()
         and all(worker_tokens.values())
-        and has_caller
     )
     if http_ready:
-        mode = (
-            "http_worker_token"
-            if os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
-            else "http_worker_password"
-        )
-        return mode, presence(_queue_variable_names())
+        return "http_worker_token", presence(_queue_variable_names())
     if worker_token_configured:
         # Once individual identity is configured, do not silently fall back to
         # the shared service-role path when one slot is missing its credential.
@@ -143,6 +142,75 @@ def queue_group() -> tuple[str, dict[str, bool]]:
         return "supabase_native_legacy", presence(_queue_variable_names())
     return "missing", presence(_queue_variable_names())
 
+
+
+def _inference_variable_names() -> tuple[str, ...]:
+    bases = (
+        "JARVIS_AGENT_REMOTE_INFERENCE", "JARVIS_AGENT_MODEL_PROVIDER",
+        "FREELLMAPI_PROVIDER", "FREELLMAPI_API_KEY", "FREELLMAPI_BASE_URL",
+        "FREELLMAPI_MODEL", "GROQ_API_KEY", "GROQ_MODEL", "VENICE_API_KEY",
+        "VENICE_MODEL",
+    )
+    per_agent = [
+        worker_env_name(base, agent_id)
+        for agent_id in _worker_agent_ids()
+        for base in bases
+    ]
+    return tuple(dict.fromkeys((*INFERENCE_KEYS, *bases[:3], *per_agent)))
+
+
+def _is_enabled(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def inference_group() -> tuple[dict[str, str], list[str]]:
+    """Resolve one real inference route for every configured worker slot."""
+    configured: dict[str, str] = {}
+    missing: list[str] = []
+    compatible_providers = {"openai", "gemini", "xai", "qwen"}
+
+    for agent_id in _worker_agent_ids():
+        if _is_enabled(worker_env_value("JARVIS_AGENT_REMOTE_INFERENCE", agent_id, "false")):
+            configured[agent_id] = "server_remote"
+            continue
+
+        provider = (
+            worker_env_value("JARVIS_AGENT_MODEL_PROVIDER", agent_id)
+            or worker_env_value("FREELLMAPI_PROVIDER", agent_id)
+        ).strip().lower()
+        api_key = worker_env_value("FREELLMAPI_API_KEY", agent_id).strip()
+        base_url = worker_env_value("FREELLMAPI_BASE_URL", agent_id).strip()
+        model = worker_env_value("FREELLMAPI_MODEL", agent_id).strip()
+        groq_key = worker_env_value("GROQ_API_KEY", agent_id).strip()
+        venice_key = worker_env_value("VENICE_API_KEY", agent_id).strip()
+
+        if provider in compatible_providers:
+            ready = bool(api_key and base_url and model and model.lower() != "auto")
+            resolved_provider = provider
+        elif provider == "groq":
+            ready = bool(api_key or groq_key)
+            resolved_provider = provider
+        elif provider == "venice":
+            ready = bool(api_key or venice_key)
+            resolved_provider = provider
+        elif provider == "freellmapi":
+            ready = bool(api_key)
+            resolved_provider = provider
+        elif api_key:
+            ready, resolved_provider = True, provider or "openai_compatible"
+        elif groq_key:
+            ready, resolved_provider = True, "groq"
+        elif venice_key:
+            ready, resolved_provider = True, "venice"
+        else:
+            ready, resolved_provider = False, provider or "local_api"
+
+        if ready:
+            configured[agent_id] = resolved_provider
+        else:
+            missing.append(agent_id)
+
+    return configured, missing
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Check the Jarvis multi-agent environment (read-only).")
@@ -157,19 +225,27 @@ def main() -> int:
 
     enabled = os.getenv("JARVIS_MINI_AGENT_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
     access_mode, _access_state = queue_group()
-    inference = presence(INFERENCE_KEYS)
+    inference_by_agent, missing_inference_agents = inference_group()
+    inference_variables = presence(_inference_variable_names())
+    inference_credentials = sorted(
+        name for name, ok in inference_variables.items() if ok and name.endswith("_API_KEY")
+    )
+    if inference_by_agent and any(value == "server_remote" for value in inference_by_agent.values()):
+        inference_credentials.append("server_remote_inference")
+    inference_credentials = sorted(set(inference_credentials))
 
     all_queue_variables = _queue_variable_names()
     report["variables"] = {
         **presence(all_queue_variables),
-        **inference,
+        **inference_variables,
         **presence(OPTIONAL),
     }
     report["opt_in_enabled"] = enabled
     report["groups"] = {
         "queue_access": access_mode if access_mode != "missing" else "missing",
         "queue_access_is_legacy": access_mode == "supabase_native_legacy",
-        "inference_credential": sorted(key for key, ok in inference.items() if ok) or "missing",
+        "inference_credential": inference_credentials or "missing",
+        "inference_by_agent": inference_by_agent,
         "worker_opt_in": "enabled" if enabled else "disabled",
     }
 
@@ -178,14 +254,15 @@ def main() -> int:
         blockers.append("JARVIS_MINI_AGENT_ENABLED is not enabled in this environment")
     if access_mode == "missing":
         blockers.append(
-            "no queue access configured: set JARVIS_TASK_QUEUE_API_URL, "
-            "JARVIS_TASK_QUEUE_WORKER_TOKEN, and either JARVIS_TASK_QUEUE_API_TOKEN "
-            "or JARVIS_TASK_QUEUE_USERNAME/JARVIS_TASK_QUEUE_PASSWORD; the legacy "
-            "Supabase service-role path is reported separately"
+            "no queue access configured: set JARVIS_TASK_QUEUE_API_URL and one "
+            "JARVIS_TASK_QUEUE_WORKER_TOKEN per configured agent; a user JWT is not required; "
+            "the legacy Supabase service-role path is reported separately"
         )
-    if not any(inference.values()):
+    if missing_inference_agents:
         blockers.append(
-            "no inference credential configured: set FREELLMAPI_API_KEY, GROQ_API_KEY or VENICE_API_KEY"
+            "no valid inference route configured for agent(s): "
+            + ", ".join(missing_inference_agents)
+            + "; configure server-side inference or the provider API key/base URL/model required by each agent"
         )
     report["blockers"] = blockers
     report["verdict"] = "ready" if not blockers else "blocked"
@@ -207,7 +284,9 @@ def main() -> int:
     report["limitations"] = [
         "Presence only: this checker never reads or prints variable values.",
         "The Supabase service-role path is a legacy fallback and does not bind a request to an individual worker credential.",
-        "A ready verdict means the runtime can start here; it does not prove the queue migrations "
+        "Worker queue routes authenticate with the per-agent worker token; a separate user JWT is not required.",
+        "Remote inference relies on server-side provider configuration, which this local checker does not validate.",
+        "A ready verdict means every configured agent has a server-side or local inference route; it does not prove the queue migrations "
         "are applied to the target database or that a worker is currently heartbeating.",
         "Tasks requiring repository, shell, browser or production-diagnostic tools cannot be claimed "
         "by the text-only mini-agent by design.",

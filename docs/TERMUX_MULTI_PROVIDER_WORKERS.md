@@ -50,7 +50,10 @@ Then restart the supervised service:
 ```bash
 jarvis-worker restart
 jarvis-worker status
+python scripts/check_multiagent_env.py
 ```
+
+The read-only checker reports queue authentication and inference readiness per worker without printing API keys or tokens. A `ready` result does not prove that the queue contains an eligible task or that the worker has claimed one.
 
 For a single worker, the existing global variables and `jarvis-worker configure` flow remain valid. A worker using server-side inference keeps `JARVIS_AGENT_REMOTE_INFERENCE=true`; its trusted provider metadata must match the provider configured on Render.
 
