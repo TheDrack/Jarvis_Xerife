@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -9,6 +10,26 @@ SERVICE_RUN = ROOT / "deploy" / "termux" / "runit" / "jarvis-agent-worker" / "ru
 WORKER_ENV = ROOT / "deploy" / "termux" / "worker.env.example"
 CONTROL = ROOT / "scripts" / "jarvis-worker"
 INSTALLER = ROOT / "scripts" / "install_termux_worker_service.sh"
+
+
+def _find_bash_executable():
+    if os.name == "nt":
+        program_files = (
+            os.environ.get("ProgramFiles", r"C:\Program Files"),
+            os.environ.get("ProgramW6432", r"C:\Program Files"),
+        )
+        for root in program_files:
+            for relative in (Path("Git") / "bin" / "bash.exe", Path("Git") / "usr" / "bin" / "bash.exe"):
+                candidate = Path(root) / relative
+                if candidate.is_file():
+                    return str(candidate)
+    candidate = shutil.which("bash")
+    if candidate and "system32" not in candidate.lower():
+        return candidate
+    return None
+
+
+BASH = _find_bash_executable()
 
 
 class TermuxObjectivePersistenceWiringTests(unittest.TestCase):
@@ -43,6 +64,7 @@ if __name__ == "__main__":
     unittest.main()
 
 
+@unittest.skipUnless(BASH, "requires Bash (Git Bash on Windows)")
 class TermuxWorkerAutostartTests(unittest.TestCase):
     def _run_control(self, command, *, initially_down, worker_count=1):
         with tempfile.TemporaryDirectory() as temporary:
@@ -100,7 +122,7 @@ class TermuxWorkerAutostartTests(unittest.TestCase):
             env = dict(os.environ)
             env.update({"HOME": str(home), "PREFIX": str(prefix)})
             result = subprocess.run(
-                ["bash", str(CONTROL), command],
+                [BASH, str(CONTROL), command],
                 env=env,
                 capture_output=True,
                 text=True,
@@ -177,7 +199,7 @@ class TermuxWorkerAutostartTests(unittest.TestCase):
                 }
             )
             result = subprocess.run(
-                ["bash", str(SERVICE_RUN)],
+                [BASH, str(SERVICE_RUN)],
                 env=env,
                 capture_output=True,
                 text=True,
