@@ -72,7 +72,7 @@ The local model runtime now supports these installed app IDs behind one provider
 |---|---|
 | `android_app:chatgpt` | `com.openai.chatgpt` |
 | `android_app:claude` | `com.anthropic.claude` |
-| `android_app:gemini` | `com.google.android.googlequicksearchbox` |
+| `android_app:gemini` | `com.google.android.apps.bard` |
 | `android_app:grok` | `ai.x.grok` |
 | `android_app:qwen` | `ai.qwenlm.chat.android` |
 

@@ -22,7 +22,7 @@ ACCESSIBILITY_MAX_RESPONSE = 2 * 1024 * 1024
 ANDROID_LLM_APPS = {
     "chatgpt": "com.openai.chatgpt",
     "claude": "com.anthropic.claude",
-    "gemini": "com.google.android.googlequicksearchbox",
+    "gemini": "com.google.android.apps.bard",
     "grok": "ai.x.grok",
     "qwen": "ai.qwenlm.chat.android",
 }

@@ -515,7 +515,7 @@ class JarvisAccessibilityService : AccessibilityService() {
         private val ALLOWED_LLM_PACKAGES = setOf(
             "com.openai.chatgpt",
             "com.anthropic.claude",
-            "com.google.android.googlequicksearchbox",
+            "com.google.android.apps.bard",
             "ai.x.grok",
             "ai.qwenlm.chat.android",
         )

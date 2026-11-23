@@ -76,7 +76,7 @@ def test_android_app_profiles_cover_installed_consumer_llm_apps():
     assert ANDROID_LLM_APPS == {
         "chatgpt": "com.openai.chatgpt",
         "claude": "com.anthropic.claude",
-        "gemini": "com.google.android.googlequicksearchbox",
+        "gemini": "com.google.android.apps.bard",
         "grok": "ai.x.grok",
         "qwen": "ai.qwenlm.chat.android",
     }
