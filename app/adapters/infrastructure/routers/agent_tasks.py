@@ -188,6 +188,10 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
         if database_url:
             if database_url.startswith("postgres://"):
                 database_url = "postgresql://" + database_url[len("postgres://"):]
+            if database_url.startswith("postgresql://"):
+                # Render installs psycopg2-binary; SQLAlchemy's default
+                # postgresql:// dialect selects psycopg 3, which is not installed.
+                database_url = "postgresql+psycopg2://" + database_url[len("postgresql://"):]
             return create_engine(database_url, pool_pre_ping=True, pool_recycle=300)
         engine = getattr(db_adapter, "engine", None) if db_adapter else None
         if engine is not None and engine.dialect.name == "postgresql":
