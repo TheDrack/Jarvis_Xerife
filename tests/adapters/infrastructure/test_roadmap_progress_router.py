@@ -22,9 +22,9 @@ def test_roadmap_progress_uses_verified_status_ledger():
     assert body["completed"] == 3
     assert body["planned"] == 1
     assert body["blocked"] == 0
-    assert body["status"] == "ready"
-    assert body["next_mission"]["criterion_id"] == "C1-WORLD-MODEL"
-    assert body["hold_reason"] is None
+    assert body["status"] == "blocked"
+    assert body["next_mission"] is None
+    assert "canonical identity" in body["hold_reason"]
 
 
 def test_health_detail_uses_evidence_based_roadmap_metrics(monkeypatch):
@@ -40,8 +40,9 @@ def test_health_detail_uses_evidence_based_roadmap_metrics(monkeypatch):
 
     assert response.status_code == 200
     evolution = response.json()["evolution"]
-    assert evolution["status"] == "ready"
+    assert evolution["status"] == "blocked"
     assert evolution["roadmap"]["total_criteria"] == 4
     assert evolution["roadmap"]["completed_criteria"] == 3
-    assert evolution["roadmap"]["next_mission"]["criterion_id"] == "C1-WORLD-MODEL"
+    assert evolution["roadmap"]["next_mission"] is None
+    assert "canonical identity" in evolution["roadmap"]["hold_reason"]
     assert evolution["legacy_inventory"]["is_completion_evidence"] is False
