@@ -321,14 +321,13 @@ def test_status_ledger_must_cover_all_roadmap_criteria(tmp_path):
         _selector(root).find_next_mission()
 
 
-def test_real_repository_roadmap_selects_c1_after_c0_evidence_is_verified():
+def test_real_repository_keeps_c1_pending_but_blocks_auto_generation_until_design_review():
     selector = RoadmapMissionSelector()
 
-    mission = selector.find_next_mission()
-
-    assert mission is not None
-    assert mission["criterion_id"] == "C1-WORLD-MODEL"
-    assert selector.hold_reason is None
+    assert selector.find_next_mission() is None
+    assert "canonical identity" in selector.hold_reason
+    assert "confidence semantics" in selector.hold_reason
+    assert "Supabase graph persistence" in selector.hold_reason
 
 
 def test_c1_mission_requires_all_c0_acceptance_criteria(tmp_path):
@@ -528,13 +527,11 @@ def test_get_progress_counts_blocked_criteria_without_marking_them_complete(tmp_
     assert progress["phase_progress"]["C0"]["blocked"] == 1
 
 
-def test_real_manifest_exposes_world_model_mission_after_c0_evidence_closure():
+def test_real_manifest_keeps_c1_pending_and_blocks_unsafe_autonomous_generation():
     root = Path(__file__).resolve().parents[2]
     selector = RoadmapMissionSelector(repository_root=root)
 
-    mission = selector.find_next_mission()
-    assert mission is not None
-    assert mission["criterion_id"] == "C1-WORLD-MODEL"
+    assert selector.find_next_mission() is None
 
     progress = selector.get_progress()
     assert progress["total_criteria"] == 4
@@ -544,10 +541,13 @@ def test_real_manifest_exposes_world_model_mission_after_c0_evidence_closure():
     assert progress["phase_progress"]["C0"]["verified"] == 3
     assert progress["phase_progress"]["C1"]["pending"] == 1
     assert set(progress["phase_progress"]) == {"C0", "C1"}
-    assert progress["next_mission"]["criterion_id"] == "C1-WORLD-MODEL"
+    assert progress["next_mission"] is None
+    assert progress["status"] == "blocked"
+    assert "canonical identity" in progress["hold_reason"]
 
     manifest = json.loads((root / "data" / "roadmap_missions.json").read_text(encoding="utf-8"))
     missions = {mission["criterion_id"]: mission for mission in manifest["missions"]}
-    assert missions["C1-WORLD-MODEL"]["status"] == "ready"
+    assert missions["C1-WORLD-MODEL"]["status"] == "blocked"
+    assert missions["C1-WORLD-MODEL"]["risk"] == "high"
     assert set(missions["C1-WORLD-MODEL"]["depends_on"]) == set(ROADMAP_CRITERIA)
     assert len(missions) == 1
