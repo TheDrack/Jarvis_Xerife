@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
   "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
-  "hold_reason": "A fase C0 foi concluída e verificada. C1-WORLD-MODEL está pronta para execução; sua conclusão exigirá implementação, consumidor e testes com evidência de merge e CI.",
+  "hold_reason": "C1-WORLD-MODEL remains the next pending criterion, but autonomous generation is blocked until canonical identity, confidence semantics, and durable Supabase graph persistence are specified and reviewed.",
   "missions": [
     {
       "criterion_id": "C1-WORLD-MODEL",
       "phase": "C1",
       "legacy_capability_id": "CAP-029",
-      "status": "ready",
-      "risk": "low",
+      "status": "blocked",
+      "risk": "high",
       "priority": 1,
       "title": "Bridge intelligence observations into the World Model",
       "objective": "Project normalized IntelligenceObservation records into stable graph nodes, preserving source, provenance, observed time, confidence, and scope.",
-      "expected_result": "Repeated observations are idempotent, graph nodes are queryable by entity and scope, and every persisted node retains source provenance.",
+      "expected_result": "Repeated observations are idempotent; cross-source identity is merged only through an explicit canonical key; uncertain identities remain separate; current state is queryable by scope and reconstructible from append-only evidence.",
       "roadmap_heading": "## 5. Fase 1 — World Model",
       "target_file": "app/application/services/intelligence_recurring_worker.py",
       "tests": [
