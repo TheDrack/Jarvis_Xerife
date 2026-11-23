@@ -3,11 +3,10 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import create_engine, text
-
 from app.adapters.infrastructure.agent_worker_credentials import (
     AgentWorkerCredentialStore,
 )
+from sqlalchemy import create_engine, text
 
 
 def _store():
@@ -19,6 +18,7 @@ def _store():
                 runtime_version text not null,
                 status text not null,
                 available_tools text not null default '[]',
+                model_provider text not null default 'unknown',
                 updated_at datetime
             )
         """))
@@ -159,3 +159,41 @@ def test_issuing_replacement_credential_revokes_the_previous_token():
     assert first != second
     assert store.authenticate(first) is None
     assert store.authenticate(second) is not None
+
+
+def test_credential_binds_a_trusted_model_provider_to_the_agent():
+    engine, store = _store()
+    token = store.issue(
+        agent_id="gemini-worker",
+        principal_id="worker:gemini-worker",
+        available_tools=["text_reasoning"],
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        model_provider="gemini",
+    )
+
+    principal = store.authenticate(token)
+
+    assert principal is not None
+    assert principal.model_provider == "gemini"
+    with engine.connect() as connection:
+        row = connection.execute(
+            text("select model_provider from jarvis_agents where agent_id = 'gemini-worker'")
+        ).one()
+    assert row[0] == "gemini"
+
+
+def test_issue_rejects_unrecognized_model_provider():
+    _, store = _store()
+
+    try:
+        store.issue(
+            agent_id="invalid-provider-worker",
+            principal_id="worker:invalid-provider-worker",
+            available_tools=["text_reasoning"],
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            model_provider="not-a-provider",
+        )
+    except ValueError as exc:
+        assert "unsupported worker model provider" in str(exc)
+    else:
+        raise AssertionError("unrecognized model providers must not be provisioned")

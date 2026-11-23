@@ -16,9 +16,17 @@ from uuid import uuid4
 
 from sqlalchemy import text
 
-
 WORKER_TOKEN_PREFIX = "jarvisw_"
 SUPPORTED_WORKER_CAPABILITIES = frozenset({"text_reasoning"})
+SUPPORTED_WORKER_MODEL_PROVIDERS = frozenset({
+    "groq",
+    "venice",
+    "freellmapi",
+    "openai",
+    "gemini",
+    "xai",
+    "qwen",
+})
 
 
 def worker_token_env_name(agent_id: str) -> str:
@@ -35,6 +43,7 @@ class AgentWorkerPrincipal:
     agent_id: str
     principal_id: str
     available_tools: tuple[str, ...]
+    model_provider: str = "unknown"
 
 
 class AgentWorkerCredentialStore:
@@ -73,6 +82,7 @@ class AgentWorkerCredentialStore:
         principal_id: str,
         available_tools: list[str] | tuple[str, ...],
         expires_at: datetime,
+        model_provider: str | None = None,
     ) -> str:
         """Create an agent registration and return a one-time bearer token."""
         normalized_agent = agent_id.strip()
@@ -91,6 +101,12 @@ class AgentWorkerCredentialStore:
             raise ValueError("worker credentials cannot live longer than 90 days")
 
         capabilities = self._normalize_capabilities(available_tools)
+        normalized_provider = (model_provider or "").strip().lower() or None
+        if (
+            normalized_provider is not None
+            and normalized_provider not in SUPPORTED_WORKER_MODEL_PROVIDERS
+        ):
+            raise ValueError(f"unsupported worker model provider: {normalized_provider}")
         token = WORKER_TOKEN_PREFIX + secrets.token_urlsafe(48)
         credential_id = str(uuid4())
         credential_id_expression = (
@@ -108,11 +124,14 @@ class AgentWorkerCredentialStore:
         with self.engine.begin() as connection:
             connection.execute(
                 text(f"""
-                    INSERT INTO {agents_table} (agent_id, runtime_version, status)
-                    VALUES (:agent_id, 'provisioned', 'offline')
+                    INSERT INTO {agents_table} (agent_id, runtime_version, status, model_provider)
+                    VALUES (:agent_id, 'provisioned', 'offline', :initial_model_provider)
                     ON CONFLICT (agent_id) DO NOTHING
                 """),
-                {"agent_id": normalized_agent},
+                {
+                    "agent_id": normalized_agent,
+                    "initial_model_provider": normalized_provider or "unknown",
+                },
             )
             # Serialize provisioning/revocation for this agent. The lock is
             # scoped to one registry row, not the global credential table.
@@ -158,12 +177,17 @@ class AgentWorkerCredentialStore:
                     UPDATE {agents_table}
                        SET available_tools = {capabilities_expression},
                            status = 'offline',
+                           model_provider = CASE
+                               WHEN :model_provider IS NULL THEN model_provider
+                               ELSE :model_provider
+                           END,
                            updated_at = :now
                      WHERE agent_id = :agent_id
                 """),
                 {
                     "available_tools": capabilities_json,
                     "agent_id": normalized_agent,
+                    "model_provider": normalized_provider,
                     "now": now,
                 },
             )
@@ -181,14 +205,18 @@ class AgentWorkerCredentialStore:
         now = datetime.now(timezone.utc)
         token_hash = self._token_hash(token)
         credentials_table = f"{self._schema}jarvis_agent_credentials"
+        agents_table = f"{self._schema}jarvis_agents"
         with self.engine.begin() as connection:
             row = connection.execute(
                 text(f"""
-                    SELECT credential_id, agent_id, principal_id, available_tools
-                      FROM {credentials_table}
-                     WHERE token_hash = :token_hash
-                       AND revoked_at IS NULL
-                       AND expires_at > :now
+                    SELECT credential.credential_id, credential.agent_id,
+                           credential.principal_id, credential.available_tools,
+                           COALESCE(agent.model_provider, 'unknown') AS model_provider
+                      FROM {credentials_table} AS credential
+                      JOIN {agents_table} AS agent ON agent.agent_id = credential.agent_id
+                     WHERE credential.token_hash = :token_hash
+                       AND credential.revoked_at IS NULL
+                       AND credential.expires_at > :now
                      LIMIT 1
                 """),
                 {"token_hash": token_hash, "now": now},
@@ -228,6 +256,9 @@ class AgentWorkerCredentialStore:
             agent_id=str(row["agent_id"]),
             principal_id=str(row["principal_id"]),
             available_tools=capabilities,
+            model_provider=(
+                str(row.get("model_provider") or "unknown").strip().lower() or "unknown"
+            ),
         )
 
     def revoke_agent(self, agent_id: str) -> int:

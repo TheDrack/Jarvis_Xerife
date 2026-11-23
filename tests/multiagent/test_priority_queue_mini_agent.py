@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import httpx
 import pytest
-
 from app.multiagent.priority_queue_mini_agent import PriorityQueueMiniAgent
 
 
@@ -197,7 +196,7 @@ def test_from_env_resolves_slot_specific_worker_credential(monkeypatch):
     monkeypatch.setenv("FREELLMAPI_API_KEY", "provider-key")
     monkeypatch.setattr(
         "app.multiagent.priority_queue_mini_agent.FreeLLMAPIClient.from_env",
-        lambda: object(),
+        lambda agent_id=None: object(),
     )
     monkeypatch.setattr(
         "app.multiagent.priority_queue_mini_agent.create_registered_model_handler",
@@ -205,7 +204,7 @@ def test_from_env_resolves_slot_specific_worker_credential(monkeypatch):
     )
     monkeypatch.setattr(
         "app.multiagent.priority_queue_mini_agent.configured_provider_id",
-        lambda: "groq",
+        lambda agent_id=None: "groq",
     )
 
     worker = PriorityQueueMiniAgent.from_env(agent_id="mini-freellmapi-2")
@@ -389,3 +388,93 @@ def test_priority_worker_does_not_finish_when_lease_renewal_is_rejected(monkeypa
         client.close()
 
     assert not any(path.endswith("/finish") for path in calls)
+
+
+def test_from_env_supports_an_openai_compatible_vendor_api_with_its_own_key(monkeypatch):
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_URL", "https://jarvis.example")
+    monkeypatch.setenv("JARVIS_AGENT_REMOTE_INFERENCE", "false")
+    monkeypatch.setenv("JARVIS_AGENT_MODEL_PROVIDER", "gemini")
+    monkeypatch.setenv("JARVIS_AGENT_ID", "gemini-worker")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_GEMINI_WORKER", "worker-only-token")
+    monkeypatch.setenv("FREELLMAPI_API_KEY", "vendor-api-key")
+    monkeypatch.setenv("FREELLMAPI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
+    monkeypatch.setenv("FREELLMAPI_MODEL", "gemini-2.5-flash")
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_API_TOKEN", raising=False)
+    captured = {}
+
+    def make_handler(client, *, provider_id):
+        captured["client"] = client
+        captured["provider_id"] = provider_id
+        return FakeHandler()
+
+    monkeypatch.setattr(
+        "app.multiagent.priority_queue_mini_agent.create_registered_model_handler",
+        make_handler,
+    )
+
+    worker = PriorityQueueMiniAgent.from_env()
+
+    assert worker.api_token == ""
+    assert worker.worker_token == "worker-only-token"
+    assert captured["provider_id"] == "gemini"
+    assert captured["client"].base_url == "https://generativelanguage.googleapis.com/v1beta"
+    assert captured["client"].model == "gemini-2.5-flash"
+
+
+def test_from_env_selects_a_different_provider_for_each_agent(monkeypatch):
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_URL", "https://jarvis.example")
+    monkeypatch.setenv("JARVIS_AGENT_REMOTE_INFERENCE", "true")
+    monkeypatch.setenv("JARVIS_AGENT_MODEL_PROVIDER", "groq")
+    monkeypatch.setenv("JARVIS_AGENT_REMOTE_INFERENCE_GEMINI_WORKER", "false")
+    monkeypatch.setenv("JARVIS_AGENT_MODEL_PROVIDER_GEMINI_WORKER", "gemini")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_GEMINI_WORKER", "worker-token")
+    monkeypatch.setenv("FREELLMAPI_API_KEY_GEMINI_WORKER", "gemini-key")
+    monkeypatch.setenv("FREELLMAPI_BASE_URL_GEMINI_WORKER", "https://generativelanguage.googleapis.com/v1beta")
+    monkeypatch.setenv("FREELLMAPI_MODEL_GEMINI_WORKER", "gemini-model")
+    captured = {}
+
+    def make_handler(client, *, provider_id):
+        captured["client"] = client
+        captured["provider_id"] = provider_id
+        return FakeHandler()
+
+    monkeypatch.setattr(
+        "app.multiagent.priority_queue_mini_agent.create_registered_model_handler",
+        make_handler,
+    )
+
+    worker = PriorityQueueMiniAgent.from_env(
+        agent_id="gemini-worker", worker_token="worker-token"
+    )
+
+    assert worker.remote_inference is False
+    assert captured["provider_id"] == "gemini"
+    assert captured["client"].api_key == "gemini-key"
+    assert captured["client"].base_url == "https://generativelanguage.googleapis.com/v1beta"
+    assert captured["client"].model == "gemini-model"
+
+
+def test_explicit_venice_agent_does_not_fall_back_to_global_groq(monkeypatch):
+    from app.multiagent.freellmapi_client import FreeLLMAPIClient
+
+    monkeypatch.setenv("GROQ_API_KEY", "global-groq-key")
+    monkeypatch.setenv("VENICE_API_KEY_VENICE_WORKER", "agent-venice-key")
+    monkeypatch.setenv("JARVIS_AGENT_MODEL_PROVIDER_VENICE_WORKER", "venice")
+
+    client = FreeLLMAPIClient.from_env(agent_id="venice-worker")
+
+    assert client.api_key == "agent-venice-key"
+    assert client.base_url == "https://api.venice.ai/api/v1"
+    assert client.model == "venice-uncensored-1-2"
+
+
+def test_generic_vendor_provider_rejects_auto_model(monkeypatch):
+    from app.multiagent.freellmapi_client import FreeLLMAPIClient, FreeLLMAPIError
+
+    monkeypatch.setenv("JARVIS_AGENT_MODEL_PROVIDER", "gemini")
+    monkeypatch.setenv("FREELLMAPI_API_KEY", "vendor-key")
+    monkeypatch.setenv("FREELLMAPI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
+    monkeypatch.setenv("FREELLMAPI_MODEL", "auto")
+
+    with pytest.raises(FreeLLMAPIError, match="requires FREELLMAPI_API_KEY"):
+        FreeLLMAPIClient.from_env()

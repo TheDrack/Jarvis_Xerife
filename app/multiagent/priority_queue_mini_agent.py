@@ -16,6 +16,7 @@ from .freellmapi_client import FreeLLMAPIClient, configured_provider_id
 from .model_runtime_factory import create_registered_model_handler
 from .remote_inference_client import RemoteInferenceHandler
 from .transport import AgentMessage
+from .worker_env import worker_env_value
 
 logger = logging.getLogger(__name__)
 
@@ -49,17 +50,8 @@ class PriorityQueueMiniAgent:
         remote_inference: bool = False,
         client: httpx.Client | None = None,
     ) -> None:
-        has_token = bool(api_token.strip())
-        has_credentials = bool(username and username.strip() and password)
-        if (
-            not api_base_url.strip()
-            or not agent_id.strip()
-            or not worker_token.strip()
-            or not (has_token or has_credentials or remote_inference)
-        ):
-            raise ValueError(
-                "api_base_url, agent_id, worker_token, and either API credentials or remote_inference are required"
-            )
+        if not api_base_url.strip() or not agent_id.strip() or not worker_token.strip():
+            raise ValueError("api_base_url, agent_id, and worker_token are required")
         if not 10 <= lease_seconds <= 3600:
             raise ValueError("lease_seconds must be between 10 and 3600")
         self.api_base_url = api_base_url.rstrip("/")
@@ -70,24 +62,35 @@ class PriorityQueueMiniAgent:
         self.remote_inference = bool(remote_inference)
         self.agent_id = agent_id
         self.handler = handler
+        self._provider_handler = handler
         self.lease_seconds = lease_seconds
         self._client = client
+        self._closed = False
+
+    def close(self) -> None:
+        """Release provider and OAuth resources once the worker is stopping."""
+        if self._closed:
+            return
+        self._closed = True
+        close_handler = getattr(self._provider_handler, "close", None)
+        if callable(close_handler):
+            close_handler()
 
     @classmethod
     def from_env(
         cls,
         agent_id: str | None = None,
         worker_token: str | None = None,
-    ) -> "PriorityQueueMiniAgent":
+    ) -> PriorityQueueMiniAgent:
+        agent_id = (agent_id or os.getenv("JARVIS_AGENT_ID", "mini-freellmapi-1")).strip()
         api_token = os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
         api_base_url = os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip()
         username = os.getenv("JARVIS_TASK_QUEUE_USERNAME", "").strip() or None
         password = os.getenv("JARVIS_TASK_QUEUE_PASSWORD", "") or None
         remote_inference = (
-            os.getenv("JARVIS_AGENT_REMOTE_INFERENCE", "false").strip().lower()
+            worker_env_value("JARVIS_AGENT_REMOTE_INFERENCE", agent_id, "false").strip().lower()
             in {"1", "true", "yes", "on"}
         )
-        agent_id = (agent_id or os.getenv("JARVIS_AGENT_ID", "mini-freellmapi-1")).strip()
         if worker_token is None:
             specific_token = os.getenv(worker_token_env_name(agent_id), "").strip()
             try:
@@ -98,26 +101,22 @@ class PriorityQueueMiniAgent:
             worker_token = specific_token or (global_token if configured_slots == 1 else "")
         if not api_base_url:
             raise RuntimeError("Set JARVIS_TASK_QUEUE_API_URL.")
-        if not remote_inference and not (api_token or (username and password)):
-            raise RuntimeError(
-                "Set JARVIS_TASK_QUEUE_API_TOKEN or both "
-                "JARVIS_TASK_QUEUE_USERNAME/JARVIS_TASK_QUEUE_PASSWORD, "
-                "or enable JARVIS_AGENT_REMOTE_INFERENCE=true."
-            )
         if not worker_token:
             raise RuntimeError("Set JARVIS_TASK_QUEUE_WORKER_TOKEN for this agent identity.")
+        provider_id = worker_env_value("JARVIS_AGENT_MODEL_PROVIDER", agent_id).strip().lower()
         if remote_inference:
             handler = RemoteInferenceHandler(
                 api_base_url=api_base_url,
                 worker_token=worker_token,
                 agent_id=agent_id,
                 timeout_seconds=float(
-                    os.getenv("JARVIS_AGENT_REMOTE_INFERENCE_TIMEOUT", "55")
+                    worker_env_value("JARVIS_AGENT_REMOTE_INFERENCE_TIMEOUT", agent_id, "55")
                 ),
             )
         else:
             handler = create_registered_model_handler(
-                FreeLLMAPIClient.from_env(), provider_id=configured_provider_id()
+                FreeLLMAPIClient.from_env(agent_id=agent_id),
+                provider_id=provider_id or configured_provider_id(agent_id),
             )
         return cls(
             api_base_url=api_base_url,
@@ -149,7 +148,7 @@ class PriorityQueueMiniAgent:
                 "agent_id": self.agent_id,
                 "runtime_version": "jarvis-freellmapi-mini/1",
                 "environment": os.getenv("JARVIS_AGENT_ENVIRONMENT", "local").strip() or "local",
-                "model_provider": "remote" if self.remote_inference else configured_provider_id(),
+                "model_provider": "remote" if self.remote_inference else configured_provider_id(self.agent_id),
                 "available_tools": ["text_reasoning"],
                 "status": "available",
                 "concurrency_limit": 1,

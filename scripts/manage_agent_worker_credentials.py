@@ -17,13 +17,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sqlalchemy import create_engine
-
 from app.adapters.infrastructure.agent_worker_credentials import (
-    AgentWorkerCredentialStore,
     SUPPORTED_WORKER_CAPABILITIES,
+    SUPPORTED_WORKER_MODEL_PROVIDERS,
+    AgentWorkerCredentialStore,
     worker_token_env_name,
 )
+from sqlalchemy import create_engine
 
 
 def _database_url() -> str:
@@ -56,6 +56,7 @@ def _parser() -> argparse.ArgumentParser:
         help="server-granted capability; repeat to select more than one",
     )
     issue.add_argument("--expires-hours", type=int, default=720)
+    issue.add_argument("--model-provider", choices=sorted(SUPPORTED_WORKER_MODEL_PROVIDERS))
 
     revoke = commands.add_parser("revoke", help="revoke all active credentials for one agent")
     revoke.add_argument("--agent-id", required=True)
@@ -80,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
                 principal_id=principal_id,
                 available_tools=capabilities,
                 expires_at=datetime.now(timezone.utc) + timedelta(hours=args.expires_hours),
+                model_provider=args.model_provider,
             )
             print(f"Credential issued. Store this value in {worker_token_env_name(args.agent_id)}:")
             print(token)
