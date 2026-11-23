@@ -1036,13 +1036,30 @@ def test_toolchain_budget_stops_before_overspending():
     assert result.step_results["second"].error_code == "budget_exceeded"
 
 
-def test_circuit_breaker_opens_and_recovers_for_provider_failures(registry):
-    import time
+def test_circuit_breaker_opens_and_recovers_for_provider_failures(registry, monkeypatch):
+    from types import SimpleNamespace
 
+    import app.runtime.toolbox.dispatcher as dispatcher_module
+
+    class FakeClock:
+        def __init__(self):
+            self.current = 100.0
+
+        def monotonic(self):
+            return self.current
+
+        def advance(self, seconds):
+            self.current += seconds
+
+    clock = FakeClock()
+    monkeypatch.setattr(
+        dispatcher_module, "time", SimpleNamespace(monotonic=clock.monotonic)
+    )
     read_tool = registry.get("sample.read").model_copy(
         update={
             "circuit_breaker_threshold": 2,
             "circuit_breaker_reset_seconds": 0.05,
+            "rate_limit": None,
         }
     )
     limited_registry = ToolRegistry([read_tool])
@@ -1067,7 +1084,7 @@ def test_circuit_breaker_opens_and_recovers_for_provider_failures(registry):
     first = dispatcher.dispatch(request)
     second = dispatcher.dispatch(request)
     blocked = dispatcher.dispatch(request)
-    time.sleep(0.06)
+    clock.advance(0.06)
     recovered = dispatcher.dispatch(request)
 
     assert first.retryable is True

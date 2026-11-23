@@ -92,7 +92,7 @@ Esta página substitui snapshots antigos como descrição geral de estado. Resul
 
 ## Revalidação técnica — 2026-11-23 — Cognitive Capability Audit
 
-- Snapshot da `main` após a PR #879: `8b1bc667` (merge funcional `b1782c61b983b552fee9a205d291ae35adf0a6bd`). O mapa técnico detalhado está em `docs/COGNITIVE_CAPABILITY_AUDIT.md`; a classificação usa callers, testes, workflow e runtime, não nomes de módulos.
+- Snapshot da `main` após as PRs #879 e #880: `0a5fa590`; merge C0 da PR #880: `9ad37374465c25a40f9bf3ceb51fa9889622aae9`. O mapa técnico detalhado está em `docs/COGNITIVE_CAPABILITY_AUDIT.md`; a classificação usa callers, testes, workflow e runtime, não nomes de módulos.
 - Worker Termux `jarvis-termux-mini-1`: PID `6598`, `running`, sem erro reportado; Supabase `available`, provider `groq`, `active_tasks=0`, `available_tools=["text_reasoning"]`. O diário local tinha zero objetivos e zero etapas.
 - A fila Supabase continha duas tarefas `ready` (`prod-agent-audit-20261027-01`, prioridade 90; `prod-agent-optimize-20261027-02`, prioridade 80). Ambas exigem `repository_read`, `github_read` e `production_read`; o worker não anuncia essas ferramentas e corretamente não as reivindica.
 - O Termux não tinha GitHub CLI autenticado nem credenciais locais de Render/Supabase. Não foram adicionadas capacidades fictícias nem alteradas as tarefas existentes.
@@ -100,10 +100,10 @@ Esta página substitui snapshots antigos como descrição geral de estado. Resul
 - Implementação local adicionada nesta branch: provider-neutral UI runtime para ChatGPT/Claude/Gemini/Grok/Qwen; launch/index actions protegidas por allowlist no bridge Android; seleção de provider e modo de inferência por agente no Termux; provider do scheduler derivado de binding server-side por identidade autenticada. A suíte Python cobre o contrato, mas o APK ainda precisa passar no workflow Android e o smoke test real depende da ativação manual da acessibilidade.
 - O worker ativo continua com `JARVIS_AGENT_REMOTE_INFERENCE=true`; nenhuma configuração de produção foi trocada para UI inference. O caminho de API permanece intacto até a validação local.
 - A execução integrada de evolução [45151249242](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45151249242) concluiu o gate, mas `EVOLUTION_ENABLED` estava vazio; geração/validação e publicação foram `skipped`. `data/roadmap_missions.json` continuava com `missions: []`.
-- O ledger agora inclui o critério inicial `C1-WORLD-MODEL`, ainda `pending`. Os três critérios C0 também permanecem `pending` até o merge da auditoria e o registro de evidências imutáveis de commit, Actions, implementação, consumidor e testes.
+- PR #880 foi mesclada em `9ad37374465c25a40f9bf3ceb51fa9889622aae9`. Os três critérios C0 foram marcados `verified` com commit, três checks verdes, implementação, consumidores e testes no ledger. `C1-WORLD-MODEL` permanece `pending`, mas sua geração autônoma está bloqueada até a revisão dos contratos de identidade canônica, confiança e persistência durável do grafo em PostgreSQL/Supabase.
 - PR [#879](https://github.com/TheDrack/Jarvis_Xerife/pull/879) foi mesclada em `b1782c61b983b552fee9a205d291ae35adf0a6bd`: autenticação por token dedicado, providers/APIs por agente, configurações independentes por slot e diagnóstico read-only do ambiente.
-- A branch de continuação adiciona runtimes locais para apps Android e seleção por agente `android_app:*`, mas a implementação ainda precisa passar pela CI. A credencial existente não foi alterada; o serviço de acessibilidade permanece desabilitado, e o worker continua no caminho remoto Groq.
-- O manifesto `data/roadmap_missions.json` deixou de estar vazio: `C1-WORLD-MODEL` está mapeada para `intelligence_recurring_worker.py` e testes existentes, com dependência explícita dos três critérios C0. O seletor consulta o ledger para dependências de fases anteriores; como C0 ainda está `pending`, nenhuma missão é executada prematuramente.
+- PR #880 adicionou runtimes locais para apps Android e seleção por agente `android_app:*`; PR Validation, Task Queue Tests e Android Mobile Build passaram. A credencial existente não foi alterada; o serviço de acessibilidade permanece desabilitado, e o worker continua no caminho remoto Groq até o smoke test real.
+- O manifesto `data/roadmap_missions.json` contém `C1-WORLD-MODEL`, mapeada inicialmente para `intelligence_recurring_worker.py` e testes existentes, com dependência explícita dos três critérios C0. C1 é o próximo critério pendente, mas a missão de autoevolução permanece `blocked/high`: o contrato atual não define identidade canônica nem confiança, e o grafo existente usa SQLite local em vez da persistência PostgreSQL/Supabase exigida pelo roadmap.
 - O caminho `CognitiveRouter`/`jarvis_chat.yml` foi classificado como isolado; o caminho de produção de conversação é `AssistantService → IntentProcessor → llm_service/ai_gateway`. A decisão evita adicionar um segundo classificador sem contrato funcional de `llm_engine`.
 
 ## Ledger verificável dos critérios cognitivos
@@ -118,35 +118,79 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
   "criteria": [
     {
       "criterion_id": "C0-CAPABILITY-MAP",
-      "state": "pending",
+      "state": "verified",
       "evidence": {
-        "commit_url": null,
-        "check_urls": [],
-        "implementation_paths": [],
-        "consumer_paths": [],
-        "test_paths": []
+        "commit_url": "https://github.com/TheDrack/Jarvis_Xerife/commit/9ad37374465c25a40f9bf3ceb51fa9889622aae9",
+        "check_urls": [
+          "https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194770911",
+          "https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194771350",
+          "https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194772160"
+        ],
+        "implementation_paths": [
+          "docs/COGNITIVE_CAPABILITY_AUDIT.md"
+        ],
+        "consumer_paths": [
+          "app/application/services/assistant_service.py",
+          "app/multiagent/priority_queue_mini_agent.py",
+          "app/application/services/intelligence_recurring_worker.py"
+        ],
+        "test_paths": [
+          "tests/application/test_roadmap_mission_selector.py",
+          "tests/multiagent/test_priority_queue_mini_agent.py",
+          "tests/adapters/infrastructure/test_android_app_model_runtime.py"
+        ]
       }
     },
     {
       "criterion_id": "C0-GAPS-RECORDED",
-      "state": "pending",
+      "state": "verified",
       "evidence": {
-        "commit_url": null,
-        "check_urls": [],
-        "implementation_paths": [],
-        "consumer_paths": [],
-        "test_paths": []
+        "commit_url": "https://github.com/TheDrack/Jarvis_Xerife/commit/9ad37374465c25a40f9bf3ceb51fa9889622aae9",
+        "check_urls": [
+          "https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194770911",
+          "https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194771350",
+          "https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194772160"
+        ],
+        "implementation_paths": [
+          "docs/COGNITIVE_CAPABILITY_AUDIT.md",
+          "data/roadmap_missions.json"
+        ],
+        "consumer_paths": [
+          ".github/workflows/auto_evolution_triggerV2.yml",
+          "app/application/services/roadmap_mission_selector.py"
+        ],
+        "test_paths": [
+          "tests/application/test_roadmap_mission_selector.py",
+          "tests/test_auto_evolution_workflow_contract.py"
+        ]
       }
     },
     {
       "criterion_id": "C0-NO-NAME-BASED-COMPLETION",
-      "state": "pending",
+      "state": "verified",
       "evidence": {
-        "commit_url": null,
-        "check_urls": [],
-        "implementation_paths": [],
-        "consumer_paths": [],
-        "test_paths": []
+        "commit_url": "https://github.com/TheDrack/Jarvis_Xerife/commit/9ad37374465c25a40f9bf3ceb51fa9889622aae9",
+        "check_urls": [
+          "https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194770911",
+          "https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194771350",
+          "https://github.com/TheDrack/Jarvis_Xerife/actions/runs/45194772160"
+        ],
+        "implementation_paths": [
+          "app/application/services/auto_evolutionV2.py",
+          "app/application/services/roadmap_mission_selector.py"
+        ],
+        "consumer_paths": [
+          "app/adapters/infrastructure/routers/health.py",
+          "app/adapters/infrastructure/routers/utility.py",
+          "app/static/index.html",
+          ".github/workflows/auto_evolution_triggerV2.yml"
+        ],
+        "test_paths": [
+          "tests/test_workflow_fixes.py",
+          "tests/adapters/infrastructure/test_roadmap_progress_router.py",
+          "tests/test_roadmap_hud_contract.py",
+          "tests/test_auto_evolution_workflow_contract.py"
+        ]
       }
     },
     {

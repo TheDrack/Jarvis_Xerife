@@ -321,11 +321,13 @@ def test_status_ledger_must_cover_all_roadmap_criteria(tmp_path):
         _selector(root).find_next_mission()
 
 
-def test_real_repository_roadmap_keeps_first_mission_blocked_until_c0_evidence_is_verified():
+def test_real_repository_keeps_c1_pending_but_blocks_auto_generation_until_design_review():
     selector = RoadmapMissionSelector()
 
     assert selector.find_next_mission() is None
-    assert "A fase C0 ainda aguarda" in selector.hold_reason
+    assert "canonical identity" in selector.hold_reason
+    assert "confidence semantics" in selector.hold_reason
+    assert "Supabase graph persistence" in selector.hold_reason
 
 
 def test_c1_mission_requires_all_c0_acceptance_criteria(tmp_path):
@@ -415,14 +417,15 @@ def test_real_repository_status_ledger_covers_production_roadmap_criteria():
     assert {
         criterion_id: records[criterion_id]["state"]
         for criterion_id in ROADMAP_CRITERIA
-    } == {criterion_id: "pending" for criterion_id in ROADMAP_CRITERIA}
+    } == {criterion_id: "verified" for criterion_id in ROADMAP_CRITERIA}
+    assert records["C1-WORLD-MODEL"]["state"] == "pending"
 
 
 @pytest.mark.parametrize("criterion_id", ROADMAP_CRITERIA)
 def test_real_c0_criterion_cannot_be_marked_complete_without_production_status_evidence(
     tmp_path, criterion_id
 ):
-    """Production C0 IDs must remain blocked while the real STATUS ledger is pending."""
+    """A verified state is invalid in a partial checkout missing referenced evidence files."""
     source_root = Path(__file__).resolve().parents[2]
     for relative_path in ("docs/COGNITIVE_ROADMAP.md", "docs/STATUS.md"):
         source = source_root / relative_path
@@ -455,7 +458,7 @@ def test_real_c0_criterion_cannot_be_marked_complete_without_production_status_e
     )
 
     with pytest.raises(
-        RoadmapManifestError, match="mission_complete_without_status_evidence"
+        RoadmapManifestError, match="cognitive_status_evidence_path_missing"
     ):
         _selector(tmp_path).find_next_mission()
 
@@ -524,23 +527,27 @@ def test_get_progress_counts_blocked_criteria_without_marking_them_complete(tmp_
     assert progress["phase_progress"]["C0"]["blocked"] == 1
 
 
-def test_real_manifest_has_first_world_model_mission_waiting_for_c0_evidence():
+def test_real_manifest_keeps_c1_pending_and_blocks_unsafe_autonomous_generation():
     root = Path(__file__).resolve().parents[2]
     selector = RoadmapMissionSelector(repository_root=root)
 
     assert selector.find_next_mission() is None
-    assert "A fase C0 ainda aguarda" in selector.hold_reason
 
     progress = selector.get_progress()
     assert progress["total_criteria"] == 4
-    assert progress["completed_criteria"] == 0
-    assert progress["pending_criteria"] == 4
-    assert progress["phase_progress"]["C0"]["total"] == 3
-    assert progress["phase_progress"]["C1"]["total"] == 1
+    assert progress["completed_criteria"] == 3
+    assert progress["pending_criteria"] == 1
+    assert progress["completion_rate"] == 0.75
+    assert progress["phase_progress"]["C0"]["verified"] == 3
+    assert progress["phase_progress"]["C1"]["pending"] == 1
+    assert set(progress["phase_progress"]) == {"C0", "C1"}
     assert progress["next_mission"] is None
+    assert progress["status"] == "blocked"
+    assert "canonical identity" in progress["hold_reason"]
 
     manifest = json.loads((root / "data" / "roadmap_missions.json").read_text(encoding="utf-8"))
     missions = {mission["criterion_id"]: mission for mission in manifest["missions"]}
-    assert missions["C1-WORLD-MODEL"]["status"] == "ready"
+    assert missions["C1-WORLD-MODEL"]["status"] == "blocked"
+    assert missions["C1-WORLD-MODEL"]["risk"] == "high"
     assert set(missions["C1-WORLD-MODEL"]["depends_on"]) == set(ROADMAP_CRITERIA)
     assert len(missions) == 1

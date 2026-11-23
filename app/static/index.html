@@ -1843,6 +1843,10 @@
                         const completion = Number(data.completion_percentage);
                         percentageValue.textContent = `${Number.isFinite(completion) ? completion.toFixed(1) : '0.0'}%`;
                         percentage.appendChild(percentageValue);
+                        const progressScope = document.createElement('div');
+                        progressScope.style.fontSize = '0.72em';
+                        progressScope.textContent = 'dos critérios atualmente mapeados';
+                        percentage.appendChild(progressScope);
                         evolutionStatus.appendChild(percentage);
 
                         const counts = document.createElement('div');

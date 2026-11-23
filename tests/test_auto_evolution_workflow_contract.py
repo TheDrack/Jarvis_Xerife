@@ -36,7 +36,7 @@ def test_workflow_rejects_malformed_mission_ids_before_candidate_generation():
 
 
 
-def test_workflow_has_first_c1_mission_but_keeps_it_gated_by_c0_evidence():
+def test_workflow_exposes_c1_mission_after_c0_evidence_closure():
     import json
 
     from app.application.services.roadmap_mission_selector import RoadmapMissionSelector
@@ -46,13 +46,14 @@ def test_workflow_has_first_c1_mission_but_keeps_it_gated_by_c0_evidence():
 
     assert manifest["roadmap_path"] == "docs/COGNITIVE_ROADMAP.md"
     assert [mission["criterion_id"] for mission in manifest["missions"]] == ["C1-WORLD-MODEL"]
-    assert manifest["missions"][0]["status"] == "ready"
+    assert manifest["missions"][0]["status"] == "blocked"
+    assert manifest["missions"][0]["risk"] == "high"
     assert len(manifest["missions"][0]["depends_on"]) == 3
-    assert "A fase C0 ainda aguarda" in manifest["hold_reason"]
+    assert "canonical identity" in manifest["hold_reason"]
 
     selector = RoadmapMissionSelector(repository_root=root)
     assert selector.find_next_mission() is None
-    assert "A fase C0 ainda aguarda" in selector.hold_reason
+    assert "canonical identity" in selector.hold_reason
 
 
 def test_workflow_dispatch_supports_one_time_run_without_global_enablement():

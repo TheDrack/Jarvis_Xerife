@@ -191,6 +191,10 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
             missions_completed = metrics.get("missions_completed", 0)
             return {
                 "completion_percentage": round(metrics.get("evolution_rate", 0.0) * 100, 2),
+                "progress_unit": "roadmap_criteria",
+                "progress_scope": "currently_mapped_criteria",
+                "total_criteria": total_missions,
+                "completed_criteria": missions_completed,
                 "total_missions": total_missions,
                 "completed": missions_completed,
                 "in_progress": 0,

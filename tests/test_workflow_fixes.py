@@ -413,9 +413,15 @@ def test_default_auto_evolution_service_reports_real_c0_status_not_legacy_progre
     metrics = service.get_success_metrics()
 
     assert metrics["total_missions"] == 4
-    assert metrics["missions_completed"] == 0
+    assert metrics["missions_completed"] == 3
     assert metrics["status"] == "blocked"
-    assert metrics["roadmap"]["pending_criteria"] == 4
+    assert metrics["evolution_rate"] == 0.75
+    assert metrics["progress_unit"] == "roadmap_criteria"
+    assert metrics["progress_scope"] == "currently_mapped_criteria"
+    assert metrics["total_criteria"] == 4
+    assert metrics["completed_criteria"] == 3
+    assert metrics["roadmap"]["pending_criteria"] == 1
     assert metrics["roadmap"]["next_mission"] is None
+    assert "canonical identity" in metrics["roadmap"]["hold_reason"]
     assert metrics["legacy_inventory"]["is_completion_evidence"] is False
     assert service.find_next_mission() is None
