@@ -1834,19 +1834,65 @@
                     const evolutionStatus = document.getElementById('evolutionStatus');
                     const pluginCount = document.getElementById('pluginCount');
 
-                    // Display roadmap completion percentage
-                    if (data.completion_percentage !== undefined) {
-                        evolutionStatus.innerHTML = `
-                            <div><strong>${data.completion_percentage.toFixed(1)}%</strong></div>
-                            <div style="margin-top: 5px; font-size: 0.85em;">
-                                ✅ ${data.completed || 0} | 🔄 ${data.in_progress || 0} | 📋 ${data.planned || 0}
-                            </div>
-                        `;
-                    } else if (data.error) {
-                        evolutionStatus.innerHTML = `
-                            <div>❌ Erro</div>
-                            <div style="margin-top: 5px; font-size: 0.85em;">${data.error}</div>
-                        `;
+                    // Render evidence-ledger status, phase progress and the current gate.
+                    if (evolutionStatus && data.completion_percentage !== undefined) {
+                        evolutionStatus.replaceChildren();
+
+                        const percentage = document.createElement('div');
+                        const percentageValue = document.createElement('strong');
+                        const completion = Number(data.completion_percentage);
+                        percentageValue.textContent = `${Number.isFinite(completion) ? completion.toFixed(1) : '0.0'}%`;
+                        percentage.appendChild(percentageValue);
+                        evolutionStatus.appendChild(percentage);
+
+                        const counts = document.createElement('div');
+                        counts.style.marginTop = '5px';
+                        counts.style.fontSize = '0.85em';
+                        counts.textContent = `✅ ${data.completed || 0} | 🔄 ${data.in_progress || 0} | 📋 ${data.planned || 0} | ⛔ ${data.blocked || 0}`;
+                        evolutionStatus.appendChild(counts);
+
+                        const status = document.createElement('div');
+                        status.style.marginTop = '5px';
+                        status.style.fontSize = '0.85em';
+                        const isBlocked = data.status === 'blocked';
+                        status.style.color = isBlocked ? '#ffd28a' : '#9be7a5';
+                        status.textContent = isBlocked ? '⏸ Roadmap bloqueado por dependências' : '▶ Roadmap pronto para executar';
+                        evolutionStatus.appendChild(status);
+
+                        const phaseProgress = document.createElement('div');
+                        phaseProgress.style.marginTop = '5px';
+                        phaseProgress.style.fontSize = '0.8em';
+                        phaseProgress.textContent = Object.entries(data.phase_progress || {})
+                            .map(([phase, progress]) => `${phase}: ${progress.verified || 0}/${progress.total || 0}`)
+                            .join(' · ');
+                        if (phaseProgress.textContent) evolutionStatus.appendChild(phaseProgress);
+
+                        if (data.next_mission && data.next_mission.title) {
+                            const nextMission = document.createElement('div');
+                            nextMission.style.marginTop = '5px';
+                            nextMission.style.fontSize = '0.8em';
+                            nextMission.textContent = `Próxima missão: ${data.next_mission.title}`;
+                            evolutionStatus.appendChild(nextMission);
+                        }
+
+                        if (data.hold_reason) {
+                            const holdReason = document.createElement('div');
+                            holdReason.style.marginTop = '5px';
+                            holdReason.style.fontSize = '0.8em';
+                            holdReason.style.color = '#ffd28a';
+                            holdReason.textContent = data.hold_reason;
+                            evolutionStatus.appendChild(holdReason);
+                        }
+                    } else if (evolutionStatus && data.error) {
+                        evolutionStatus.replaceChildren();
+                        const errorTitle = document.createElement('div');
+                        errorTitle.textContent = '❌ Erro';
+                        evolutionStatus.appendChild(errorTitle);
+                        const errorDetail = document.createElement('div');
+                        errorDetail.style.marginTop = '5px';
+                        errorDetail.style.fontSize = '0.85em';
+                        errorDetail.textContent = data.error;
+                        evolutionStatus.appendChild(errorDetail);
                     }
 
                     // Update plugin count if available (keeping backward compatibility)
