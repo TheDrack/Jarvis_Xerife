@@ -170,7 +170,8 @@ case "${1:-status}" in
         ;;
     provision-help)
         echo "Em ambiente administrativo confiável, com DATABASE_URL/JARVIS_TASK_QUEUE_DATABASE_URL apontando ao PostgreSQL compartilhado:"
-        echo "python scripts/manage_agent_worker_credentials.py issue --agent-id jarvis-termux-mini-1 --capability text_reasoning --model-provider <provider-id>"
+        echo 'PROVIDER_ID=gemini  # use the same provider configured for this worker'
+        echo 'python scripts/manage_agent_worker_credentials.py issue --agent-id jarvis-termux-mini-1 --capability text_reasoning --model-provider "$PROVIDER_ID"'
         echo "Escolha o mesmo provider_id configurado no worker. O token aparece uma única vez; não o envie por chat."
         ;;
     *) echo "Uso: jarvis-worker {configure|start|stop|restart|status|logs|objectives|prune-objectives|provision-help}" >&2; exit 2 ;;

@@ -37,7 +37,8 @@ def _bash_path(path):
     if os.name != "nt":
         return value
     drive, tail = os.path.splitdrive(value)
-    return f"/{drive.rstrip(':').lower()}{tail.replace('\\', '/')}"
+    normalized_tail = tail.replace("\\", "/")
+    return f"/{drive.rstrip(':').lower()}{normalized_tail}"
 
 
 class TermuxObjectivePersistenceWiringTests(unittest.TestCase):
