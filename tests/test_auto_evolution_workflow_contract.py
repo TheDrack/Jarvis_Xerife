@@ -46,14 +46,14 @@ def test_workflow_exposes_c1_mission_after_c0_evidence_closure():
 
     assert manifest["roadmap_path"] == "docs/COGNITIVE_ROADMAP.md"
     assert [mission["criterion_id"] for mission in manifest["missions"]] == ["C1-WORLD-MODEL"]
-    assert manifest["missions"][0]["status"] == "ready"
+    assert manifest["missions"][0]["status"] == "blocked"
+    assert manifest["missions"][0]["risk"] == "high"
     assert len(manifest["missions"][0]["depends_on"]) == 3
-    assert "C0 foi concluída" in manifest["hold_reason"]
+    assert "canonical identity" in manifest["hold_reason"]
 
     selector = RoadmapMissionSelector(repository_root=root)
-    mission = selector.find_next_mission()
-    assert mission is not None
-    assert mission["criterion_id"] == "C1-WORLD-MODEL"
+    assert selector.find_next_mission() is None
+    assert "canonical identity" in selector.hold_reason
 
 
 def test_workflow_dispatch_supports_one_time_run_without_global_enablement():
