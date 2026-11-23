@@ -95,6 +95,6 @@ Supported provider IDs are `android_app:chatgpt`, `android_app:claude`, `android
 
 5. Run one controlled text-only smoke test and verify the result in the objective journal before using the provider for recurring work.
 
-The adapter allows only the five installed package IDs, refuses login/password screens and unknown editable fields, requires an accessible send control, serializes all app sessions with a device-wide lock, and never grants shell, browser, repository, or production tools. Only one foreground app conversation can execute at a time. If the service is disabled, the selected app is signed out, or its UI changes, inference fails closed and the queue attempt is released; the worker does not silently claim a fabricated answer.
+The adapter allows only the five installed package IDs, refuses login/password screens and unknown editable fields, requires an accessible send control, serializes all app sessions with a worker-process-wide lock, and never grants shell, browser, repository, or production tools. Only one foreground app conversation can execute at a time. If the service is disabled, the selected app is signed out, or its UI changes, inference fails closed and the queue attempt is released; the worker does not silently claim a fabricated answer.
 
 Do not switch the active production Termux worker from its API provider until the Android service is enabled and the real device smoke test passes. API-backed providers remain the default and fallback route.

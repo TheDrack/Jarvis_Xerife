@@ -58,7 +58,7 @@ The installed consumer applications are not API credentials. Their subscriptions
 The UI-backed route must:
 
 1. Use only the visible accessibility tree, screenshots, and user-authorized UI actions.
-2. Serialize access through one device-level lock; a single Android foreground UI cannot safely serve concurrent conversations from several agents.
+2. Serialize access through one worker-process-wide lock; a single Android foreground UI cannot safely serve concurrent conversations from several agents.
 3. Validate app identity, prompt submission, response completion, and response extraction before returning a result.
 4. Treat app UI changes, quotas, sign-in state, and network delays as recoverable provider failures.
 
@@ -78,7 +78,7 @@ The local model runtime now supports these installed app IDs behind one provider
 
 The Termux worker can select a provider per agent using `JARVIS_AGENT_MODEL_PROVIDER_<AGENT_ID>` and `JARVIS_AGENT_REMOTE_INFERENCE_<AGENT_ID>`. For `jarvis-termux-mini-1`, the suffix is `JARVIS_TERMUX_MINI_1`. The Render API must receive the same server-side provider binding; it derives the provider from authenticated agent identity, not from an untrusted heartbeat claim. API-backed Groq/Venice/FreeLLMAPI and ChatGPT Plan runtime paths remain available and unchanged.
 
-The UI adapter serializes all requests through one device-level lock, launches only allowlisted apps, rejects password/login screens and unrecognized editable fields, submits only through an accessible send control, and returns text only after the visible response stabilizes. It has no tool execution, file access, or action permissions. Consumer app sessions do not expose API keys; this is a local UI bridge, not a replacement for official APIs. App UI changes and quotas can still cause recoverable failures.
+The UI adapter serializes all requests through one worker-process-wide lock, launches only allowlisted apps, rejects password/login screens and unrecognized editable fields, submits only through an accessible send control, and returns text only after the visible response stabilizes. It has no tool execution, file access, or action permissions. Consumer app sessions do not expose API keys; this is a local UI bridge, not a replacement for official APIs. App UI changes and quotas can still cause recoverable failures.
 
 **Not yet runtime-verified:** the native service listener was not active at audit time, so no real prompt has been submitted to any consumer app. CI must build the Android APK, and the user must enable the accessibility service before a device smoke test. Do not switch the active Termux worker away from remote API inference until that smoke test passes.
 

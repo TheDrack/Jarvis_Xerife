@@ -358,13 +358,13 @@ class JarvisAccessibilityService : AccessibilityService() {
             }
             "click_index" -> {
                 val index = body.optInt("index", -1)
-                if (index !in 0 until MAX_NODES) false
+                if (!isAllowedLlmForeground() || index !in 0 until MAX_NODES) false
                 else findNodeByIndex(index)?.let { clickNode(it) } ?: false
             }
             "set_text_index" -> {
                 val index = body.optInt("index", -1)
                 val text = body.optString("text")
-                if (index !in 0 until MAX_NODES || text.length > 12000) false
+                if (!isAllowedLlmForeground() || index !in 0 until MAX_NODES || text.length > 12000) false
                 else {
                     val target = findNodeByIndex(index)
                     try {
@@ -410,6 +410,15 @@ class JarvisAccessibilityService : AccessibilityService() {
         }
         return try {
             search(root, 0)
+        } finally {
+            root.recycle()
+        }
+    }
+
+    private fun isAllowedLlmForeground(): Boolean {
+        val root = rootInActiveWindow ?: return false
+        return try {
+            root.packageName?.toString() in ALLOWED_LLM_PACKAGES
         } finally {
             root.recycle()
         }
