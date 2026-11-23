@@ -325,7 +325,7 @@ def test_real_repository_roadmap_keeps_first_mission_blocked_until_c0_evidence_i
     selector = RoadmapMissionSelector()
 
     assert selector.find_next_mission() is None
-    assert "C0 evidence is pending" in selector.hold_reason
+    assert "A fase C0 ainda aguarda" in selector.hold_reason
 
 
 def test_c1_mission_requires_all_c0_acceptance_criteria(tmp_path):
@@ -529,7 +529,7 @@ def test_real_manifest_has_first_world_model_mission_waiting_for_c0_evidence():
     selector = RoadmapMissionSelector(repository_root=root)
 
     assert selector.find_next_mission() is None
-    assert "C0 evidence is pending" in selector.hold_reason
+    assert "A fase C0 ainda aguarda" in selector.hold_reason
 
     progress = selector.get_progress()
     assert progress["total_criteria"] == 4

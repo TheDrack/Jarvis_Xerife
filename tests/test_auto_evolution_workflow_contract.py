@@ -48,11 +48,11 @@ def test_workflow_has_first_c1_mission_but_keeps_it_gated_by_c0_evidence():
     assert [mission["criterion_id"] for mission in manifest["missions"]] == ["C1-WORLD-MODEL"]
     assert manifest["missions"][0]["status"] == "ready"
     assert len(manifest["missions"][0]["depends_on"]) == 3
-    assert "C0 evidence is pending" in manifest["hold_reason"]
+    assert "A fase C0 ainda aguarda" in manifest["hold_reason"]
 
     selector = RoadmapMissionSelector(repository_root=root)
     assert selector.find_next_mission() is None
-    assert "C0 evidence is pending" in selector.hold_reason
+    assert "A fase C0 ainda aguarda" in selector.hold_reason
 
 
 def test_workflow_dispatch_supports_one_time_run_without_global_enablement():

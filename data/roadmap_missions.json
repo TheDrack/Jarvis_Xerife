@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
-  "hold_reason": "C0 evidence is pending review and CI verification. C1-WORLD-MODEL has a reviewed target and regression-test mapping, but remains blocked until all C0 criteria are verified in the STATUS ledger.",
+  "hold_reason": "A fase C0 ainda aguarda revisão, merge e CI verde. A primeira missão C1-WORLD-MODEL já está mapeada, mas permanece bloqueada até que os três critérios C0 tenham evidências verificadas no ledger docs/STATUS.md.",
   "missions": [
     {
       "criterion_id": "C1-WORLD-MODEL",

@@ -20,7 +20,7 @@ def test_roadmap_progress_uses_verified_status_ledger():
     assert body["blocked"] == 0
     assert body["status"] == "blocked"
     assert body["next_mission"] is None
-    assert "C0 evidence is pending" in body["hold_reason"]
+    assert "A fase C0 ainda aguarda" in body["hold_reason"]
 
 
 def test_health_detail_uses_evidence_based_roadmap_metrics(monkeypatch):
