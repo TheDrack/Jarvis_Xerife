@@ -200,6 +200,10 @@ class AutoEvolutionServiceV2(NexusComponent):
         return {
             "missions_completed": progress["completed_criteria"],
             "total_missions": progress["total_criteria"],
+            "completed_criteria": progress["completed_criteria"],
+            "total_criteria": progress["total_criteria"],
+            "progress_unit": "roadmap_criteria",
+            "progress_scope": "currently_mapped_criteria",
             "evolution_rate": round(progress["completion_rate"], 4),
             "status": progress["status"],
             "roadmap": progress,

@@ -15,3 +15,4 @@ def test_hud_renders_roadmap_gate_and_phase_progress_without_html_injection():
     assert "phaseProgress.textContent" in source
     assert "evolutionStatus.innerHTML" not in source
     assert "percentageValue.textContent" in source
+    assert "dos critérios atualmente mapeados" in source

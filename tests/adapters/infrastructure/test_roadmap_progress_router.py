@@ -14,6 +14,10 @@ def test_roadmap_progress_uses_verified_status_ledger():
     assert response.status_code == 200
     body = response.json()
     assert body["completion_percentage"] == 75.0
+    assert body["progress_unit"] == "roadmap_criteria"
+    assert body["progress_scope"] == "currently_mapped_criteria"
+    assert body["total_criteria"] == 4
+    assert body["completed_criteria"] == 3
     assert body["total_missions"] == 4
     assert body["completed"] == 3
     assert body["planned"] == 1
