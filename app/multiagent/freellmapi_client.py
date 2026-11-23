@@ -6,12 +6,14 @@ replace ChatGPT/Claude as high-capability agents and does not execute tools.
 from __future__ import annotations
 
 import logging
-import os
 import time
+from collections.abc import Mapping, Sequence
 from math import isfinite
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 import httpx
+
+from .worker_env import worker_env_value
 
 logger = logging.getLogger(__name__)
 
@@ -25,17 +27,17 @@ TRANSPORT_RETRY_DELAY_SECONDS = 0.5
 
 
 
-def configured_provider_id() -> str:
-    """Return the configured provider identity without exposing credentials."""
+def configured_provider_id(agent_id: str | None = None) -> str:
+    """Return one agent's configured provider identity without exposing credentials."""
     for name in ("JARVIS_AGENT_MODEL_PROVIDER", "FREELLMAPI_PROVIDER"):
-        value = os.getenv(name, "").strip().lower()
+        value = worker_env_value(name, agent_id).strip().lower()
         if value and value != "unknown":
             return value
-    if os.getenv("FREELLMAPI_API_KEY", "").strip():
+    if worker_env_value("FREELLMAPI_API_KEY", agent_id).strip():
         return "unknown"
-    if os.getenv("GROQ_API_KEY", "").strip():
+    if worker_env_value("GROQ_API_KEY", agent_id).strip():
         return "groq"
-    if os.getenv("VENICE_API_KEY", "").strip():
+    if worker_env_value("VENICE_API_KEY", agent_id).strip():
         return "venice"
     return "unknown"
 
@@ -55,7 +57,7 @@ class FreeLLMAPIError(RuntimeError):
 
 
 class FreeLLMAPIClient:
-    """Small OpenAI-compatible client using the local FreeLLMAPI gateway."""
+    """Small OpenAI-compatible client for local gateways and vendor APIs."""
 
     def __init__(
         self,
@@ -86,32 +88,61 @@ class FreeLLMAPIClient:
         self._client = client
 
     @classmethod
-    def from_env(cls) -> "FreeLLMAPIClient":
-        """Build a client from explicit environment configuration."""
-        api_key = os.getenv("FREELLMAPI_API_KEY", "").strip()
-        base_url = os.getenv("FREELLMAPI_BASE_URL", "").strip()
-        model = os.getenv("FREELLMAPI_MODEL", "").strip()
-        if not api_key:
-            # Prefer Groq to preserve Venice capacity for explicitly routed
-            # Red/Blue tasks. Respect an explicit non-auto model override.
-            api_key = os.getenv("GROQ_API_KEY", "").strip()
-            if api_key:
-                base_url = base_url or "https://api.groq.com/openai/v1"
-                model = model if model and model.lower() != "auto" else os.getenv(
-                    "GROQ_MODEL", "llama-3.3-70b-versatile"
+    def from_env(cls, agent_id: str | None = None) -> FreeLLMAPIClient:
+        """Build a client from per-agent settings, falling back to global configuration."""
+        provider_id = configured_provider_id(agent_id)
+        api_key = worker_env_value("FREELLMAPI_API_KEY", agent_id).strip()
+        base_url = worker_env_value("FREELLMAPI_BASE_URL", agent_id).strip()
+        model = worker_env_value("FREELLMAPI_MODEL", agent_id).strip()
+
+        if provider_id in {"openai", "gemini", "xai", "qwen"}:
+            if not api_key or not base_url or not model or model.lower() == "auto":
+                raise FreeLLMAPIError(
+                    f"Provider {provider_id} requires FREELLMAPI_API_KEY, "
+                    "FREELLMAPI_BASE_URL and FREELLMAPI_MODEL for this agent."
                 )
-            else:
-                api_key = os.getenv("VENICE_API_KEY", "").strip()
+        elif provider_id == "groq":
+            api_key = api_key or worker_env_value("GROQ_API_KEY", agent_id).strip()
+            base_url = base_url or "https://api.groq.com/openai/v1"
+            model = model if model and model.lower() != "auto" else worker_env_value(
+                "GROQ_MODEL", agent_id, "llama-3.3-70b-versatile"
+            )
+        elif provider_id == "venice":
+            api_key = api_key or worker_env_value("VENICE_API_KEY", agent_id).strip()
+            base_url = base_url or "https://api.venice.ai/api/v1"
+            model = model if model and model.lower() != "auto" else worker_env_value(
+                "VENICE_MODEL", agent_id, "venice-uncensored-1-2"
+            )
+        elif provider_id in {"freellmapi", "unknown"}:
+            if not api_key:
+                # Preserve the legacy preference for Groq, leaving Venice available
+                # for tasks that explicitly require that provider.
+                api_key = worker_env_value("GROQ_API_KEY", agent_id).strip()
                 if api_key:
-                    base_url = base_url or "https://api.venice.ai/api/v1"
-                    model = model if model and model.lower() != "auto" else "venice-uncensored-1-2"
+                    base_url = base_url or "https://api.groq.com/openai/v1"
+                    model = model if model and model.lower() != "auto" else worker_env_value(
+                        "GROQ_MODEL", agent_id, "llama-3.3-70b-versatile"
+                    )
+                else:
+                    api_key = worker_env_value("VENICE_API_KEY", agent_id).strip()
+                    if api_key:
+                        base_url = base_url or "https://api.venice.ai/api/v1"
+                        model = model if model and model.lower() != "auto" else worker_env_value(
+                            "VENICE_MODEL", agent_id, "venice-uncensored-1-2"
+                        )
+        else:
+            raise FreeLLMAPIError(
+                f"Unsupported local model provider: {provider_id}.",
+                code="unsupported_provider",
+            )
+
         if not api_key:
             raise FreeLLMAPIError(
                 "Configure FREELLMAPI_API_KEY, GROQ_API_KEY, or VENICE_API_KEY; "
                 "mini-agent inference remains disabled."
             )
         try:
-            timeout = float(os.getenv("FREELLMAPI_TIMEOUT_SECONDS", "45"))
+            timeout = float(worker_env_value("FREELLMAPI_TIMEOUT_SECONDS", agent_id, "45"))
         except ValueError as exc:
             raise FreeLLMAPIError("FREELLMAPI_TIMEOUT_SECONDS must be numeric.") from exc
         return cls(

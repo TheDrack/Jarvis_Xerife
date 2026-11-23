@@ -14,9 +14,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from starlette.concurrency import run_in_threadpool
 
-from app.adapters.infrastructure.agent_worker_credentials import AgentWorkerCredentialStore
+from app.adapters.infrastructure.agent_worker_credentials import (
+    AgentWorkerCredentialStore,
+)
 from app.application.services.agent_task_queue_service import (
-    AgentTaskQueueService, TaskQueueUnavailable,
+    AgentTaskQueueService,
+    TaskQueueUnavailable,
 )
 from app.core.nexus import nexus
 from app.multiagent.transport import AgentMessage
@@ -291,9 +294,14 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
             agent_id = require_worker_identity(request.agent_id, worker)
             payload = request.model_dump(exclude={"agent_id", "available_tools"})
             payload["agent_id"] = agent_id
-            # Provider identity participates in scheduler eligibility (e.g. red-team
-            # task restrictions), so it must come from trusted server configuration.
-            payload["model_provider"] = _configured_worker_model_provider()
+            # Provider identity affects scheduler eligibility. Read it from the
+            # server-provisioned agent record, never from the heartbeat payload.
+            trusted_provider = str(getattr(worker, "model_provider", "") or "").strip().lower()
+            payload["model_provider"] = (
+                trusted_provider
+                if trusted_provider and trusted_provider != "unknown"
+                else _configured_worker_model_provider()
+            )
             payload["available_tools"] = list(worker.available_tools)
             # The current worker runtime executes one task per loop. Do not let
             # the request body inflate the scheduler's concurrency budget.

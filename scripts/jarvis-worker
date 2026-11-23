@@ -14,22 +14,68 @@ load_config() {
     set +a
 }
 
+configured_worker_ids() {
+    local base="${JARVIS_AGENT_ID:-jarvis-termux-mini-1}"
+    local count="${JARVIS_MINI_AGENT_WORKERS:-1}" prefix index
+    [[ "$count" =~ ^[0-9]+$ ]] || count=1
+    (( count < 1 )) && count=1
+    (( count > 8 )) && count=8
+    if (( count == 1 )); then printf '%s\n' "$base"; return; fi
+    prefix="$(printf '%s' "$base" | sed -E 's/[0-9]+$//; s/[-_.]+$//')"
+    [ -n "$prefix" ] || prefix="$base"
+    for ((index=1; index<=count; index++)); do printf '%s-%d\n' "$prefix" "$index"; done
+}
+
 missing_config() {
-    local missing=() agent normalized token_var
-    agent="${JARVIS_AGENT_ID:-jarvis-termux-mini-1}"
-    normalized="$(printf '%s' "$agent" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g; s/^_*//; s/_*$//')"
-    token_var="JARVIS_TASK_QUEUE_WORKER_TOKEN_${normalized}"
+    local missing=() count agent normalized token_var token remote_var remote
+    local provider_var provider api_key_var base_url_var model_var api_key base_url model
+    count="${JARVIS_MINI_AGENT_WORKERS:-1}"
+    [[ "$count" =~ ^[0-9]+$ ]] || count=1
+    (( count < 1 )) && count=1
+    (( count > 8 )) && count=8
     [ "${JARVIS_MINI_AGENT_ENABLED:-false}" = "true" ] || missing+=("JARVIS_MINI_AGENT_ENABLED=true")
     [ -n "${JARVIS_TASK_QUEUE_API_URL:-}" ] || missing+=("JARVIS_TASK_QUEUE_API_URL")
-    if [ "${JARVIS_AGENT_REMOTE_INFERENCE:-false}" != "true" ]; then
-        if [ -z "${JARVIS_TASK_QUEUE_API_TOKEN:-}" ] && { [ -z "${JARVIS_TASK_QUEUE_USERNAME:-}" ] || [ -z "${JARVIS_TASK_QUEUE_PASSWORD:-}" ]; }; then
-            missing+=("JARVIS_TASK_QUEUE_API_TOKEN or JARVIS_TASK_QUEUE_USERNAME+JARVIS_TASK_QUEUE_PASSWORD")
-        fi
-        if [ -z "${FREELLMAPI_API_KEY:-}" ] && [ -z "${GROQ_API_KEY:-}" ] && [ -z "${VENICE_API_KEY:-}" ]; then
-            missing+=("FREELLMAPI_API_KEY or GROQ_API_KEY or VENICE_API_KEY")
-        fi
-    fi
-    [ -n "${!token_var:-${JARVIS_TASK_QUEUE_WORKER_TOKEN:-}}" ] || missing+=("$token_var")
+    while IFS= read -r agent; do
+        normalized="$(printf '%s' "$agent" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g; s/^_*//; s/_*$//')"
+        token_var="JARVIS_TASK_QUEUE_WORKER_TOKEN_${normalized}"
+        token="${!token_var:-}"
+        if (( count == 1 )); then token="${token:-${JARVIS_TASK_QUEUE_WORKER_TOKEN:-}}"; fi
+        [ -n "$token" ] || missing+=("$token_var")
+        remote_var="JARVIS_AGENT_REMOTE_INFERENCE_${normalized}"
+        remote="${!remote_var:-${JARVIS_AGENT_REMOTE_INFERENCE:-false}}"
+        [ "$remote" = "true" ] && continue
+        provider_var="JARVIS_AGENT_MODEL_PROVIDER_${normalized}"
+        provider="${!provider_var:-${JARVIS_AGENT_MODEL_PROVIDER:-}}"
+        api_key_var="FREELLMAPI_API_KEY_${normalized}"
+        base_url_var="FREELLMAPI_BASE_URL_${normalized}"
+        model_var="FREELLMAPI_MODEL_${normalized}"
+        api_key="${!api_key_var:-${FREELLMAPI_API_KEY:-}}"
+        base_url="${!base_url_var:-${FREELLMAPI_BASE_URL:-}}"
+        model="${!model_var:-${FREELLMAPI_MODEL:-}}"
+        case "$provider" in
+            openai|gemini|xai|qwen)
+                [ -n "$api_key" ] || missing+=("$api_key_var")
+                [ -n "$base_url" ] || missing+=("$base_url_var")
+                [ -n "$model" ] && [ "$model" != "auto" ] || missing+=("$model_var (explicit model ID required)")
+                ;;
+            groq)
+                groq_var="GROQ_API_KEY_${normalized}"
+                [ -n "$api_key" ] || [ -n "${!groq_var:-${GROQ_API_KEY:-}}" ] || missing+=("FREELLMAPI_API_KEY or $groq_var")
+                ;;
+            venice)
+                venice_var="VENICE_API_KEY_${normalized}"
+                [ -n "$api_key" ] || [ -n "${!venice_var:-${VENICE_API_KEY:-}}" ] || missing+=("FREELLMAPI_API_KEY or $venice_var")
+                ;;
+            freellmapi)
+                [ -n "$api_key" ] || missing+=("$api_key_var")
+                ;;
+            *)
+                groq_var="GROQ_API_KEY_${normalized}"
+                venice_var="VENICE_API_KEY_${normalized}"
+                [ -n "$api_key" ] || [ -n "${!groq_var:-${GROQ_API_KEY:-}}" ] || [ -n "${!venice_var:-${VENICE_API_KEY:-}}" ] || missing+=("FREELLMAPI_API_KEY or GROQ_API_KEY or VENICE_API_KEY")
+                ;;
+        esac
+    done < <(configured_worker_ids)
     printf '%s\n' "${missing[@]}"
 }
 
@@ -49,7 +95,9 @@ configure() {
     if [ -z "$worker_token" ]; then
         read -r -s -p "Token individual do worker ($token_var): " worker_token; echo
     else
-        echo "Token individual ja provisionado localmente; sera preservado sem exibicao."
+        read -r -s -p "Novo token individual (Enter preserva o atual): " replacement_token; echo
+        [ -n "${replacement_token:-}" ] && worker_token="$replacement_token"
+        unset replacement_token
     fi
     if [ -z "$worker_token" ]; then
         echo "Token individual do worker ausente; configuracao cancelada." >&2
@@ -73,6 +121,8 @@ configure() {
     start_service
 }
 
+
+
 start_service() {
     if ! load_config; then echo "Configuração ausente. Execute: jarvis-worker configure" >&2; return 2; fi
     local missing
@@ -80,6 +130,7 @@ start_service() {
     if [ -n "$missing" ]; then
         echo "Worker BLOQUEADO; faltam:"; printf ' - %s\n' "$missing"; return 2
     fi
+    rm -f "$SERVICE/down"
     "$PREFIX/bin/sv" up "$SERVICE"
     "$PREFIX/bin/sv" status "$SERVICE"
 }
@@ -89,15 +140,17 @@ case "${1:-status}" in
     start) start_service ;;
     boot-start)
         if load_config && [ -z "$(missing_config)" ]; then
+            rm -f "$SERVICE/down"
             "$PREFIX/bin/sv" up "$SERVICE" >/dev/null 2>&1 || true
             "$PREFIX/bin/sv" status "$SERVICE"
         else
+            touch "$SERVICE/down"
             "$PREFIX/bin/sv" down "$SERVICE" >/dev/null 2>&1 || true
             echo "[BOOT] Worker não iniciado: configuração/credenciais ainda ausentes."
         fi
         ;;
-    stop) "$PREFIX/bin/sv" down "$SERVICE"; "$PREFIX/bin/sv" status "$SERVICE" ;;
-    restart) load_config || { echo "Configuração ausente."; exit 2; }; [ -z "$(missing_config)" ] || { echo "Configuração incompleta."; exit 2; }; "$PREFIX/bin/sv" restart "$SERVICE"; "$PREFIX/bin/sv" status "$SERVICE" ;;
+    stop) touch "$SERVICE/down"; "$PREFIX/bin/sv" down "$SERVICE"; "$PREFIX/bin/sv" status "$SERVICE" ;;
+    restart) load_config || { echo "Configuração ausente."; exit 2; }; [ -z "$(missing_config)" ] || { echo "Configuração incompleta."; exit 2; }; rm -f "$SERVICE/down"; "$PREFIX/bin/sv" restart "$SERVICE"; "$PREFIX/bin/sv" status "$SERVICE" ;;
     status)
         "$PREFIX/bin/sv" status "$SERVICE" 2>&1 || true
         if [ -f "$STATUS_FILE" ]; then cat "$STATUS_FILE"; else echo "Estado do worker ainda não publicado."; fi
@@ -117,8 +170,9 @@ case "${1:-status}" in
         ;;
     provision-help)
         echo "Em ambiente administrativo confiável, com DATABASE_URL/JARVIS_TASK_QUEUE_DATABASE_URL apontando ao PostgreSQL compartilhado:"
-        echo "python scripts/manage_agent_worker_credentials.py issue --agent-id jarvis-termux-mini-1 --capability text_reasoning"
-        echo "O token aparece uma única vez. Não o envie por chat; use jarvis-worker configure diretamente no Termux."
+        echo 'PROVIDER_ID=gemini  # use the same provider configured for this worker'
+        echo 'python scripts/manage_agent_worker_credentials.py issue --agent-id jarvis-termux-mini-1 --capability text_reasoning --model-provider "$PROVIDER_ID"'
+        echo "Escolha o mesmo provider_id configurado no worker. O token aparece uma única vez; não o envie por chat."
         ;;
     *) echo "Uso: jarvis-worker {configure|start|stop|restart|status|logs|objectives|prune-objectives|provision-help}" >&2; exit 2 ;;
 esac

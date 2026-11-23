@@ -26,6 +26,21 @@ CONFIGURED_VARS = (
     "JARVIS_TASK_QUEUE_WORKER_TOKEN",
     "JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1",
     "JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_2",
+    "JARVIS_TASK_QUEUE_WORKER_TOKEN_JARVIS_MOBILE",
+    "JARVIS_TASK_QUEUE_WORKER_TOKEN_JARVIS_MOBILE_1",
+    "JARVIS_TASK_QUEUE_WORKER_TOKEN_JARVIS_MOBILE_2",
+    "JARVIS_AGENT_REMOTE_INFERENCE",
+    "JARVIS_AGENT_REMOTE_INFERENCE_JARVIS_MOBILE",
+    "JARVIS_AGENT_REMOTE_INFERENCE_JARVIS_MOBILE_1",
+    "JARVIS_AGENT_REMOTE_INFERENCE_JARVIS_MOBILE_2",
+    "JARVIS_AGENT_MODEL_PROVIDER_JARVIS_MOBILE_1",
+    "JARVIS_AGENT_MODEL_PROVIDER_JARVIS_MOBILE_2",
+    "FREELLMAPI_API_KEY_JARVIS_MOBILE_1",
+    "FREELLMAPI_API_KEY_JARVIS_MOBILE_2",
+    "FREELLMAPI_BASE_URL_JARVIS_MOBILE_1",
+    "FREELLMAPI_BASE_URL_JARVIS_MOBILE_2",
+    "FREELLMAPI_MODEL_JARVIS_MOBILE_1",
+    "FREELLMAPI_MODEL_JARVIS_MOBILE_2",
     "JARVIS_TASK_QUEUE_USERNAME",
     "JARVIS_TASK_QUEUE_PASSWORD",
     "FREELLMAPI_API_KEY",
@@ -84,7 +99,6 @@ def test_supabase_native_configuration_is_ready_without_http_access(clean_env, c
 def test_http_token_configuration_is_accepted(clean_env, capsys):
     clean_env.setenv("JARVIS_MINI_AGENT_ENABLED", "1")
     clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
-    clean_env.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "token-value")
     clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "worker-token-value")
     clean_env.setenv("VENICE_API_KEY", "venice-value")
 
@@ -123,7 +137,6 @@ def test_probe_without_api_url_reports_the_gap(clean_env, capsys):
 def test_http_configuration_without_worker_token_is_not_ready(clean_env, capsys):
     clean_env.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
     clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
-    clean_env.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "user-jwt")
     clean_env.setenv("GROQ_API_KEY", "groq-value")
 
     report, _ = run_cli(capsys)
@@ -136,7 +149,6 @@ def test_http_configuration_without_worker_token_is_not_ready(clean_env, capsys)
 def test_http_worker_identity_is_preferred_over_legacy_service_role(clean_env, capsys):
     clean_env.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
     clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
-    clean_env.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "user-jwt")
     clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "worker-token")
     clean_env.setenv("SUPABASE_URL", "https://example.supabase.co")
     clean_env.setenv("SUPABASE_SERVICE_ROLE_KEY", "legacy-service-role")
@@ -154,7 +166,6 @@ def test_multi_slot_http_runtime_requires_one_token_per_agent(clean_env, capsys)
     clean_env.setenv("JARVIS_MINI_AGENT_WORKERS", "2")
     clean_env.setenv("JARVIS_AGENT_ID", "mini-freellmapi-1")
     clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
-    clean_env.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "user-jwt")
     clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "shared-token")
     clean_env.setenv("GROQ_API_KEY", "groq-value")
 
@@ -169,7 +180,6 @@ def test_multi_slot_http_runtime_accepts_distinct_agent_tokens(clean_env, capsys
     clean_env.setenv("JARVIS_MINI_AGENT_WORKERS", "2")
     clean_env.setenv("JARVIS_AGENT_ID", "mini-freellmapi-1")
     clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
-    clean_env.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "user-jwt")
     clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1", "token-one")
     clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_2", "token-two")
     clean_env.setenv("GROQ_API_KEY", "groq-value")
@@ -180,3 +190,47 @@ def test_multi_slot_http_runtime_accepts_distinct_agent_tokens(clean_env, capsys
     assert report["groups"]["queue_access"] == "http_worker_token"
     assert report["variables"]["JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1"] is True
     assert report["variables"]["JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_2"] is True
+
+
+def test_per_agent_vendor_api_credentials_are_recognized_without_global_keys(clean_env, capsys):
+    clean_env.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    clean_env.setenv("JARVIS_MINI_AGENT_WORKERS", "2")
+    clean_env.setenv("JARVIS_AGENT_ID", "jarvis-mobile")
+    clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
+    clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_JARVIS_MOBILE_1", "token-one")
+    clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_JARVIS_MOBILE_2", "token-two")
+    clean_env.setenv("JARVIS_AGENT_REMOTE_INFERENCE_JARVIS_MOBILE_1", "false")
+    clean_env.setenv("JARVIS_AGENT_MODEL_PROVIDER_JARVIS_MOBILE_1", "gemini")
+    clean_env.setenv("FREELLMAPI_API_KEY_JARVIS_MOBILE_1", "gemini-secret")
+    clean_env.setenv("FREELLMAPI_BASE_URL_JARVIS_MOBILE_1", "https://generativelanguage.googleapis.com/v1beta")
+    clean_env.setenv("FREELLMAPI_MODEL_JARVIS_MOBILE_1", "gemini-model")
+    clean_env.setenv("JARVIS_AGENT_REMOTE_INFERENCE_JARVIS_MOBILE_2", "false")
+    clean_env.setenv("JARVIS_AGENT_MODEL_PROVIDER_JARVIS_MOBILE_2", "xai")
+    clean_env.setenv("FREELLMAPI_API_KEY_JARVIS_MOBILE_2", "xai-secret")
+    clean_env.setenv("FREELLMAPI_BASE_URL_JARVIS_MOBILE_2", "https://api.x.ai/v1")
+    clean_env.setenv("FREELLMAPI_MODEL_JARVIS_MOBILE_2", "grok-model")
+
+    report, output = run_cli(capsys)
+
+    assert report["verdict"] == "ready"
+    assert report["groups"]["queue_access"] == "http_worker_token"
+    assert report["groups"]["inference_by_agent"] == {
+        "jarvis-mobile-1": "gemini",
+        "jarvis-mobile-2": "xai",
+    }
+    assert report["variables"]["FREELLMAPI_API_KEY_JARVIS_MOBILE_1"] is True
+    assert report["variables"]["FREELLMAPI_API_KEY_JARVIS_MOBILE_2"] is True
+    assert "gemini-secret" not in output and "xai-secret" not in output
+
+
+def test_server_side_inference_does_not_require_a_local_provider_key(clean_env, capsys):
+    clean_env.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    clean_env.setenv("JARVIS_AGENT_ID", "jarvis-mobile")
+    clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
+    clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_JARVIS_MOBILE", "worker-token")
+    clean_env.setenv("JARVIS_AGENT_REMOTE_INFERENCE_JARVIS_MOBILE", "true")
+
+    report, _ = run_cli(capsys)
+
+    assert report["verdict"] == "ready"
+    assert report["groups"]["inference_by_agent"] == {"jarvis-mobile": "server_remote"}

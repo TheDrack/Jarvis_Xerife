@@ -6,7 +6,6 @@ import time
 from threading import Event
 
 import pytest
-
 from app.multiagent import agent_worker_runtime
 from app.multiagent.agent_worker_runtime import run_worker_loop, start_configured_worker
 
@@ -344,3 +343,50 @@ def test_runtime_rejects_one_shared_token_for_multiple_http_slots(monkeypatch):
 
     with pytest.raises(RuntimeError, match="one dedicated worker token per agent slot"):
         start_configured_worker()
+
+
+def test_runtime_starts_local_vendor_api_worker_without_user_jwt(monkeypatch):
+    class IdleWorker:
+        agent_id = "jarvis-gemini-mini-1"
+        handler = None
+
+        def run_once(self):
+            return None
+
+    captured = {}
+    monkeypatch.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    monkeypatch.setenv("JARVIS_MINI_AGENT_WORKERS", "1")
+    monkeypatch.setenv("JARVIS_AGENT_ID", "jarvis-gemini-mini-1")
+    monkeypatch.setenv("JARVIS_AGENT_REMOTE_INFERENCE", "false")
+    monkeypatch.setenv("JARVIS_AGENT_MODEL_PROVIDER", "gemini")
+    monkeypatch.setenv("FREELLMAPI_API_KEY", "vendor-api-key")
+    monkeypatch.setenv("FREELLMAPI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
+    monkeypatch.setenv("FREELLMAPI_MODEL", "gemini-model")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_URL", "https://jarvis.example")
+    monkeypatch.setenv(
+        "JARVIS_TASK_QUEUE_WORKER_TOKEN_JARVIS_GEMINI_MINI_1", "worker-token-only"
+    )
+    for key in (
+        "JARVIS_TASK_QUEUE_API_TOKEN", "JARVIS_TASK_QUEUE_USERNAME",
+        "JARVIS_TASK_QUEUE_PASSWORD", "JARVIS_TASK_QUEUE_WORKER_TOKEN",
+        "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(
+        "app.multiagent.agent_worker_runtime.PriorityQueueMiniAgent.from_env",
+        lambda agent_id=None, worker_token=None: captured.update(
+            agent_id=agent_id, worker_token=worker_token
+        ) or IdleWorker(),
+    )
+
+    runtime = start_configured_worker()
+
+    assert runtime is not None
+    group, stop = runtime
+    assert captured == {
+        "agent_id": "jarvis-gemini-mini-1",
+        "worker_token": "worker-token-only",
+    }
+    stop.set()
+    group.join(timeout=1)
+    assert not group.is_alive()

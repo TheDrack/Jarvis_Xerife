@@ -17,21 +17,64 @@ set -a
 set +a
 
 JARVIS_AGENT_ID="${JARVIS_AGENT_ID:-jarvis-termux-mini-1}"
-normalized_agent="$(printf '%s' "$JARVIS_AGENT_ID" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g; s/^_*//; s/_*$//')"
-worker_token_var="JARVIS_TASK_QUEUE_WORKER_TOKEN_${normalized_agent}"
-worker_token="${!worker_token_var:-${JARVIS_TASK_QUEUE_WORKER_TOKEN:-}}"
+JARVIS_MINI_AGENT_WORKERS="${JARVIS_MINI_AGENT_WORKERS:-1}"
+[[ "$JARVIS_MINI_AGENT_WORKERS" =~ ^[0-9]+$ ]] || JARVIS_MINI_AGENT_WORKERS=1
+(( JARVIS_MINI_AGENT_WORKERS < 1 )) && JARVIS_MINI_AGENT_WORKERS=1
+(( JARVIS_MINI_AGENT_WORKERS > 8 )) && JARVIS_MINI_AGENT_WORKERS=8
 missing=()
 [ "${JARVIS_MINI_AGENT_ENABLED:-false}" = "true" ] || missing+=("JARVIS_MINI_AGENT_ENABLED=true")
 [ -n "${JARVIS_TASK_QUEUE_API_URL:-}" ] || missing+=("JARVIS_TASK_QUEUE_API_URL")
-if [ "${JARVIS_AGENT_REMOTE_INFERENCE:-false}" != "true" ]; then
-    if [ -z "${JARVIS_TASK_QUEUE_API_TOKEN:-}" ] && { [ -z "${JARVIS_TASK_QUEUE_USERNAME:-}" ] || [ -z "${JARVIS_TASK_QUEUE_PASSWORD:-}" ]; }; then
-        missing+=("JARVIS_TASK_QUEUE_API_TOKEN or JARVIS_TASK_QUEUE_USERNAME+JARVIS_TASK_QUEUE_PASSWORD")
+worker_prefix="$(printf '%s' "$JARVIS_AGENT_ID" | sed -E 's/[0-9]+$//; s/[-_.]+$//')"
+[ -n "$worker_prefix" ] || worker_prefix="$JARVIS_AGENT_ID"
+for ((worker_index=1; worker_index<=JARVIS_MINI_AGENT_WORKERS; worker_index++)); do
+    if [ "$JARVIS_MINI_AGENT_WORKERS" -eq 1 ]; then
+        current_agent="$JARVIS_AGENT_ID"
+    else
+        current_agent="${worker_prefix}-${worker_index}"
     fi
-    if [ -z "${FREELLMAPI_API_KEY:-}" ] && [ -z "${GROQ_API_KEY:-}" ] && [ -z "${VENICE_API_KEY:-}" ]; then
-        missing+=("FREELLMAPI_API_KEY or GROQ_API_KEY or VENICE_API_KEY")
+    normalized_agent="$(printf '%s' "$current_agent" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g; s/^_*//; s/_*$//')"
+    worker_token_var="JARVIS_TASK_QUEUE_WORKER_TOKEN_${normalized_agent}"
+    worker_token="${!worker_token_var:-}"
+    if [ "$JARVIS_MINI_AGENT_WORKERS" -eq 1 ]; then
+        worker_token="${worker_token:-${JARVIS_TASK_QUEUE_WORKER_TOKEN:-}}"
     fi
-fi
-[ -n "$worker_token" ] || missing+=("$worker_token_var")
+    [ -n "$worker_token" ] || missing+=("$worker_token_var")
+    remote_var="JARVIS_AGENT_REMOTE_INFERENCE_${normalized_agent}"
+    remote="${!remote_var:-${JARVIS_AGENT_REMOTE_INFERENCE:-false}}"
+    [ "$remote" = "true" ] && continue
+    provider_var="JARVIS_AGENT_MODEL_PROVIDER_${normalized_agent}"
+    provider="${!provider_var:-${JARVIS_AGENT_MODEL_PROVIDER:-}}"
+    api_key_var="FREELLMAPI_API_KEY_${normalized_agent}"
+    base_url_var="FREELLMAPI_BASE_URL_${normalized_agent}"
+    model_var="FREELLMAPI_MODEL_${normalized_agent}"
+    api_key="${!api_key_var:-${FREELLMAPI_API_KEY:-}}"
+    base_url="${!base_url_var:-${FREELLMAPI_BASE_URL:-}}"
+    model="${!model_var:-${FREELLMAPI_MODEL:-}}"
+    case "$provider" in
+        openai|gemini|xai|qwen)
+            [ -n "$api_key" ] || missing+=("$api_key_var")
+            [ -n "$base_url" ] || missing+=("$base_url_var")
+            [ -n "$model" ] && [ "$model" != "auto" ] || missing+=("$model_var (explicit model ID required)")
+            ;;
+        groq)
+            groq_var="GROQ_API_KEY_${normalized_agent}"
+            [ -n "$api_key" ] || [ -n "${!groq_var:-${GROQ_API_KEY:-}}" ] || missing+=("FREELLMAPI_API_KEY or $groq_var")
+            ;;
+        venice)
+            venice_var="VENICE_API_KEY_${normalized_agent}"
+            [ -n "$api_key" ] || [ -n "${!venice_var:-${VENICE_API_KEY:-}}" ] || missing+=("FREELLMAPI_API_KEY or $venice_var")
+            ;;
+        freellmapi)
+            [ -n "$api_key" ] || missing+=("$api_key_var")
+            ;;
+        *)
+            groq_var="GROQ_API_KEY_${normalized_agent}"
+            venice_var="VENICE_API_KEY_${normalized_agent}"
+            [ -n "$api_key" ] || [ -n "${!groq_var:-${GROQ_API_KEY:-}}" ] || [ -n "${!venice_var:-${VENICE_API_KEY:-}}" ] || missing+=("FREELLMAPI_API_KEY or GROQ_API_KEY or VENICE_API_KEY")
+            ;;
+    esac
+done
+
 if [ "${#missing[@]}" -gt 0 ]; then
     printf '[WORKER] BLOQUEADO; configuração ausente: %s\n' "${missing[*]}"
     exit 78
@@ -39,7 +82,7 @@ fi
 
 export JARVIS_AGENT_ID
 export JARVIS_AGENT_ENVIRONMENT="${JARVIS_AGENT_ENVIRONMENT:-termux-android}"
-export JARVIS_MINI_AGENT_WORKERS=1
+export JARVIS_MINI_AGENT_WORKERS="${JARVIS_MINI_AGENT_WORKERS:-1}"
 export JARVIS_WORKER_STATUS_FILE="$STATUS_FILE"
 # Objective progress is persisted on the phone so an interrupted attempt resumes.
 export JARVIS_OBJECTIVE_JOURNAL_ENABLED="${JARVIS_OBJECTIVE_JOURNAL_ENABLED:-true}"

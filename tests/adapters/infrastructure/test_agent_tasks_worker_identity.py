@@ -1,11 +1,12 @@
 from types import SimpleNamespace
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
-from app.adapters.infrastructure.agent_worker_credentials import AgentWorkerCredentialStore
+from app.adapters.infrastructure.agent_worker_credentials import (
+    AgentWorkerCredentialStore,
+)
 from app.adapters.infrastructure.routers.agent_tasks import create_agent_tasks_router
 from app.application.services.agent_task_queue_service import AgentTaskQueueService
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 def _client(monkeypatch, worker, *, heartbeat_stub):
@@ -521,3 +522,30 @@ def test_worker_heartbeat_cannot_self_assert_a_provider_for_scheduler_eligibilit
 
     assert response.status_code == 200
     assert calls[0]["model_provider"] == "groq"
+
+
+def test_heartbeat_uses_trusted_worker_model_provider_not_server_default(monkeypatch):
+    calls = []
+    worker = SimpleNamespace(
+        agent_id="chatgpt-mini-1",
+        principal_id="worker:chatgpt-mini-1",
+        available_tools=("text_reasoning",),
+        model_provider="chatgpt_plan",
+    )
+
+    def heartbeat_stub(self, **kwargs):
+        calls.append(kwargs)
+        return {"agent_id": kwargs["agent_id"], "status": "available"}
+
+    monkeypatch.setattr(
+        "app.adapters.infrastructure.routers.agent_tasks._configured_worker_model_provider",
+        lambda: "groq",
+    )
+    client = _client(monkeypatch, worker, heartbeat_stub=heartbeat_stub)
+    response = client.post(
+        "/v1/agents/heartbeat",
+        json={"agent_id": "chatgpt-mini-1", "model_provider": "xai"},
+    )
+
+    assert response.status_code == 200
+    assert calls[0]["model_provider"] == "chatgpt_plan"

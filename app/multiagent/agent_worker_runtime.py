@@ -11,7 +11,8 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from app.adapters.infrastructure.agent_worker_credentials import worker_token_env_name
 
@@ -37,32 +38,36 @@ def run_worker_loop(
         raise ValueError("error backoff bounds are invalid")
 
     backoff = min_error_backoff_seconds
-    while not stop_event.is_set():
-        try:
-            result = worker.run_once()
-            backoff = min_error_backoff_seconds
-            if result is None:
-                stop_event.wait(idle_interval_seconds)
-            else:
-                logger.info(
-                    "Agent worker finished task %s with status %s",
-                    result.get("task_id"),
-                    result.get("status"),
-                )
-        except Exception as exc:  # noqa: BLE001 - supervision boundary
-            if on_error is not None:
-                on_error(exc)
-            else:
-                logger.exception(
-                    "Agent worker iteration failed; retrying with backoff "
-                    "(worker_id=%s, exception_type=%s, backoff_seconds=%.1f)",
-                    getattr(worker, "agent_id", "unknown"),
-                    type(exc).__name__,
-                    backoff,
-                )
-            stop_event.wait(backoff)
-            backoff = min(max_error_backoff_seconds, backoff * 2)
-
+    try:
+        while not stop_event.is_set():
+            try:
+                result = worker.run_once()
+                backoff = min_error_backoff_seconds
+                if result is None:
+                    stop_event.wait(idle_interval_seconds)
+                else:
+                    logger.info(
+                        "Agent worker finished task %s with status %s",
+                        result.get("task_id"),
+                        result.get("status"),
+                    )
+            except Exception as exc:  # noqa: BLE001 - supervision boundary
+                if on_error is not None:
+                    on_error(exc)
+                else:
+                    logger.exception(
+                        "Agent worker iteration failed; retrying with backoff "
+                        "(worker_id=%s, exception_type=%s, backoff_seconds=%.1f)",
+                        getattr(worker, "agent_id", "unknown"),
+                        type(exc).__name__,
+                        backoff,
+                    )
+                stop_event.wait(backoff)
+                backoff = min(max_error_backoff_seconds, backoff * 2)
+    finally:
+        close_worker = getattr(worker, "close", None)
+        if callable(close_worker):
+            close_worker()
 
 DEFAULT_WORKER_SLOTS = 1
 MAX_WORKER_SLOTS = 8
@@ -167,24 +172,16 @@ def start_configured_worker() -> tuple[WorkerGroup, threading.Event] | None:
             for name in os.environ
         )
     )
-    has_api_caller = bool(
-        os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
-        or (
-            os.getenv("JARVIS_TASK_QUEUE_USERNAME", "").strip()
-            and os.getenv("JARVIS_TASK_QUEUE_PASSWORD", "").strip()
-        )
-    )
+    # Queue routes authenticate each agent with its dedicated worker token; a
+    # separate user JWT is not required for either remote or local inference.
     has_worker_api = bool(
         os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip()
         and all(worker_tokens.values())
-        and has_api_caller
     )
     if worker_token_configured and not has_worker_api:
         missing = []
         if not os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip():
             missing.append("JARVIS_TASK_QUEUE_API_URL")
-        if not has_api_caller:
-            missing.append("JARVIS_TASK_QUEUE_API_TOKEN or username/password caller identity")
         if not all(worker_tokens.values()):
             missing.append("one dedicated worker token per agent slot")
         raise RuntimeError(
@@ -216,9 +213,6 @@ def start_configured_worker() -> tuple[WorkerGroup, threading.Event] | None:
         # Log presence only, never values, to diagnose incomplete deployment config.
         required = (
             "JARVIS_TASK_QUEUE_API_URL",
-            "JARVIS_TASK_QUEUE_API_TOKEN",
-            "JARVIS_TASK_QUEUE_USERNAME",
-            "JARVIS_TASK_QUEUE_PASSWORD",
             "JARVIS_TASK_QUEUE_WORKER_TOKEN",
             "FREELLMAPI_API_KEY",
         )
