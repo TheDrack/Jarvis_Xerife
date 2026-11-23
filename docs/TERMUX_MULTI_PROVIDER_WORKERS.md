@@ -68,3 +68,33 @@ The current worker uses an OpenAI-compatible Chat Completions client. Supported 
 The Android ChatGPT, Claude, Gemini, Qwen and Grok apps are not themselves local inference servers. Their app sessions do not supply developer API keys. Claude's Messages API is not compatible with this Chat Completions client and requires a dedicated adapter. ChatGPT plan usage through Sign in with ChatGPT is limited to eligible paid plans; it is not available to a Free account. See [Sign in with ChatGPT](https://developers.openai.com/siwc/quickstart).
 
 All worker slots currently advertise only `text_reasoning`. Provider selection does not grant repository, GitHub, shell, browser or production tools. The Android accessibility bridge is a separate, user-enabled route for controlled UI interaction; it must be running before any consumer-app UI adapter can be validated.
+
+## Optional Android consumer-app sessions
+
+A worker can use an already-authenticated consumer app session as its local text model. This does not convert the subscription into an API key and does not replace API providers. It drives the visible Android app through the Jarvis AccessibilityService and is available only to a worker running on that same Android device.
+
+Supported provider IDs are `android_app:chatgpt`, `android_app:claude`, `android_app:gemini`, `android_app:grok` and `android_app:qwen`. Before enabling one:
+
+1. Enable **Jarvis Accessibility** in Android Settings → Accessibility → Installed apps. The service must expose the authenticated loopback `/healthz` endpoint.
+2. Run `python scripts/check_multiagent_env.py`; it must report `android_accessibility_bridge` in the inference group.
+3. Bind the trusted provider to the existing server-side agent record without rotating its token:
+
+   ```bash
+   python scripts/manage_agent_worker_credentials.py set-provider \
+     --agent-id jarvis-termux-mini-1 \
+     --model-provider android_app:claude
+   ```
+
+4. Add the per-agent settings to the Termux worker environment and restart it:
+
+   ```bash
+   JARVIS_AGENT_REMOTE_INFERENCE_JARVIS_TERMUX_MINI_1=false
+   JARVIS_AGENT_MODEL_PROVIDER_JARVIS_TERMUX_MINI_1=android_app:claude
+   jarvis-worker restart
+   ```
+
+5. Run one controlled text-only smoke test and verify the result in the objective journal before using the provider for recurring work.
+
+The adapter allows only the five installed package IDs, refuses login/password screens and unknown editable fields, requires an accessible send control, serializes all app sessions with a worker-process-wide lock, and never grants shell, browser, repository, or production tools. Only one foreground app conversation can execute at a time. If the service is disabled, the selected app is signed out, or its UI changes, inference fails closed and the queue attempt is released; the worker does not silently claim a fabricated answer.
+
+Do not switch the active production Termux worker from its API provider until the Android service is enabled and the real device smoke test passes. API-backed providers remain the default and fallback route.

@@ -20,6 +20,7 @@ from starlette.routing import Mount, Route
 from app.adapters.edge.android_accessibility_client import (
     accessibility_request,
     build_accessibility_action,
+    build_accessibility_app_launch,
 )
 from app.adapters.edge.android_host_status import (
     android_battery_status as read_battery_status,
@@ -34,12 +35,14 @@ from app.adapters.edge.android_mcp_observability import MetadataObservabilityMid
 from app.adapters.edge.android_network_mcp_tools import register_android_network_tools
 from app.adapters.edge.chatgpt_plan_mcp_tools import register_chatgpt_plan_tools
 from app.adapters.edge.communication_mcp_tools import register_communication_tools
-from app.adapters.edge.protocol_pattern_mcp_tools import register_protocol_pattern_tools
-from app.adapters.edge.prospecting_demand_mcp_tools import register_prospecting_demand_tools
-from app.adapters.edge.prospecting_mcp_tools import (
-    register_prospecting_tools,
-    register_prospecting_outreach_tools,
+from app.adapters.edge.prospecting_demand_mcp_tools import (
+    register_prospecting_demand_tools,
 )
+from app.adapters.edge.prospecting_mcp_tools import (
+    register_prospecting_outreach_tools,
+    register_prospecting_tools,
+)
+from app.adapters.edge.protocol_pattern_mcp_tools import register_protocol_pattern_tools
 from app.adapters.infrastructure.termux_shell_mcp_tools import (
     register_termux_shell_tools,
 )
@@ -81,6 +84,13 @@ def android_wifi_status() -> dict:
 def android_accessibility_status() -> dict:
     """Check whether the native Android accessibility service and local bridge are reachable."""
     return accessibility_request("/healthz")
+
+
+@mcp.tool()
+def android_accessibility_launch_llm_app(app_id: str) -> dict:
+    """Open one installed, allowlisted LLM app (ChatGPT, Claude, Gemini, Grok or Qwen)."""
+    payload = build_accessibility_app_launch(app_id)
+    return accessibility_request("/v1/apps/launch", payload)
 
 
 @mcp.tool()

@@ -52,7 +52,8 @@ A inspeção documental e a busca de símbolos na `main` identificaram component
 | Roteamento cognitivo | `app/domain/gears/cognitive_router.py`, pipeline `jarvis_chat.yml` | Auditar escopo: roteamento de conversa não equivale a ciclo cognitivo contínuo |
 | Memória | `memory_manager.py`, `working_memory`, `vector_memory_adapter.py`, `procedural_memory_adapter.py`, `memory_consolidation_service.py` | Verificar semântica, persistência, recuperação, consolidação, proveniência, retenção e testes comportamentais |
 | Inteligência e observações | `intelligence_core.py`, contratos e adaptadores documentados em `jarvis-universal-intelligence.md` | Reutilizar ingestão e síntese; semântica de entidade/track e correlação temporal continuam incrementais |
-| Raciocínio/reflexão | `thought_log_service.py`, `meta_reflection.py`, `technical_analysis_service.py` | Verificar se produzem hipóteses ligadas a evidências, contraditório e calibração, não apenas logs ou chamadas LLM |
+| Raciocínio/reflexão | `thought_log_service.py`, `meta_reflection.py`, `technical_analysis_service.py`, `llm_router.py`, runtimes provider-neutral e adaptadores de API | Verificar se produzem hipóteses ligadas a evidências, contraditório e calibração, não apenas logs ou chamadas LLM; preservar seleção de modelo por agente |
+| LLMs locais do Android | `android_accessibility_client.py`, `JarvisAccessibilityService.kt`, `android_app_model_runtime.py`, `model_runtime_factory.py` | Usar sessões autenticadas dos apps instalados somente no worker local, com lock de UI, allowlist, isolamento de ferramentas e validação de resposta; APIs oficiais continuam preferidas |
 | Planejamento | `strategist_service.py`, `app/multiagent/execution_plan.py`, `TaskRunner`, diário declarativo | Reutilizar execução declarativa; confirmar se há objetivos persistentes, dependências e replanejamento |
 | Coordenação/execução | Scheduler, fila, workers, Universal Toolbox e política de execução | Completar gaps operacionais multi-runtime e verificação de efeitos |
 | Iniciativa | `assistant_proactivity.py`, `assistant_curiosity.py`, `curiosity_engine.py`, workers recorrentes | Verificar gatilhos, frequência, deduplicação, utilidade e controles; não confundir sugestão em chat com iniciativa contínua |
@@ -96,6 +97,9 @@ A busca de código é um inventário preliminar. Nenhum item desta tabela está 
 - Integrar observações da Universal Intelligence, OSINT, inventário de rede e fontes do ambiente por adaptadores, sem tornar mapas ou dashboards a fonte canônica.
 - Começar com PostgreSQL/Supabase e índices relacionais/JSONB; avaliar banco de grafos somente após medir consultas e escala reais.
 - Expor consultas de entidade, vizinhança, histórico, proveniência e alterações.
+
+### Primeiro critério verificável
+- **`C1-WORLD-MODEL`**: observações normalizadas da Universal Intelligence são convertidas em nós de grafo com identidade determinística, proveniência, fonte, instante observado e confiança; a persistência por escopo é idempotente e consultável.
 
 ### Aceitação
 - Observações repetidas são idempotentes.

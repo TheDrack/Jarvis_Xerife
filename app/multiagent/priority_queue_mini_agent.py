@@ -13,7 +13,10 @@ import httpx
 from app.adapters.infrastructure.agent_worker_credentials import worker_token_env_name
 
 from .freellmapi_client import FreeLLMAPIClient, configured_provider_id
-from .model_runtime_factory import create_registered_model_handler
+from .model_runtime_factory import (
+    create_registered_android_app_handler,
+    create_registered_model_handler,
+)
 from .remote_inference_client import RemoteInferenceHandler
 from .transport import AgentMessage
 from .worker_env import worker_env_value
@@ -114,10 +117,14 @@ class PriorityQueueMiniAgent:
                 ),
             )
         else:
-            handler = create_registered_model_handler(
-                FreeLLMAPIClient.from_env(agent_id=agent_id),
-                provider_id=provider_id or configured_provider_id(agent_id),
-            )
+            provider_id = provider_id or configured_provider_id(agent_id)
+            if provider_id.startswith("android_app:"):
+                handler = create_registered_android_app_handler(provider_id=provider_id)
+            else:
+                handler = create_registered_model_handler(
+                    FreeLLMAPIClient.from_env(agent_id=agent_id),
+                    provider_id=provider_id,
+                )
         return cls(
             api_base_url=api_base_url,
             api_token=api_token,

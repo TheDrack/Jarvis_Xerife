@@ -224,3 +224,47 @@ def test_android_network_snapshot_filter_requires_package_names_array(monkeypatc
 
     assert result["flow_count"] == 1
     assert result["flows"] == [{"package_names": ["com.example.chat"]}]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"action": "click_index", "index": 4},
+        {"action": "set_text_index", "index": 3, "text": "Prompt completo"},
+    ],
+)
+def test_accessibility_index_actions_accept_bounded_node_references(payload):
+    assert android_mcp.validate_accessibility_action(payload) == payload
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"action": "click_index", "index": -1},
+        {"action": "click_index", "index": True},
+        {"action": "set_text_index", "index": 0, "text": "x" * 12001},
+        {"action": "set_text_index", "index": 0, "text": "x", "extra": True},
+    ],
+)
+def test_accessibility_index_actions_reject_invalid_node_references(payload):
+    with pytest.raises(ValueError):
+        android_mcp.validate_accessibility_action(payload)
+
+
+def test_accessibility_app_launch_only_accepts_installed_llm_allowlist():
+    assert android_mcp.build_accessibility_app_launch("claude") == {
+        "package_name": "com.anthropic.claude"
+    }
+    with pytest.raises(ValueError, match="allowlist"):
+        android_mcp.build_accessibility_app_launch("settings")
+
+
+def test_android_mcp_registers_allowlisted_llm_app_launcher():
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[3]
+        / "app" / "adapters" / "edge" / "jarvis_android_mcp.py"
+    ).read_text(encoding="utf-8")
+    assert "def android_accessibility_launch_llm_app" in source
+    assert "build_accessibility_app_launch(app_id)" in source

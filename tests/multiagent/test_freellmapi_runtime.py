@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import httpx
 import pytest
-
-from app.adapters.infrastructure.freellmapi_model_runtime import FreeLLMAPIModelRuntimeAdapter
+from app.adapters.infrastructure.freellmapi_model_runtime import (
+    FreeLLMAPIModelRuntimeAdapter,
+)
 from app.application.ports.model_runtime import (
     ModelInvocationRequest,
     ModelInvocationResult,
@@ -11,9 +12,13 @@ from app.application.ports.model_runtime import (
     ModelRuntimeError,
     ModelUsage,
 )
-from app.multiagent.freellmapi_client import FreeLLMAPIClient, FreeLLMAPIError, configured_provider_id
-from app.multiagent.model_runtime_factory import create_registered_model_handler
+from app.multiagent.freellmapi_client import (
+    FreeLLMAPIClient,
+    FreeLLMAPIError,
+    configured_provider_id,
+)
 from app.multiagent.freellmapi_handler import FreeLLMAgentHandler
+from app.multiagent.model_runtime_factory import create_registered_model_handler
 from app.multiagent.transport import AgentMessage
 
 
@@ -369,3 +374,18 @@ def test_configured_provider_id_detects_fallback_provider(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "groq-key")
     monkeypatch.setenv("VENICE_API_KEY", "venice-key")
     assert configured_provider_id() == "groq"
+
+
+def test_registered_android_app_handler_uses_provider_neutral_local_runtime():
+    from app.adapters.infrastructure.android_app_model_runtime import (
+        AndroidAppLLMRuntimeAdapter,
+    )
+    from app.multiagent.model_runtime_factory import (
+        create_registered_android_app_handler,
+    )
+
+    handler = create_registered_android_app_handler(provider_id="android_app:claude")
+
+    assert isinstance(handler.runtime, AndroidAppLLMRuntimeAdapter)
+    assert handler.runtime.provider_id == "android_app:claude"
+    assert handler.engine == "android_app:claude"

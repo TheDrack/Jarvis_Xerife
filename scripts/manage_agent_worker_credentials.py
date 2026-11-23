@@ -58,6 +58,15 @@ def _parser() -> argparse.ArgumentParser:
     issue.add_argument("--expires-hours", type=int, default=720)
     issue.add_argument("--model-provider", choices=sorted(SUPPORTED_WORKER_MODEL_PROVIDERS))
 
+    set_provider = commands.add_parser(
+        "set-provider", help="change one agent's trusted provider without rotating its token"
+    )
+    set_provider.add_argument("--agent-id", required=True)
+    set_provider.add_argument(
+        "--model-provider", required=True,
+        choices=sorted(SUPPORTED_WORKER_MODEL_PROVIDERS),
+    )
+
     revoke = commands.add_parser("revoke", help="revoke all active credentials for one agent")
     revoke.add_argument("--agent-id", required=True)
     return parser
@@ -86,6 +95,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Credential issued. Store this value in {worker_token_env_name(args.agent_id)}:")
             print(token)
             print("This token is shown only once. Reissuing revokes the previous active token.")
+            return 0
+
+        if args.command == "set-provider":
+            store.set_model_provider(args.agent_id, args.model_provider)
+            print(
+                f"Updated trusted model provider for agent {args.agent_id} "
+                "without rotating its worker credential."
+            )
             return 0
 
         revoked = store.revoke_agent(args.agent_id)

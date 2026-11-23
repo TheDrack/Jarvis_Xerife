@@ -2,6 +2,12 @@ name: 🚀 JARVIS Integrated Evolution
 
 on:
   workflow_dispatch:
+    inputs:
+      run_once:
+        description: "Executar uma única missão elegível, sem habilitar evolução contínua."
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: "0 * * * *"
 
@@ -16,18 +22,26 @@ jobs:
       contents: read
     outputs:
       enabled: ${{ steps.check.outputs.enabled }}
+      evolution_enabled: ${{ steps.check.outputs.evolution_enabled }}
     steps:
-      - name: Verificar EVOLUTION_ENABLED
+      - name: Verificar habilitação contínua ou execução manual única
         id: check
         env:
           EVOLUTION_ENABLED: ${{ vars.EVOLUTION_ENABLED }}
+          MANUAL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.run_once }}
         run: |
-          if [ "${EVOLUTION_ENABLED}" = "true" ]; then
+          if [ "${EVOLUTION_ENABLED}" = "true" ] || [ "${MANUAL_RUN}" = "true" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
-            echo "✅ Auto-evolução habilitada."
+            echo "evolution_enabled=true" >> "$GITHUB_OUTPUT"
+            if [ "${EVOLUTION_ENABLED}" = "true" ]; then
+              echo "✅ Auto-evolução contínua habilitada."
+            else
+              echo "🟡 Execução manual única autorizada; a flag global continua desligada."
+            fi
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "⏸️ Auto-evolução pausada (EVOLUTION_ENABLED != true)."
+            echo "evolution_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "⏸️ Auto-evolução pausada; habilite EVOLUTION_ENABLED ou marque run_once no dispatch."
           fi
 
   evolution_cycle:
@@ -61,7 +75,7 @@ jobs:
       - name: 🧠 Orquestrador e identificação de missão
         id: flow
         env:
-          EVOLUTION_ENABLED: ${{ vars.EVOLUTION_ENABLED }}
+          EVOLUTION_ENABLED: ${{ needs.gate.outputs.evolution_enabled }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
           uv venv --clear --python 3.11
@@ -132,7 +146,7 @@ jobs:
         if: steps.flow.outputs.action == 'evolve'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          EVOLUTION_ENABLED: ${{ vars.EVOLUTION_ENABLED }}
+          EVOLUTION_ENABLED: ${{ needs.gate.outputs.evolution_enabled }}
           EVOLUTION_SANDBOX_IMAGE: jarvis-evolution-sandbox:ci
           EVOLUTION_ARTIFACT_DIR: ${{ runner.temp }}/jarvis-evolution-artifacts
           CAP_ID: ${{ steps.flow.outputs.cap_id }}

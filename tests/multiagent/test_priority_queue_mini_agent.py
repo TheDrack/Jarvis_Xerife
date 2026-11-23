@@ -478,3 +478,57 @@ def test_generic_vendor_provider_rejects_auto_model(monkeypatch):
 
     with pytest.raises(FreeLLMAPIError, match="requires FREELLMAPI_API_KEY"):
         FreeLLMAPIClient.from_env()
+
+
+def test_from_env_binds_android_app_runtime_per_agent_without_api_credentials(monkeypatch):
+    from app.adapters.infrastructure.android_app_model_runtime import (
+        AndroidAppLLMRuntimeAdapter,
+    )
+
+    agent_id = "jarvis-termux-mini-1"
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_URL", "https://jarvis.example")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_JARVIS_TERMUX_MINI_1", "worker-token")
+    monkeypatch.setenv("JARVIS_AGENT_REMOTE_INFERENCE_JARVIS_TERMUX_MINI_1", "false")
+    monkeypatch.setenv("JARVIS_AGENT_MODEL_PROVIDER_JARVIS_TERMUX_MINI_1", "android_app:claude")
+    for key in ("FREELLMAPI_API_KEY", "GROQ_API_KEY", "VENICE_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(
+        "app.multiagent.priority_queue_mini_agent.FreeLLMAPIClient.from_env",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("app runtime must not require API credentials")),
+    )
+
+    worker = PriorityQueueMiniAgent.from_env(agent_id=agent_id)
+
+    assert worker.remote_inference is False
+    assert isinstance(worker.handler.runtime, AndroidAppLLMRuntimeAdapter)
+    assert worker.handler.runtime.provider_id == "android_app:claude"
+
+
+def test_android_app_worker_heartbeat_reports_its_configured_provider(monkeypatch):
+    import json
+
+    calls = []
+    agent_id = "jarvis-termux-mini-1"
+    monkeypatch.setenv("JARVIS_AGENT_MODEL_PROVIDER_JARVIS_TERMUX_MINI_1", "android_app:claude")
+
+    def transport(request):
+        body = json.loads(request.content)
+        calls.append((request.url.path, body))
+        if request.url.path.endswith("/heartbeat"):
+            return httpx.Response(200, json={"status": "available"})
+        if request.url.path.endswith("/claim-next"):
+            return httpx.Response(200, json={"task": None})
+        raise AssertionError(request.url.path)
+
+    client = httpx.Client(transport=httpx.MockTransport(transport))
+    worker = PriorityQueueMiniAgent(
+        api_base_url="https://jarvis.example", worker_token="worker-token",
+        agent_id=agent_id, handler=FakeHandler(), client=client,
+    )
+    try:
+        assert worker.run_once() is None
+    finally:
+        client.close()
+
+    heartbeat = next(body for path, body in calls if path.endswith("/heartbeat"))
+    assert heartbeat["model_provider"] == "android_app:claude"

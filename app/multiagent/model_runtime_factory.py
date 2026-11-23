@@ -68,6 +68,47 @@ def create_registered_model_handler(
     )
 
 
+def create_registered_android_app_handler(
+    *,
+    provider_id: str,
+    max_tokens: int = 1200,
+    temperature: float = 0.2,
+    accessibility=None,
+) -> FreeLLMAgentHandler:
+    """Bind one installed Android LLM app to a local text-only mini-agent."""
+    if not isinstance(provider_id, str) or not provider_id.startswith("android_app:"):
+        raise ValueError("provider_id must use the android_app:<app-id> form")
+    from app.adapters.infrastructure.android_app_model_runtime import (
+        ANDROID_LLM_APPS,
+        AndroidAppLLMRuntimeAdapter,
+    )
+
+    app_id = provider_id.partition(":")[2].strip().lower()
+    if app_id not in ANDROID_LLM_APPS:
+        raise ValueError("provider_id references an unsupported Android LLM app")
+    kwargs = {"accessibility": accessibility} if accessibility is not None else {}
+    adapter = AndroidAppLLMRuntimeAdapter(app_id, **kwargs)
+    profile = ModelProfile(
+        model_id=adapter.model_id,
+        provider_id=adapter.provider_id,
+        runtime_kind="android_accessibility_ui",
+        capabilities=frozenset({"chat", "text_reasoning"}),
+        modalities=frozenset({"text"}),
+        max_concurrency=1,
+        trust_level="user_session",
+        metadata={"authentication": "installed_app_session", "execution": "local_device_only"},
+    )
+    profiles = ModelRegistry((profile,))
+    bindings = ModelRuntimeBindings({adapter.provider_id: adapter})
+    selected = profiles.get(adapter.model_id)
+    if selected is None:
+        raise RuntimeError("Android LLM app profile was not registered")
+    runtime = bindings.resolve(selected)
+    return FreeLLMAgentHandler(
+        runtime, max_tokens=max_tokens, temperature=temperature, engine=adapter.provider_id
+    )
+
+
 def create_registered_chatgpt_plan_runtime(
     oauth: ChatGPTPlanOAuthPort,
     *,

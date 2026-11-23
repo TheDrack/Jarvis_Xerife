@@ -19,6 +19,14 @@ ACCESSIBILITY_URL = os.environ.get(
 ACCESSIBILITY_TOKEN_FILE = Path.home() / ".config/jarvis/accessibility/token"
 ACCESSIBILITY_TIMEOUT = 10
 ACCESSIBILITY_MAX_RESPONSE = 2 * 1024 * 1024
+ANDROID_LLM_APPS = {
+    "chatgpt": "com.openai.chatgpt",
+    "claude": "com.anthropic.claude",
+    "gemini": "com.google.android.apps.bard",
+    "grok": "ai.x.grok",
+    "qwen": "ai.qwenlm.chat.android",
+}
+ANDROID_LLM_APP_PACKAGES = frozenset(ANDROID_LLM_APPS.values())
 
 
 def accessibility_token() -> str:
@@ -62,6 +70,8 @@ def validate_accessibility_action(payload: dict[str, Any]) -> dict[str, Any]:
         "click_text": {"text"},
         "click_view_id": {"view_id"},
         "set_text": {"view_id", "text"},
+        "click_index": {"index"},
+        "set_text_index": {"index", "text"},
     }
     if action not in schemas:
         raise ValueError("Unsupported Android accessibility action.")
@@ -80,6 +90,14 @@ def validate_accessibility_action(payload: dict[str, Any]) -> dict[str, Any]:
         value = payload.get(field)
         if not isinstance(value, str) or not value.strip() or len(value) > 500:
             raise ValueError(f"{field} must be a non-empty string of at most 500 characters.")
+    elif action in {"click_index", "set_text_index"}:
+        index = payload.get("index")
+        if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < 300:
+            raise ValueError("index must be an integer between 0 and 299.")
+        if action == "set_text_index":
+            value = payload.get("text")
+            if not isinstance(value, str) or len(value) > 12000:
+                raise ValueError("text must be a string of at most 12000 characters.")
     elif action == "set_text":
         view_id, value = payload.get("view_id"), payload.get("text")
         if not isinstance(view_id, str) or not view_id.strip() or len(view_id) > 300:
@@ -95,6 +113,12 @@ def build_accessibility_action(action: str, parameters: dict[str, Any] | None = 
     if parameters and "action" in parameters:
         raise ValueError("Action parameters cannot override the selected action.")
     return validate_accessibility_action({"action": action, **(parameters or {})})
+
+
+def build_accessibility_app_launch(app_id: str) -> dict[str, str]:
+    if not isinstance(app_id, str) or app_id.strip().lower() not in ANDROID_LLM_APPS:
+        raise ValueError("Android LLM app is not in the installed-app allowlist.")
+    return {"package_name": ANDROID_LLM_APPS[app_id.strip().lower()]}
 
 
 def _coordinates(payload: dict[str, Any], fields: tuple[str, ...]) -> None:

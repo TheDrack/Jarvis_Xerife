@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from app.application.security.repository_path_policy import (
     UnsafeRepositoryPath,
@@ -64,7 +64,7 @@ class RoadmapMissionSelector:
 
     def _repository_file(
         self, relative_path: str, *, label: str
-    ) -> Tuple[Path, str]:
+    ) -> tuple[Path, str]:
         try:
             path, normalized, resolved_relative = resolve_repository_path(
                 self.repository_root, relative_path, reject_symlinks=True
@@ -79,7 +79,7 @@ class RoadmapMissionSelector:
         return path, normalized
 
     @staticmethod
-    def _required_text(mission: Dict[str, Any], field: str) -> str:
+    def _required_text(mission: dict[str, Any], field: str) -> str:
         value = mission.get(field)
         if (
             not isinstance(value, str)
@@ -111,7 +111,7 @@ class RoadmapMissionSelector:
         }
         return identifiers
 
-    def _load_status_evidence(self, roadmap_content: str) -> Dict[str, Dict[str, Any]]:
+    def _load_status_evidence(self, roadmap_content: str) -> dict[str, dict[str, Any]]:
         """Load the machine-readable completion evidence ledger from STATUS.md."""
         status_file, _ = self._repository_file(_STATUS_PATH, label="cognitive_status")
         try:
@@ -144,7 +144,7 @@ class RoadmapMissionSelector:
         ):
             raise RoadmapManifestError("cognitive_status_evidence_schema_invalid")
 
-        records: Dict[str, Dict[str, Any]] = {}
+        records: dict[str, dict[str, Any]] = {}
         for entry in payload["criteria"]:
             if not isinstance(entry, dict):
                 raise RoadmapManifestError("cognitive_status_criterion_invalid")
@@ -164,7 +164,7 @@ class RoadmapMissionSelector:
             if not isinstance(evidence, dict):
                 raise RoadmapManifestError("cognitive_status_evidence_invalid")
 
-            normalized_evidence: Dict[str, Any] = {
+            normalized_evidence: dict[str, Any] = {
                 "commit_url": None,
                 "check_urls": [],
                 "implementation_paths": [],
@@ -192,7 +192,7 @@ class RoadmapMissionSelector:
                     values = evidence.get(field)
                     if not isinstance(values, list) or not values:
                         raise RoadmapManifestError("cognitive_status_evidence_incomplete")
-                    normalized_paths: List[str] = []
+                    normalized_paths: list[str] = []
                     for relative_path in values:
                         if (
                             not isinstance(relative_path, str)
@@ -230,10 +230,10 @@ class RoadmapMissionSelector:
         return records
 
     @staticmethod
-    def _roadmap_criteria_by_phase(content: str) -> Dict[int, List[str]]:
+    def _roadmap_criteria_by_phase(content: str) -> dict[int, list[str]]:
         """Extract machine-readable acceptance criterion IDs from each phase."""
         lines = content.splitlines()
-        criteria_by_phase: Dict[int, List[str]] = {}
+        criteria_by_phase: dict[int, list[str]] = {}
         for index, heading in enumerate(lines):
             if not heading.startswith("## "):
                 continue
@@ -280,7 +280,7 @@ class RoadmapMissionSelector:
         roadmap_lines: set[str],
         roadmap_content: str,
         capability_ids: set[str],
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if not isinstance(mission, dict):
             raise RoadmapManifestError("mission_entry_must_be_object")
 
@@ -340,7 +340,7 @@ class RoadmapMissionSelector:
         tests = mission.get("tests")
         if not isinstance(tests, list) or not tests:
             raise RoadmapManifestError("mission_tests_required")
-        normalized_tests: List[str] = []
+        normalized_tests: list[str] = []
         for test_file in tests:
             if not isinstance(test_file, str) or not test_file.startswith("tests/"):
                 raise RoadmapManifestError("mission_test_path_invalid")
@@ -383,7 +383,52 @@ class RoadmapMissionSelector:
             "depends_on": dependencies,
         }
 
-    def find_next_mission(self) -> Optional[Dict[str, Any]]:
+    def get_progress(self) -> dict[str, Any]:
+        """Return roadmap progress from the evidence ledger, never legacy status names."""
+        roadmap_file, _ = self._repository_file(
+            self.roadmap_path, label="cognitive_roadmap"
+        )
+        if self.roadmap_path != _ROADMAP_PATH:
+            raise RoadmapManifestError("roadmap_path_must_be_canonical")
+        try:
+            roadmap_content = roadmap_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise RoadmapManifestError("cognitive_roadmap_unreadable") from exc
+
+        evidence = self._load_status_evidence(roadmap_content)
+        criteria_by_phase = self._roadmap_criteria_by_phase(roadmap_content)
+        phase_progress: dict[str, dict[str, int]] = {}
+        ordered_criteria: list[str] = []
+        for phase_number, criterion_ids in sorted(criteria_by_phase.items()):
+            counts = {"total": len(criterion_ids), "verified": 0, "pending": 0, "blocked": 0}
+            for criterion_id in criterion_ids:
+                state = evidence[criterion_id]["state"]
+                counts[state] += 1
+                ordered_criteria.append(criterion_id)
+            phase_progress[f"C{phase_number}"] = counts
+
+        completed = sum(item["state"] == "verified" for item in evidence.values())
+        pending = sum(item["state"] == "pending" for item in evidence.values())
+        blocked = sum(item["state"] == "blocked" for item in evidence.values())
+        total = len(ordered_criteria)
+        next_mission = self.find_next_mission()
+        return {
+            "total_criteria": total,
+            "completed_criteria": completed,
+            "pending_criteria": pending,
+            "blocked_criteria": blocked,
+            "completion_rate": completed / total if total else 0.0,
+            "criteria": [
+                {"criterion_id": criterion_id, "state": evidence[criterion_id]["state"]}
+                for criterion_id in ordered_criteria
+            ],
+            "phase_progress": phase_progress,
+            "next_mission": next_mission,
+            "hold_reason": None if next_mission else self.hold_reason,
+            "status": "ready" if next_mission else "blocked",
+        }
+
+    def find_next_mission(self) -> Optional[dict[str, Any]]:
         """Return the highest-priority eligible mission, or None for a safe no-op."""
         manifest_file, _ = self._repository_file(
             self.manifest_path, label="roadmap_mission_manifest"
@@ -436,7 +481,7 @@ class RoadmapMissionSelector:
         for mission in validated:
             phase_number = int(mission["phase"][1:])
             if phase_number > 0:
-                required_prior_criteria: List[str] = []
+                required_prior_criteria: list[str] = []
                 for prior_phase in range(phase_number):
                     prior_criteria = criteria_by_phase.get(prior_phase, [])
                     if not prior_criteria:
@@ -452,7 +497,7 @@ class RoadmapMissionSelector:
                     )
 
             for dependency in mission["depends_on"]:
-                if dependency not in by_id:
+                if dependency not in by_id and dependency not in status_evidence:
                     raise RoadmapManifestError("roadmap_manifest_unknown_dependency")
 
             if mission["status"] == "complete":
@@ -471,7 +516,14 @@ class RoadmapMissionSelector:
             for mission in validated
             if mission["status"] == "ready"
             and mission["risk"] == "low"
-            and all(by_id[dep]["status"] == "complete" for dep in mission["depends_on"])
+            and all(
+                (
+                    by_id[dependency]["status"] == "complete"
+                    if dependency in by_id
+                    else status_evidence[dependency]["state"] == "verified"
+                )
+                for dependency in mission["depends_on"]
+            )
         ]
         if not eligible:
             return None

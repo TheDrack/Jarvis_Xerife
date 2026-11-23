@@ -163,6 +163,16 @@ def _is_enabled(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def android_accessibility_ready() -> bool:
+    """Verify the authenticated local Android accessibility bridge, without exposing its token."""
+    try:
+        from app.adapters.edge.android_accessibility_client import accessibility_request
+
+        return accessibility_request("/healthz").get("status") == "ready"
+    except Exception:
+        return False
+
+
 def inference_group() -> tuple[dict[str, str], list[str]]:
     """Resolve one real inference route for every configured worker slot."""
     configured: dict[str, str] = {}
@@ -184,7 +194,13 @@ def inference_group() -> tuple[dict[str, str], list[str]]:
         groq_key = worker_env_value("GROQ_API_KEY", agent_id).strip()
         venice_key = worker_env_value("VENICE_API_KEY", agent_id).strip()
 
-        if provider in compatible_providers:
+        if provider.startswith("android_app:"):
+            from app.adapters.edge.android_accessibility_client import ANDROID_LLM_APPS
+
+            app_id = provider.partition(":")[2]
+            ready = app_id in ANDROID_LLM_APPS and android_accessibility_ready()
+            resolved_provider = provider
+        elif provider in compatible_providers:
             ready = bool(api_key and base_url and model and model.lower() != "auto")
             resolved_provider = provider
         elif provider == "groq":
@@ -232,6 +248,8 @@ def main() -> int:
     )
     if inference_by_agent and any(value == "server_remote" for value in inference_by_agent.values()):
         inference_credentials.append("server_remote_inference")
+    if inference_by_agent and any(value.startswith("android_app:") for value in inference_by_agent.values()):
+        inference_credentials.append("android_accessibility_bridge")
     inference_credentials = sorted(set(inference_credentials))
 
     all_queue_variables = _queue_variable_names()
@@ -262,7 +280,7 @@ def main() -> int:
         blockers.append(
             "no valid inference route configured for agent(s): "
             + ", ".join(missing_inference_agents)
-            + "; configure server-side inference or the provider API key/base URL/model required by each agent"
+            + "; configure server-side inference, provider API credentials, or enable the authenticated Android AccessibilityService for android_app providers"
         )
     report["blockers"] = blockers
     report["verdict"] = "ready" if not blockers else "blocked"
@@ -286,6 +304,7 @@ def main() -> int:
         "The Supabase service-role path is a legacy fallback and does not bind a request to an individual worker credential.",
         "Worker queue routes authenticate with the per-agent worker token; a separate user JWT is not required.",
         "Remote inference relies on server-side provider configuration, which this local checker does not validate.",
+        "Android app inference requires an enabled, paired local AccessibilityService and a visible, authenticated consumer app session.",
         "A ready verdict means every configured agent has a server-side or local inference route; it does not prove the queue migrations "
         "are applied to the target database or that a worker is currently heartbeating.",
         "Tasks requiring repository, shell, browser or production-diagnostic tools cannot be claimed "

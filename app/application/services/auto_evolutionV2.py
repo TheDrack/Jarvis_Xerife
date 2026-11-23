@@ -1,101 +1,102 @@
-from app.core.nexus import nexus, NexusComponent
-from app.utils.document_store import document_store
-from pathlib import Path
-from typing import List, Dict, Optional
 import logging
 import os
+from pathlib import Path
+from typing import Optional
+
+from app.application.services.roadmap_mission_selector import RoadmapMissionSelector
+from app.core.nexus import NexusComponent, nexus
+from app.utils.document_store import document_store
+
 logger = logging.getLogger(__name__)
 
 class AutoEvolutionServiceV2(NexusComponent):
     """
-    Versão Evoluída: Migração de Roadmap Markdown para Inventário de Capacidades .JRVS.
-    Localização: data/capabilities.jrvs
+    Serviço de compatibilidade para execução do Cognitive Roadmap.
+    A seleção e a conclusão são governadas por RoadmapMissionSelector e docs/STATUS.md.
+    data/capabilities.json permanece apenas como catálogo legado de IDs/telemetria.
     """
 
-    def __init__(self, capabilities_path: str = "data/capabilities.jrvs") -> None:
+    def __init__(
+        self,
+        capabilities_path: str = "data/capabilities.jrvs",
+        mission_selector: Optional[RoadmapMissionSelector] = None,
+    ) -> None:
         super().__init__()
-        # Define o caminho relativo ao root do projeto
         self.capabilities_path = Path(capabilities_path)
+        self.mission_selector = mission_selector or RoadmapMissionSelector()
 
-    def execute(self, context: Optional[Dict] = None) -> Dict:
-        """
-        Despacha ações baseadas em context["action"]:
-          "status"      → get_success_metrics()
-          "find_next"   → find_next_mission()
-          "evolve_next" | "evolve_cap" → evolve uma cap pelo evolution_orchestrator
-        """
-        if not context:
-            context = {}
-
+    def execute(self, context: Optional[dict] = None) -> dict:
+        """Expose evidence-based status, selection and explicitly gated proposal creation."""
+        context = context or {}
         action = context.get("action", "status")
 
         try:
             if action == "status":
-                metrics = self.get_success_metrics()
-                return {"success": True, "action": action, "metrics": metrics}
+                return {"success": True, "action": action, "metrics": self.get_success_metrics()}
 
             if action == "find_next":
                 mission = self.find_next_mission()
-                return {"success": True, "action": action, "mission": mission}
+                return {
+                    "success": True,
+                    "action": action,
+                    "mission": mission,
+                    "hold_reason": None if mission else self.mission_selector.hold_reason,
+                }
 
             if action in ("evolve_next", "evolve_cap"):
-                # Fail closed: status/discovery remain available while mutation is paused.
                 if os.environ.get("EVOLUTION_ENABLED", "").strip().lower() != "true":
                     return {
                         "success": False,
                         "action": action,
                         "reason": "evolution_paused",
-                        "error": "Autoevolução pausada: defina EVOLUTION_ENABLED=true explicitamente após concluir a revisão de segurança.",
+                        "error": "Autoevolução pausada: a geração só pode ser habilitada após a revisão do roadmap.",
                     }
 
-                cap_id = context.get("cap_id")
-                if not cap_id:
-                    mission = self.find_next_mission()
-                    if not mission:
-                        return {"success": False, "error": "Nenhuma cap pendente encontrada."}
-                    cap_id = mission["id"]
-                else:
-                    mission = next(
-                        (
-                            c
-                            for c in self._load_data().get("capabilities", [])
-                            if c.get("id") == cap_id
-                        ),
-                        None,
-                    )
-                    if mission is None:
-                        return {
-                            "success": False,
-                            "error": f"Capability {cap_id} não encontrada no inventário.",
-                            "cap_id": cap_id,
-                        }
+                mission = self.find_next_mission()
+                if mission is None:
+                    return {
+                        "success": False,
+                        "action": action,
+                        "reason": "no_eligible_roadmap_mission",
+                        "hold_reason": self.mission_selector.hold_reason,
+                    }
 
-                roadmap_context = context.get("roadmap_context") or self.get_roadmap_context(mission)
+                requested_cap_id = context.get("cap_id")
+                if requested_cap_id and requested_cap_id != mission["id"]:
+                    return {
+                        "success": False,
+                        "action": action,
+                        "reason": "requested_capability_not_eligible_roadmap_mission",
+                        "requested_cap_id": requested_cap_id,
+                        "eligible_cap_id": mission["id"],
+                        "criterion_id": mission["criterion_id"],
+                    }
+
+                roadmap_context = context.get("roadmap_context") or mission["roadmap_context"]
                 max_attempts = context.get("max_attempts", 3)
-                return self._evolve_capability(cap_id, mission, roadmap_context, max_attempts)
+                return self._evolve_capability(
+                    mission["id"],
+                    mission,
+                    roadmap_context,
+                    max_attempts,
+                    mission_id=mission["criterion_id"],
+                )
 
             return {"success": False, "error": f"Ação desconhecida: {action!r}"}
-
         except Exception as exc:
             logger.error("[AutoEvolutionV2] execute() falhou: %s", exc)
             return {"success": False, "error": str(exc)}
 
     def _evolve_capability(
-        self, cap_id: str, mission: Optional[Dict], roadmap_context: str, max_attempts: int = 3
-    ) -> Dict:
-        """Evolui uma capability através do EvolutionOrchestrator (via Nexus).
-
-        O antigo motor ``scripts/evolution_mutator.py`` foi removido do projeto;
-        o caminho vivo de mutação é o ``EvolutionOrchestrator``, que gera o patch
-        via MetabolismCore, valida a sintaxe, salva a proposta em
-        ``data/evolution_proposals/`` e abre o PR pelo GitHubWorker.
-
-        Args:
-            cap_id: identificador da capability-alvo (ex.: ``CAP-042``).
-            mission: metadados da capability (título/notas) ou ``None``.
-            roadmap_context: contexto textual já montado para o LLM.
-            max_attempts: número máximo de ciclos de evolução tentados.
-        """
+        self,
+        cap_id: str,
+        mission: Optional[dict],
+        roadmap_context: str,
+        max_attempts: int = 3,
+        *,
+        mission_id: Optional[str] = None,
+    ) -> dict:
+        """Create a bounded proposal for the selected roadmap criterion."""
         try:
             orchestrator = nexus.resolve("evolution_orchestrator")
         except Exception as exc:
@@ -109,26 +110,35 @@ class AutoEvolutionServiceV2(NexusComponent):
                 "cap_id": cap_id,
             }
 
+        selected = mission or {}
+        payload = {
+            "cap_id": cap_id,
+            "cap_title": selected.get("title", ""),
+            "mission_id": mission_id or selected.get("criterion_id") or cap_id,
+            "criterion_id": selected.get("criterion_id"),
+            "roadmap_context": roadmap_context,
+            "target_file": selected.get("target_file"),
+            "tests": selected.get("tests", []),
+            "expected_result": selected.get("expected_result", ""),
+            "risk": selected.get("risk", "low"),
+        }
         attempts = max(1, int(max_attempts or 1))
-        last_result: Dict = {}
+        last_result: dict = {}
         for attempt in range(1, attempts + 1):
-            last_result = orchestrator.execute(
-                {
-                    "cap_id": cap_id,
-                    "cap_title": (mission or {}).get("title", ""),
-                    "mission_id": cap_id,
-                    "roadmap_context": roadmap_context,
-                }
-            ) or {}
+            last_result = orchestrator.execute(payload) or {}
             if last_result.get("success"):
+                pr_url = last_result.get("pr_url") or last_result.get("pull_request_url")
                 return {
                     "success": True,
-                    "evolved": cap_id,
+                    "status": "pr_created" if pr_url else "proposal_created",
+                    "criterion_id": payload["mission_id"],
+                    "legacy_capability_id": cap_id,
+                    "pr_url": pr_url,
                     "attempts": attempt,
                     "result": last_result,
                 }
             logger.warning(
-                "[AutoEvolutionV2] Tentativa %d/%d de evoluir %s falhou: %s",
+                "[AutoEvolutionV2] Tentativa %d/%d de propor %s falhou: %s",
                 attempt,
                 attempts,
                 cap_id,
@@ -137,7 +147,7 @@ class AutoEvolutionServiceV2(NexusComponent):
 
         return {
             "success": False,
-            "error": f"Evolução de {cap_id} falhou após {attempts} tentativas.",
+            "error": f"Proposta para {cap_id} falhou após {attempts} tentativas.",
             "cap_id": cap_id,
             "last_result": last_result,
         }
@@ -162,7 +172,7 @@ class AutoEvolutionServiceV2(NexusComponent):
                 return alt
         return path
 
-    def _load_data(self) -> Dict:
+    def _load_data(self) -> dict:
         """Carrega o inventário de capacidades."""
         path = self._resolved_path()
         if not path.exists():
@@ -172,83 +182,74 @@ class AutoEvolutionServiceV2(NexusComponent):
         except Exception:
             return {"capabilities": []}
 
-    def _save_data(self, data: Dict):
+    def _save_data(self, data: dict):
         """Persiste as atualizações no inventário (mesmo formato lido)."""
         document_store.write(self._resolved_path(), data)
 
-    def get_success_metrics(self) -> Dict:
-        """Calcula métricas reais baseadas nos itens de capacidade."""
+    def get_success_metrics(self) -> dict:
+        """Return roadmap completion from verified STATUS evidence, not legacy labels."""
+        progress = self.mission_selector.get_progress()
         data = self._load_data()
-        caps = data.get("capabilities", [])
-        total = len(caps)
-        completed = len([c for c in caps if c.get("status") == "complete"])
-
+        capabilities = data.get("capabilities", []) if isinstance(data, dict) else []
+        legacy_total = len(capabilities) if isinstance(capabilities, list) else 0
+        legacy_complete = (
+            sum(item.get("status") == "complete" for item in capabilities if isinstance(item, dict))
+            if isinstance(capabilities, list)
+            else 0
+        )
         return {
-            "missions_completed": completed,
-            "total_missions": total,
-            "evolution_rate": round(completed / total, 4) if total > 0 else 0.0,
-            "status": "operational" if total > 0 else "empty_inventory"
+            "missions_completed": progress["completed_criteria"],
+            "total_missions": progress["total_criteria"],
+            "evolution_rate": round(progress["completion_rate"], 4),
+            "status": progress["status"],
+            "roadmap": progress,
+            "legacy_inventory": {
+                "total_capabilities": legacy_total,
+                "status_complete_count": legacy_complete,
+                "is_completion_evidence": False,
+            },
         }
 
-    def find_next_mission(self) -> Optional[Dict]:
-        """
-        Algoritmo de seleção baseado em Dependências e Prioridade.
-        """
-        data = self._load_data()
-        caps = data.get("capabilities", [])
-        completed_ids = {c["id"] for c in caps if c.get("status") == "complete"}
+    def find_next_mission(self) -> Optional[dict]:
+        """Select only a reviewed mission from the Cognitive Roadmap manifest."""
+        selected = self.mission_selector.find_next_mission()
+        if selected is None:
+            return None
+        return {
+            "mission": selected,
+            "id": selected["legacy_capability_id"],
+            "title": selected["title"],
+            "description": selected["objective"],
+            "notes": selected["expected_result"],
+            "status": selected["status"],
+            "priority": selected["priority"],
+            "depends_on": selected["depends_on"],
+            "criterion_id": selected["criterion_id"],
+            "mission_id": selected["criterion_id"],
+            "target_file": selected["target_file"],
+            "tests": selected["tests"],
+            "expected_result": selected["expected_result"],
+            "risk": selected["risk"],
+            "roadmap_context": selected["roadmap_context"],
+        }
 
-        pending = [c for c in caps if c.get("status") != "complete"]
-        # Prioridade 1 vem antes de 2
-        pending.sort(key=lambda x: x.get("priority", 99))
-
-        for cap in pending:
-            deps = cap.get("depends_on", [])
-            if not deps or all(d in completed_ids for d in deps):
-                # Retornamos o objeto completo para o contexto
-                return {
-                    "mission": cap,
-                    "id": cap.get("id"),
-                    "title": cap.get("title"),
-                    "description": cap.get("description", ""),
-                    "notes": cap.get("notes", "N/A"),
-                    "priority": cap.get("priority", 3)
-                }
-        return None
-
-    def get_roadmap_context(self, mission_data: Dict) -> str:
-        """
-        Transforma os dados da missão em texto para a IA.
-        Soluciona o erro: 'AutoEvolutionServiceV2' object has no attribute 'get_roadmap_context'
-        """
+    def get_roadmap_context(self, mission_data: dict) -> str:
+        """Prefer the selector's validated context; never reconstruct from legacy labels."""
         if not mission_data:
-            return "No mission context available"
-        
-        # Extrai a missão do dicionário retornado pelo find_next_mission
-        cap = mission_data.get('mission', mission_data)
-        
-        return (
-            f"IDENTIFICADOR: {cap.get('id')}\n"
-            f"CAPACIDADE: {cap.get('title')}\n"
-            f"DESCRIÇÃO: {cap.get('description')}\n"
-            f"DEPENDÊNCIAS: {', '.join(cap.get('depends_on', []))}\n"
-            f"NOTAS/CAPÍTULO: {cap.get('notes', 'N/A')}\n"
-            f"STATUS: {cap.get('status', 'pending')}"
-        )
+            return "No eligible roadmap mission."
+        if isinstance(mission_data.get("roadmap_context"), str):
+            return mission_data["roadmap_context"]
+        selected = mission_data.get("mission", mission_data)
+        return str(selected.get("objective") or selected.get("expected_result") or "")
 
     def mark_mission_as_completed(self, cap_id: str) -> bool:
-        """Atualiza o status no JSON usando o ID único."""
-        data = self._load_data()
-        found = False
-        for cap in data.get("capabilities", []):
-            if cap.get("id") == cap_id:
-                cap["status"] = "complete"
-                found = True
-                break
-
-        if found:
-            self._save_data(data)
-        return found
+        """Legacy status labels cannot complete a roadmap criterion without evidence."""
+        logger.warning(
+            "[AutoEvolutionV2] Ignorando conclusão legada de %s; atualize docs/STATUS.md "
+            "com commit, CI, implementação, consumidor e testes verificados.",
+            cap_id,
+        )
+        return False
 
     def is_auto_evolution_pr(self, title: str) -> bool:
         """Detecta se um PR/Commit é parte do nosso ciclo de evolução."""

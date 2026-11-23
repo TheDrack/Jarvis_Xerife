@@ -26,6 +26,7 @@
         <package android:name="com.google.android.apps.bard" />
         <package android:name="ai.x.grok" />
         <package android:name="ai.qwenlm.chat.android" />
+        <package android:name="ai.qwenlm.chat.android" />
         <package android:name="com.whatsapp" />
         <package android:name="com.Slack" />
         <package android:name="com.discord" />

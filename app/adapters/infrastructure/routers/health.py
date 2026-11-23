@@ -3,15 +3,17 @@
 """Health check router: /health, /v1/health/detail e /warmup endpoints."""
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
+
 from fastapi import APIRouter, Depends
+
 from app.core.config import settings
 from app.core.nexus import nexus
 
 logger = logging.getLogger(__name__)
 
 # Tabelas protegidas por RLS (Row Level Security) no PostgreSQL
-RLS_PROTECTED_TABLES: List[str] = [
+RLS_PROTECTED_TABLES: list[str] = [
     "jarvis_capabilities",
     "evolution_rewards",
     "users",
@@ -36,7 +38,7 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
     # /health — Health check básico (público, usado pelo Render)
     # ------------------------------------------------------------------
     @router.get("/health")
-    async def health_check() -> Dict[str, Any]:
+    async def health_check() -> dict[str, Any]:
         """
         Health check endpoint validando conectividade do banco e status do Nexus.
         Retorna HTTP 200 mesmo em modo degradado para evitar restarts desnecessários.
@@ -45,7 +47,7 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
             JSON com status, informações do banco e status de segurança (RLS).
         """
         start_ts = time.monotonic()
-        response: Dict[str, Any] = {
+        response: dict[str, Any] = {
             "status": "healthy",
             "version": settings.version,
             "database": {"connected": False, "type": "unknown"},
@@ -87,8 +89,8 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
                 )
                 with Session(db_adapter.engine) as session:
                     results = session.exec(rls_query).fetchall()
-                    tables_with_rls: List[str] = []
-                    tables_without_rls: List[str] = []
+                    tables_with_rls: list[str] = []
+                    tables_without_rls: list[str] = []
                     for row in results:
                         table_name = row[1]
                         rls_enabled = row[2]
@@ -122,10 +124,10 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
     # ------------------------------------------------------------------
     # /v1/health/detail — Health check detalhado (protegido por autenticação)
     # ------------------------------------------------------------------
-    _auth_deps: List[Any] = [Depends(get_current_user)] if get_current_user else []
+    _auth_deps: list[Any] = [Depends(get_current_user)] if get_current_user else []
 
     @router.get("/v1/health/detail", dependencies=_auth_deps)
-    async def health_detail() -> Dict[str, Any]:
+    async def health_detail() -> dict[str, Any]:
         """
         Endpoint de health detalhado cobrindo todos os subsistemas do JARVIS.
         Cada seção usa fallback gracioso: se o componente não está disponível,
@@ -144,7 +146,7 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
         """
         from app.core.nexus import nexus
 
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
 
         # Nexus section -------------------------------------------------------
         try:
@@ -164,6 +166,9 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
                 "evolution_rate": metrics.get("evolution_rate", 0.0),
                 "missions_completed": metrics.get("missions_completed", 0),
                 "total_missions": metrics.get("total_missions", 0),
+                "status": metrics.get("status", "unknown"),
+                "roadmap": metrics.get("roadmap", {}),
+                "legacy_inventory": metrics.get("legacy_inventory", {}),
             }
         except Exception as exc:
             logger.warning("[health/detail] evolution: %s", exc)
@@ -202,14 +207,16 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
 
         # Gatekeeper section --------------------------------------------------
         try:
-            from pathlib import Path as _Path
             import json as _json
+            from pathlib import Path as _Path
 
             rejections_file = _Path("data/gatekeeper_rejections.jsonl")
             total_rejections = 0
             rejections_7d = 0
             if rejections_file.exists():
-                from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+                from datetime import datetime as _dt
+                from datetime import timedelta as _td
+                from datetime import timezone as _tz
 
                 cutoff = (_dt.now(tz=_tz.utc) - _td(days=7)).timestamp()
                 for line in rejections_file.read_text(encoding="utf-8").splitlines():
@@ -251,7 +258,7 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
     # /warmup — Endpoint para prevenir spin-down no Render
     # ------------------------------------------------------------------
     @router.get("/warmup")
-    async def warmup() -> Dict[str, Any]:
+    async def warmup() -> dict[str, Any]:
         """
         Endpoint de warmup para prevenir spin-down no Render.
         
@@ -269,7 +276,7 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
             JSON com status, componentes resolvidos e tempo de resposta.
         """
         start_ts = time.monotonic()
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "status": "warm",
             "timestamp": time.time(),
             "response_time_ms": 0.0,
