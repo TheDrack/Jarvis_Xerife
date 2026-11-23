@@ -32,6 +32,14 @@ def _find_bash_executable():
 BASH = _find_bash_executable()
 
 
+def _bash_path(path):
+    value = str(path)
+    if os.name != "nt":
+        return value
+    drive, tail = os.path.splitdrive(value)
+    return f"/{drive.rstrip(':').lower()}{tail.replace('\\', '/')}"
+
+
 class TermuxObjectivePersistenceWiringTests(unittest.TestCase):
     def test_service_enables_local_objective_journal_by_default(self):
         source = SERVICE_RUN.read_text(encoding="utf-8")
@@ -113,16 +121,16 @@ class TermuxWorkerAutostartTests(unittest.TestCase):
             fake_sv.write_text(
                 "#!/bin/sh\n"
                 "command=$1\n"
-                f"if [ -e '{service}/down' ]; then state=down; else state=up; fi\n"
-                f"printf '%s:%s\n' \"$command\" \"$state\" >> '{marker}'\n"
+                f"if [ -e '{_bash_path(service)}/down' ]; then state=down; else state=up; fi\n"
+                f"printf '%s:%s\n' \"$command\" \"$state\" >> '{_bash_path(marker)}'\n"
                 "exit 0\n",
                 encoding="utf-8",
             )
             fake_sv.chmod(0o755)
             env = dict(os.environ)
-            env.update({"HOME": str(home), "PREFIX": str(prefix)})
+            env.update({"HOME": _bash_path(home), "PREFIX": _bash_path(prefix)})
             result = subprocess.run(
-                [BASH, str(CONTROL), command],
+                [BASH, _bash_path(CONTROL), command],
                 env=env,
                 capture_output=True,
                 text=True,
@@ -192,14 +200,14 @@ class TermuxWorkerAutostartTests(unittest.TestCase):
             env = dict(os.environ)
             env.update(
                 {
-                    "HOME": str(home),
-                    "PREFIX": str(prefix),
-                    "JARVIS_REPO_ROOT": str(repo),
-                    "JARVIS_WORKER_ENV_FILE": str(config),
+                    "HOME": _bash_path(home),
+                    "PREFIX": _bash_path(prefix),
+                    "JARVIS_REPO_ROOT": _bash_path(repo),
+                    "JARVIS_WORKER_ENV_FILE": _bash_path(config),
                 }
             )
             result = subprocess.run(
-                [BASH, str(SERVICE_RUN)],
+                [BASH, _bash_path(SERVICE_RUN)],
                 env=env,
                 capture_output=True,
                 text=True,
