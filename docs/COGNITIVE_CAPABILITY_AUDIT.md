@@ -22,7 +22,7 @@ Jarvis is not missing all of the cognitive components. It has several useful sub
 
 The strongest live path is the Termux worker's authenticated queue connection and remote LLM inference. It is healthy, but it advertises only `text_reasoning`. The two real tasks waiting in Supabase require repository, GitHub, and production-read capabilities, so neither is eligible for that worker.
 
-The roadmap is separately blocked: the mission manifest is empty, all C0 evidence-ledger criteria remain pending, and the latest scheduled evolution run was paused because `EVOLUTION_ENABLED` was empty. Consequently, the scheduled workflow skipped both isolated generation and privileged publication.
+The main-branch roadmap remains gated: `docs/STATUS.md` on `main` still marks the three C0 criteria pending. PR #881 records the merged PR #880 implementation and its three green checks, and marks C0 verified only on that PR branch. In the same branch, C1-WORLD-MODEL is pending but its auto-evolution mission is blocked/high until canonical identity, confidence semantics, and durable PostgreSQL/Supabase graph persistence are specified and reviewed. `EVOLUTION_ENABLED` remains unset, so scheduled generation and privileged publication stay paused.
 
 ## Capability map
 
@@ -85,7 +85,7 @@ The UI adapter serializes all requests through one worker-process-wide lock, lau
 ## Recorded gaps and implementation order
 
 1. **C0 — capability map and evidence ledger:** keep implementation, consumer, test, CI, and runtime evidence separate. Do not infer completion from legacy capability statuses.
-2. **C1 — World Model observation bridge:** map normalized `IntelligenceObservation` records to stable graph nodes, preserve source/provenance/time/confidence, and persist idempotently through `GraphStore`. This is the first bounded roadmap mission.
+2. **C1 — World Model observation bridge:** define canonical identity/alias and confidence contracts, then project normalized `IntelligenceObservation` records into a durable, scope-isolated graph store. The existing SQLite adapter and exact provider-snapshot dedup do not yet satisfy cross-source identity or cloud persistence; C1 remains pending until this boundary is reviewed.
 3. **C2 — Perception:** make the recurring collection path observable and verify source health, deduplication, and history persistence.
 4. **C3 — Cognitive Memory:** connect episodic observations and task outcomes to semantic consolidation, with provenance, retention, and retrieval tests.
 5. **C4 — Reasoning:** connect the shared LLM router to production consumers and require evidence/contradiction-aware outputs where appropriate.
@@ -99,11 +99,11 @@ The UI adapter serializes all requests through one worker-process-wide lock, lau
 - `C0-GAPS-RECORDED`: the disconnected call paths, inactive services, missing tools, and roadmap gate are listed explicitly above.
 - `C0-NO-NAME-BASED-COMPLETION`: all classifications are based on callers, tests, workflow evidence, and observed runtime state. A module or legacy capability label alone never establishes completion.
 
-The machine-readable ledger in `docs/STATUS.md` remains authoritative for completion. PR #880 was merged as `9ad37374465c25a40f9bf3ceb51fa9889622aae9`; the three C0 criteria now carry verified commit, CI, implementation, consumer and test evidence. `C1-WORLD-MODEL` is consequently eligible for execution.
+The machine-readable ledger in `docs/STATUS.md` remains authoritative. The C0 evidence references merged PR #880 commit `9ad37374465c25a40f9bf3ceb51fa9889622aae9` and its three green Actions runs. PR #881 records the evidence and marks the three C0 criteria verified on its branch; `main` remains pending until PR #881 merges. C1-WORLD-MODEL remains the next pending criterion, but its mission is blocked/high until identity, confidence and durable graph-storage contracts are reviewed.
 
 ## Roadmap execution gate update
 
-The machine-readable mission manifest contains the first bounded C1 task, `C1-WORLD-MODEL`, with an existing implementation target and regression tests. The selector accepts prior-phase dependencies directly from the evidence ledger, so C1 does not need placeholder C0 code-generation missions. After PR #880 merged and its commit/check/consumer/test evidence was recorded, all three C0 criteria became `verified`; `find_next_mission()` now selects C1 without another selector change.
+The machine-readable mission manifest contains `C1-WORLD-MODEL`, but PR #881 marks it `blocked/high` until canonical identity, confidence semantics and durable PostgreSQL/Supabase graph persistence are reviewed. The selector therefore returns no mission even after C0 evidence is accepted. This is intentional: the current single `target_file` does not cover the cross-layer contract, graph adapter, migration, worker integration and regression tests required by C1. The C0 evidence is recorded in PR #881's branch; `main` remains pending until that PR merges.
 
 ## C0 evidence closure — 2026-11-23
 
