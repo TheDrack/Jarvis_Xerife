@@ -2,7 +2,9 @@
 
 - **Status:** Proposed — requer revisão arquitetural; não aceito nem implementado
 - **Data:** 2026-11-24
-- **Depende de:** ADR-002, ADR-004 e C1-WORLD-MODEL
+- **Depende de:** ADR-002 e ADR-004
+- **Pré-requisito do roadmap:** C0-CAPABILITY-MAP, C0-GAPS-RECORDED e C0-NO-NAME-BASED-COMPLETION (verified em `docs/STATUS.md`)
+- **Critério-alvo:** C1-WORLD-MODEL
 - **Escopo:** primeiro incremento verificável da Fase 1 do Cognitive Roadmap
 
 ## 1. Contexto e estado comprovado
@@ -142,8 +144,9 @@ O critério C1-WORLD-MODEL só pode ser registrado como concluído quando o test
 
 - Nenhuma migração, segredo, flag ou serviço de produção é alterado por este ADR.
 - Implementação inicial deve usar fixtures e PostgreSQL descartável.
-- A divergência do ledger de migrações remoto/local registrada na issue #732 precisa ser reconciliada antes de qualquer operação remota.
-- Os grants efetivos das tabelas ADR-004 ainda precisam de auditoria read-only; RLS habilitado não prova privilégio correto.
+- **Reconciliação de versões/nomes (auditoria read-only 2026-11-24):** os 31 arquivos SQL locais correspondem exatamente às 31 entradas retornadas pelo ledger remoto, incluindo `20261103184307_20261103100304_intelligence_history.sql`. A issue #732 permanece aberta: a correspondência de versão/nome não comprova comparação completa de schema, validação descartável, Supabase Preview nem plano de rollback. Nenhuma migração foi aplicada ou reparada nesta execução.
+- **Auditoria read-only de privilégios (2026-11-24):** as duas tabelas ADR-004 têm RLS habilitado e nenhuma policy em `pg_policies`; `service_role` possui somente SELECT/INSERT; `anon`, `authenticated` e `PUBLIC` não possuem privilégios. `UPDATE`, `DELETE` e `TRUNCATE` estão negados para os roles verificados.
+- **Evidência operacional (2026-11-24):** `intelligence_event_snapshots`, `intelligence_observation_snapshots` e `jarvis_intelligence_worker_runs` têm zero linhas; o registro singleton de lease está sem `worker_id` e `lease_expires_at`. O schema e os grants estão comprovados, mas não há evidência de ciclo recorrente ou ingestão real no momento.
 - Qualquer flag C1 deve nascer desabilitada e só ser ativada após revisão, CI, teste de integração e evidência operacional.
 - Não habilitar captura contínua de câmeras/RTSP como parte do C1. Câmeras entram depois como fontes de IntelligenceObservation, respeitando consentimento, origem, limites e orçamento.
 
@@ -154,7 +157,7 @@ O critério C1-WORLD-MODEL só pode ser registrado como concluído quando o test
 3. Qual política versionada atribui confiabilidade às fontes e como scores probabilísticos serão calibrados?
 4. A projeção atual será uma tabela rebuildable, view ou materialized view? Quais consultas precisam ser atendidas no primeiro slice?
 5. Como retenção, exclusão por solicitação e dados sensíveis se aplicam à projeção sem violar a trilha de evidências?
-6. Qual reconciliação da migração ADR-004 será aceita para o ambiente de preview?
+6. Como validar em ambiente descartável/preview a reconciliação de versões já alinhada, incluindo comparação de schema, Supabase Preview e rollback?
 
 ## 9. Próximo incremento após aceitação
 
