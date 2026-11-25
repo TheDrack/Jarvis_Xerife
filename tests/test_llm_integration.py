@@ -115,12 +115,19 @@ class TestLLMCommandInterpreter(NexusComponent):
         assert intent.parameters.get("text") == "teste"
     
     def test_synchronous_interpret_uses_fallback(self, interpreter):
-        """Test that synchronous interpret uses fallback"""
+        """Test that synchronous interpret falls back on an empty gateway response."""
+        # The default AsyncMock return value is itself an AsyncMock. The parser
+        # treats that as a response object and calls its async .get() mock
+        # without awaiting it, producing an unawaited-coroutine warning.
+        # A real gateway returns a plain mapping, so model that boundary here.
+        interpreter.ai_gateway.generate_completion.return_value = {}
+
         intent = interpreter.interpret("xerife escreva hello")
-        
-        # Should use fallback (keyword-based)
+
+        # The empty gateway response must preserve the keyword fallback.
         assert intent.command_type == CommandType.TYPE_TEXT
         assert intent.parameters.get("text") == "hello"
+        interpreter.ai_gateway.generate_completion.assert_awaited_once()
     
     def test_is_exit_command(self, interpreter):
         """Test exit command detection"""
