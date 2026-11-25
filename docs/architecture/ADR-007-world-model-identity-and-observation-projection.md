@@ -96,6 +96,8 @@ Invariantes obrigatórias:
 - Índices iniciais cobrem (scope_id, entity_id, observed_at DESC) e lookup de identidade por escopo/namespace/hash. Índices adicionais dependem de EXPLAIN ANALYZE com volume representativo.
 - Conteúdo sensível segue SensitivityPolicy e o armazenamento sensível existente. CPF em texto claro, tokens e segredos não entram no grafo geral.
 - Todas as tabelas têm RLS e grants explícitos. O cliente é server-side; não usar anon/authenticated nem fallback para cliente público. Como service_role pode ignorar RLS, os grants SQL continuam sendo a fronteira efetiva.
+- Cada escrita da projeção precisa identificar `projector_id` e `projector_version` imutáveis e usar chaves de idempotência determinísticas nas relações, afirmações e eventos. A chave deve incluir escopo, snapshot de origem, versão do projetor e identidade/hash da saída conforme o tipo de registro.
+- Reexecutar o mesmo snapshot com a mesma versão do projetor não pode duplicar links, afirmações nem `world_change_events`. Uma nova versão do projetor representa uma revisão distinta, que precisa ser reconstruída/validada e promovida deliberadamente; não pode sobrescrever silenciosamente a projeção ativa nem duplicar eventos visíveis.
 
 world_entities pode ser atualizado somente pela transação/RPC controlada do adapter de projeção. A trilha de evidências permanece append-only. A projeção deve poder ser descartada e reconstruída sem perder informação.
 
@@ -129,6 +131,7 @@ Executar contra PostgreSQL descartável, sem DDL no Supabase de produção:
 10. Replay integral das evidências: mesma projeção e mesmos IDs.
 11. Falha após persistir o histórico e antes da projeção: replay conclui sem duplicação.
 12. Cliente admin ausente ou grants insuficientes: falha fechada, sem fallback público.
+13. Replay do mesmo snapshot e da mesma versão do projetor mantém os mesmos links, afirmações e IDs de change event; uma versão nova gera revisão identificável sem mutar os snapshots de origem.
 
 O critério C1-WORLD-MODEL só pode ser registrado como concluído quando o teste integrado provar consulta por escopo, replay, proveniência, confiança e reconstrução a partir das evidências.
 
@@ -158,6 +161,7 @@ O critério C1-WORLD-MODEL só pode ser registrado como concluído quando o test
 4. A projeção atual será uma tabela rebuildable, view ou materialized view? Quais consultas precisam ser atendidas no primeiro slice?
 5. Como retenção, exclusão por solicitação e dados sensíveis se aplicam à projeção sem violar a trilha de evidências?
 6. Como validar em ambiente descartável/preview a reconciliação de versões já alinhada, incluindo comparação de schema, Supabase Preview e rollback?
+7. Como `projector_id`, `projector_version` e as chaves de idempotência serão persistidos e como uma nova versão será reconstruída, comparada e promovida sem duplicar eventos?
 
 ## 9. Próximo incremento após aceitação
 
