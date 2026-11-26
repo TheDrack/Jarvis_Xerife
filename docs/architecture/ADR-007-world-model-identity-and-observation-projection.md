@@ -163,6 +163,21 @@ O critério C1-WORLD-MODEL só pode ser registrado como concluído quando o test
 6. Como validar em ambiente descartável/preview a reconciliação de versões já alinhada, incluindo comparação de schema, Supabase Preview e rollback?
 7. Como `projector_id`, `projector_version` e as chaves de idempotência serão persistidos e como uma nova versão será reconstruída, comparada e promovida sem duplicar eventos?
 
+8. Qual é a classificação de escopo/visibilidade do snapshot antes da projeção? Hoje `IntelligenceObservation` e `intelligence_observation_snapshots` não carregam `scope_id`, `owner_id` nem classificação de visibilidade; o worker recorrente usa lease singleton e chama o collector sem principal ou escopo. Definir explicitamente quais fontes produzem observações globais compartilháveis e quais são tenant/user/case-scoped, como o escopo é atribuído antes da persistência, e se um snapshot global pode ser ligado a múltiplos escopos. Nunca inferir escopo por `source_id`, `worker_id`, host ou nome da fonte, nem permitir que um snapshot privado seja consultado por outro escopo por meio de um link do World Model.
+
 ## 9. Próximo incremento após aceitação
 
 Depois da revisão deste ADR, implementar primeiro os contratos de domínio e o projetor puro com testes determinísticos. Em seguida, implementar o adapter/migração PostgreSQL e só então conectá-lo ao worker existente. Nenhum desses passos deve marcar C1 como concluído antes do teste integrado e do registro de evidência em docs/STATUS.md.
+
+
+## 10. Revalidação read-only — 2026-11-26
+
+A revalidação foi feita contra `main @ 5359b02505b28751bec4da780bfd3e5951c2f687` e o projeto Supabase ativo, sem DDL/DML, alteração de migration ledger ou escrita de dados.
+
+- **Migrações:** 31 arquivos SQL em `supabase/migrations` e 31 entradas no ledger remoto; pareamento exato `(version, name)` = **31/31**, sem itens locais ou remotos exclusivos. Isso resolve apenas a correspondência de nomes/versões; não fecha a issue #732, pois equivalência schema-a-schema, Supabase Preview e rollback continuam sem evidência suficiente.
+- **Idempotência da origem:** a tabela `intelligence_observation_snapshots` possui a constraint única `(source_id, entity_type, entity_id, observed_at, content_hash)`, correspondente ao `on_conflict` usado pelo adapter atual. A chave não contém escopo, pois a tabela de origem também não tem coluna de escopo.
+- **Privilégios:** RLS habilitado nas duas tabelas de snapshots; nenhuma policy aparece em `pg_policies`. `service_role` possui SELECT/INSERT; `anon`, `authenticated` e `PUBLIC` não aparecem com privilégios nessas tabelas. O owner `postgres` mantém privilégios administrativos. As cinco RPCs do worker de inteligência existem e EXECUTE está concedido a `service_role` e `postgres`.
+- **Runtime:** `intelligence_event_snapshots`, `intelligence_observation_snapshots` e `jarvis_intelligence_worker_runs` continuam com zero linhas. O lease singleton está sem `worker_id` e sem `lease_expires_at`. Portanto, a infraestrutura SQL está presente, mas não há evidência de ciclo recorrente ou ingestão operacional.
+- **Contrato de escopo:** a inspeção de `IntelligenceObservation`, `collect_live_intelligence` e `IntelligenceRecurringWorker` confirma que o contrato não recebe escopo/principal e que o worker executa coleta global sob lease singleton. O projetor não pode inventar `scope_id`; a política de visibilidade e a atribuição do escopo precisam ser definidas na origem ou em um vínculo de escopo explicitamente autorizado antes de habilitar projeção.
+
+A pendência C1 permanece arquitetural: definir a semântica de escopo/visibilidade na origem, além das decisões já listadas na seção 8. Nenhum dado foi escrito e nenhuma capacidade foi marcada como concluída.
